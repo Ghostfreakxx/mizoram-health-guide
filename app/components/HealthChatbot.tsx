@@ -1,172 +1,173 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
+import { OPEN_CHAT_EVENT } from "./openChat";
 
 const quickQuestions = [
   "What are early signs of oral cancer?",
   "How does smoking affect my health?",
   "What are warning signs of diabetes?",
-  "How can I reduce cancer risk?",
-  "What causes high blood pressure?",
-  "How much exercise do adults need?",
-  "What are symptoms of depression?",
   "When should I visit a hospital?",
 ];
 
+type Message = { role: "user" | "bot"; text: string };
+
 export default function HealthChatbot() {
   const [open, setOpen] = useState(false);
-  const [messages, setMessages] = useState([
+  const [loading, setLoading] = useState(false);
+  const [input, setInput] = useState("");
+  const [messages, setMessages] = useState<Message[]>([
     {
       role: "bot",
       text: "Hello. I am the AI Health Guide. I give simple health awareness information. I do not diagnose or prescribe medicine.",
     },
   ]);
-  const [input, setInput] = useState("");
+  const scrollRef = useRef<HTMLDivElement>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
 
-  function getBotReply(question: string) {
-    const q = question.toLowerCase();
+  useEffect(() => {
+    const handler = () => setOpen(true);
+    window.addEventListener(OPEN_CHAT_EVENT, handler);
+    return () => window.removeEventListener(OPEN_CHAT_EVENT, handler);
+  }, []);
 
-    if (q.includes("cancer")) {
-      return "Some early warning signs of cancer can include a wound that does not heal, unusual bleeding, a lump, long-lasting cough, weight loss without reason, or difficulty swallowing. These signs do not always mean cancer, but it is safer to visit a doctor early.";
-    }
+  useEffect(() => {
+    if (open) inputRef.current?.focus();
+  }, [open]);
 
-    if (q.includes("tobacco") || q.includes("oral") || q.includes("smoking")) {
-      return "Tobacco, smoking, and betel nut can increase the risk of mouth cancer, lung disease, and heart problems. If you use them, try to reduce slowly and ask a doctor or counsellor for help.";
-    }
-
-    if (q.includes("diabetes") || q.includes("sugar")) {
-      return "Common signs of diabetes can include frequent urination, too much thirst, tiredness, slow wound healing, blurred vision, and weight changes. A simple blood sugar test can help confirm it.";
-    }
-
-    if (q.includes("doctor") || q.includes("hospital")) {
-      return "Visit a doctor if symptoms continue for more than a few days, become worse, cause severe pain, bleeding, breathing difficulty, chest pain, fainting, or sudden weakness.";
-    }
-
-    return "Thank you for asking. This assistant gives only general awareness. For serious symptoms, please visit a doctor or hospital.";
-  }
+  useEffect(() => {
+    scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight });
+  }, [messages, loading]);
 
   async function sendMessage(text?: string) {
-  const userText = text || input;
-  if (!userText.trim()) return;
+    const userText = (text ?? input).trim();
+    if (!userText || loading) return;
 
-  setInput("");
+    setInput("");
+    setLoading(true);
+    setMessages((prev) => [...prev, { role: "user", text: userText }]);
 
-  setMessages((prev) => [
-    ...prev,
-    { role: "user", text: userText },
-    { role: "bot", text: "Thinking..." },
-  ]);
+    let reply: string;
+    try {
+      const res = await fetch("/api/chat", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ message: userText }),
+      });
+      const data = await res.json();
+      reply = data.reply;
+    } catch {
+      reply = "Sorry, the AI assistant is not working right now.";
+    }
 
-  try {
-    const res = await fetch("/api/chat", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({ message: userText }),
-    });
-
-    const data = await res.json();
-
-    setMessages((prev) => [
-      ...prev.slice(0, -1),
-      { role: "bot", text: data.reply },
-    ]);
-  } catch {
-    setMessages((prev) => [
-      ...prev.slice(0, -1),
-      {
-        role: "bot",
-        text: "Sorry, the AI assistant is not working right now.",
-      },
-    ]);
+    setMessages((prev) => [...prev, { role: "bot", text: reply }]);
+    setLoading(false);
   }
-}
 
   return (
-    <div className="fixed bottom-5 right-5 z-50">
+    <div className="fixed bottom-4 right-4 z-50">
       {open && (
-        <div className="mb-4 w-[360px] max-w-[90vw] rounded-2xl border border-slate-700 bg-slate-950 text-white shadow-2xl">
-          <div className="flex items-center justify-between border-b border-slate-800 p-4">
+        <div
+          role="dialog"
+          aria-label="AI Health Guide"
+          className="mb-3 flex w-[380px] max-w-[calc(100vw-2rem)] flex-col overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-2xl"
+        >
+          <div className="flex items-center justify-between bg-teal-700 px-4 py-3 text-white">
             <div>
-              <h3 className="font-bold">AI Health Guide</h3>
-              <p className="text-xs text-slate-400">
-                Simple health awareness assistant
-              </p>
+              <h2 className="font-bold">AI Health Guide</h2>
+              <p className="text-xs text-teal-100">Simple health awareness assistant</p>
             </div>
-
             <button
+              type="button"
               onClick={() => setOpen(false)}
-              className="rounded-full bg-slate-800 px-3 py-1 text-sm"
+              aria-label="Close chat"
+              className="rounded-full px-2 py-1 text-lg hover:bg-teal-800"
             >
               ✕
             </button>
           </div>
 
-          <div className="h-72 overflow-y-auto p-4 space-y-3 text-sm">
+          <div
+            ref={scrollRef}
+            aria-live="polite"
+            className="h-80 overflow-y-auto bg-slate-50 p-4 space-y-3 text-sm"
+          >
             {messages.map((msg, index) => (
               <div
                 key={index}
-                className={`rounded-xl p-3 leading-relaxed ${
+                className={`whitespace-pre-line rounded-xl px-3 py-2 leading-relaxed ${
                   msg.role === "user"
-                    ? "bg-emerald-400 text-slate-950 ml-8"
-                    : "bg-slate-800 text-slate-200 mr-8"
+                    ? "ml-10 bg-teal-700 text-white"
+                    : "mr-10 border border-slate-200 bg-white text-slate-800"
                 }`}
               >
                 {msg.text}
               </div>
             ))}
+
+            {loading && (
+              <div className="mr-10 rounded-xl border border-slate-200 bg-white px-3 py-2 text-slate-500">
+                Thinking…
+              </div>
+            )}
+
+            {messages.length === 1 && !loading && (
+              <div className="pt-2 space-y-2">
+                <p className="text-xs font-medium text-slate-500">Try asking:</p>
+                {quickQuestions.map((q) => (
+                  <button
+                    key={q}
+                    type="button"
+                    onClick={() => sendMessage(q)}
+                    className="block w-full rounded-lg border border-teal-200 bg-white px-3 py-2 text-left text-teal-800 hover:bg-teal-50"
+                  >
+                    {q}
+                  </button>
+                ))}
+              </div>
+            )}
           </div>
 
-          <div className="px-4 pb-3 grid grid-cols-1 gap-2">
-            {quickQuestions.map((q) => (
-              <button
-                key={q}
-                onClick={() => sendMessage(q)}
-                className="rounded-xl border border-slate-700 bg-slate-900 px-3 py-2 text-left text-xs text-slate-300 hover:bg-slate-800"
-              >
-                {q}
-              </button>
-            ))}
-          </div>
-
-          <div className="border-t border-slate-800 p-3">
+          <form
+            className="border-t border-slate-200 p-3"
+            onSubmit={(e) => {
+              e.preventDefault();
+              sendMessage();
+            }}
+          >
             <div className="flex gap-2">
               <input
-                className="flex-1 rounded-xl bg-slate-900 border border-slate-700 px-3 py-2 text-sm outline-none"
-                placeholder="Ask a health question..."
+                ref={inputRef}
+                aria-label="Your health question"
+                className="flex-1 rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-900 outline-none focus:border-teal-600 focus:ring-2 focus:ring-teal-600/20"
+                placeholder="Ask a health question…"
                 value={input}
                 onChange={(e) => setInput(e.target.value)}
-                onKeyDown={(e) => e.key === "Enter" && sendMessage()}
               />
-
               <button
-                onClick={() => sendMessage()}
-                className="rounded-xl bg-emerald-400 px-4 py-2 text-sm font-bold text-slate-950"
+                type="submit"
+                disabled={loading || !input.trim()}
+                className="rounded-lg bg-teal-700 px-4 py-2 text-sm font-semibold text-white hover:bg-teal-800 disabled:opacity-50"
               >
                 Send
               </button>
             </div>
-
             <p className="mt-2 text-[11px] text-slate-500">
-              For awareness only. Not medical advice.
+              For awareness only. Not medical advice. In an emergency call 108.
             </p>
-          </div>
+          </form>
         </div>
       )}
 
       {!open && (
         <button
+          type="button"
           onClick={() => setOpen(true)}
-          className="rounded-full bg-emerald-400 px-5 py-4 font-bold text-slate-950 shadow-xl"
+          className="rounded-full bg-teal-700 px-5 py-3 font-semibold text-white shadow-lg hover:bg-teal-800"
         >
-          🤖 Ask AI
+          💬 Ask AI
         </button>
       )}
     </div>
   );
-}
-
-function setInput(question: string): void {
-    throw new Error("Function not implemented.");
 }
