@@ -64,16 +64,16 @@ export default function HealthChatbot() {
           aria-label="Health Assistant"
           className="mb-3 flex w-[380px] max-w-[calc(100vw-2rem)] flex-col overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-2xl"
         >
-          <div className="flex items-center justify-between bg-teal-700 px-4 py-3 text-white">
+          <div className="flex items-center justify-between bg-blue-700 px-4 py-3 text-white">
             <div>
               <h2 className="font-bold">Health Assistant</h2>
-              <p className="text-xs text-teal-100">Simple health awareness assistant</p>
+              <p className="text-xs text-blue-100">Simple health awareness assistant</p>
             </div>
             <button
               type="button"
               onClick={() => setOpen(false)}
               aria-label="Close chat"
-              className="rounded-full px-2 py-1 text-lg hover:bg-teal-800"
+              className="rounded-full px-2 py-1 text-lg hover:bg-blue-800"
             >
               ✕
             </button>
@@ -89,7 +89,7 @@ export default function HealthChatbot() {
                 key={index}
                 className={`whitespace-pre-line rounded-xl px-3 py-2 leading-relaxed ${
                   msg.role === "user"
-                    ? "ml-10 bg-teal-700 text-white"
+                    ? "ml-10 bg-blue-700 text-white"
                     : "mr-10 border border-slate-200 bg-white text-slate-800"
                 }`}
               >
@@ -98,7 +98,7 @@ export default function HealthChatbot() {
                   <Link
                     href={msg.link.href}
                     onClick={() => setOpen(false)}
-                    className="mt-2 block font-semibold text-teal-700 hover:underline"
+                    className="mt-2 block font-semibold text-blue-700 hover:underline"
                   >
                     {msg.link.label} →
                   </Link>
@@ -120,7 +120,7 @@ export default function HealthChatbot() {
                     key={q}
                     type="button"
                     onClick={() => sendMessage(q)}
-                    className="block w-full rounded-lg border border-teal-200 bg-white px-3 py-2 text-left text-teal-800 hover:bg-teal-50"
+                    className="block w-full rounded-lg border border-blue-200 bg-white px-3 py-2 text-left text-blue-800 hover:bg-blue-50"
                   >
                     {q}
                   </button>
@@ -140,7 +140,7 @@ export default function HealthChatbot() {
               <input
                 ref={inputRef}
                 aria-label="Your health question"
-                className="flex-1 rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-900 outline-none focus:border-teal-600 focus:ring-2 focus:ring-teal-600/20"
+                className="flex-1 rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-900 outline-none focus:border-blue-600 focus:ring-2 focus:ring-blue-600/20"
                 placeholder="Ask a health question…"
                 maxLength={1000}
                 value={input}
@@ -149,7 +149,7 @@ export default function HealthChatbot() {
               <button
                 type="submit"
                 disabled={loading || !input.trim()}
-                className="rounded-lg bg-teal-700 px-4 py-2 text-sm font-semibold text-white hover:bg-teal-800 disabled:opacity-50"
+                className="rounded-lg bg-blue-700 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-800 disabled:opacity-50"
               >
                 Send
               </button>
@@ -165,7 +165,7 @@ export default function HealthChatbot() {
         <button
           type="button"
           onClick={() => setOpen(true)}
-          className="rounded-full bg-teal-700 px-5 py-3 font-semibold text-white shadow-lg hover:bg-teal-800"
+          className="rounded-full bg-blue-700 px-5 py-3 font-semibold text-white shadow-lg hover:bg-blue-800"
         >
           💬 Ask a question
         </button>

@@ -67,8 +67,8 @@ function riskLevel(score: number) {
     };
   return {
     level: "Low risk",
-    style: "border-teal-200 bg-teal-50 text-teal-950",
-    bar: "bg-teal-600",
+    style: "border-blue-200 bg-blue-50 text-blue-950",
+    bar: "bg-blue-600",
     advice:
       "Your score suggests a low risk right now. Keep it that way with regular activity, balanced food, and fewer sugary drinks. Check again every few years.",
   };
@@ -85,7 +85,7 @@ export default function DiabetesRiskCheck() {
       {questions.map((q, i) => (
         <fieldset key={q.id} className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
           <legend className="sr-only">{q.question}</legend>
-          <p className="text-sm font-semibold text-teal-700">Question {i + 1} of {questions.length}</p>
+          <p className="text-sm font-semibold text-blue-700">Question {i + 1} of {questions.length}</p>
           <p className="mt-1 text-lg font-bold text-slate-900">{q.question}</p>
           {q.help && <p className="mt-1 text-sm text-slate-500">{q.help}</p>}
 
@@ -97,7 +97,7 @@ export default function DiabetesRiskCheck() {
                   key={opt.label}
                   className={`flex cursor-pointer items-center gap-3 rounded-lg border px-4 py-3 transition ${
                     selected
-                      ? "border-teal-600 bg-teal-50 text-teal-900"
+                      ? "border-blue-600 bg-blue-50 text-blue-900"
                       : "border-slate-200 text-slate-700 hover:bg-slate-50"
                   }`}
                 >
@@ -106,7 +106,7 @@ export default function DiabetesRiskCheck() {
                     name={q.id}
                     checked={selected}
                     onChange={() => setAnswers((a) => ({ ...a, [q.id]: opt.points }))}
-                    className="h-4 w-4 accent-teal-700"
+                    className="h-4 w-4 accent-blue-700"
                   />
                   {opt.label}
                 </label>

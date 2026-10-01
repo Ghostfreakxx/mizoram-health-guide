@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import Link from "next/link";
+import PageHeader from "../components/PageHeader";
 
 export const metadata: Metadata = { title: "Hospital & Help Directory" };
 
@@ -12,20 +12,10 @@ const hospitals = [
 export default function HospitalsPage() {
   return (
     <main className="flex-1">
-      <section className="bg-white border-b border-slate-200">
-        <div className="max-w-6xl mx-auto px-4 sm:px-6 py-12">
-          <nav aria-label="Breadcrumb" className="text-sm text-slate-500">
-            <Link href="/" className="hover:text-teal-700">Home</Link>
-          </nav>
-          <h1 className="mt-6 text-4xl md:text-5xl font-bold tracking-tight text-slate-900">
-            Hospital &amp; Help Directory
-          </h1>
-          <p className="mt-5 max-w-3xl text-lg text-slate-600 leading-relaxed">
-            Useful hospital and public health contact information for citizens
-            in Mizoram.
-          </p>
-        </div>
-      </section>
+      <PageHeader
+        title="Hospital & Help Directory"
+        intro="Useful hospital and public health contact information for citizens in Mizoram."
+      />
 
       <section className="max-w-6xl mx-auto px-4 sm:px-6 py-12">
         <div className="rounded-2xl border border-red-200 bg-red-50 p-6 flex flex-col sm:flex-row sm:items-center justify-between gap-4">

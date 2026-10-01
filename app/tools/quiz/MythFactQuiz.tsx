@@ -89,13 +89,13 @@ export default function MythFactQuiz() {
         : "Many people believe these myths. Now you know the facts!";
 
     return (
-      <div aria-live="polite" className="rounded-2xl border border-teal-200 bg-teal-50 p-8 text-center">
-        <p className="text-sm font-semibold uppercase tracking-wide text-teal-700">Your score</p>
-        <p className="mt-2 text-6xl font-bold text-teal-900">
+      <div aria-live="polite" className="rounded-2xl border border-blue-200 bg-blue-50 p-8 text-center">
+        <p className="text-sm font-semibold uppercase tracking-wide text-blue-700">Your score</p>
+        <p className="mt-2 text-6xl font-bold text-blue-900">
           {score}/{questions.length}
         </p>
-        <p className="mt-4 text-lg text-teal-950">{message}</p>
-        <p className="mt-2 text-teal-900/80">
+        <p className="mt-4 text-lg text-blue-950">{message}</p>
+        <p className="mt-2 text-blue-900/80">
           Share the quiz with your family and friends — they may believe some of these myths too.
         </p>
         <div className="mt-6 flex flex-col sm:flex-row justify-center gap-3">
@@ -109,7 +109,7 @@ export default function MythFactQuiz() {
           </button>
         </div>
         <p className="mt-6 text-sm">
-          <Link href="/tools" className="font-semibold text-teal-700 hover:underline">
+          <Link href="/tools" className="font-semibold text-blue-700 hover:underline">
             Try another self-check tool →
           </Link>
         </p>
@@ -130,7 +130,7 @@ export default function MythFactQuiz() {
       </div>
       <div className="mt-3 h-2 rounded-full bg-slate-100" aria-hidden>
         <div
-          className="h-2 rounded-full bg-teal-600 transition-all"
+          className="h-2 rounded-full bg-blue-600 transition-all"
           style={{ width: `${(index / questions.length) * 100}%` }}
         />
       </div>
@@ -140,7 +140,7 @@ export default function MythFactQuiz() {
       <div className="mt-8 grid grid-cols-2 gap-3">
         {[
           { value: false, label: "Myth", base: "border-red-300 text-red-800 hover:bg-red-50" },
-          { value: true, label: "Fact", base: "border-teal-300 text-teal-800 hover:bg-teal-50" },
+          { value: true, label: "Fact", base: "border-blue-300 text-blue-800 hover:bg-blue-50" },
         ].map((opt) => {
           const isAnswer = picked !== null && opt.value === q.fact;
           const isWrongPick = picked === opt.value && !isAnswer;
@@ -152,7 +152,7 @@ export default function MythFactQuiz() {
               disabled={picked !== null}
               className={`rounded-xl border-2 py-4 text-lg font-bold transition ${
                 isAnswer
-                  ? "border-teal-600 bg-teal-600 text-white"
+                  ? "border-blue-600 bg-blue-600 text-white"
                   : isWrongPick
                   ? "border-red-600 bg-red-600 text-white"
                   : picked !== null
@@ -168,7 +168,7 @@ export default function MythFactQuiz() {
 
       {picked !== null && (
         <div aria-live="polite" className="mt-6">
-          <p className={`text-lg font-bold ${correct ? "text-teal-700" : "text-red-700"}`}>
+          <p className={`text-lg font-bold ${correct ? "text-blue-700" : "text-red-700"}`}>
             {correct ? "Correct!" : "Not quite."} It&apos;s a {q.fact ? "fact" : "myth"}.
           </p>
           <p className="mt-2 text-slate-700 leading-relaxed">{q.explain}</p>
@@ -176,7 +176,7 @@ export default function MythFactQuiz() {
             type="button"
             onClick={next}
             autoFocus
-            className="mt-6 w-full rounded-lg bg-teal-700 px-5 py-3 font-semibold text-white hover:bg-teal-800"
+            className="mt-6 w-full rounded-lg bg-blue-700 px-5 py-3 font-semibold text-white hover:bg-blue-800"
           >
             {index + 1 === questions.length ? "See my score" : "Next question →"}
           </button>

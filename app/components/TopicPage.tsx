@@ -1,9 +1,10 @@
 import Link from "next/link";
+import PageHeader from "./PageHeader";
 import AskAIButton from "./AskAIButton";
 import ShareButton from "./ShareButton";
 
 const tones = {
-  info: "border-teal-200 bg-teal-50 text-teal-950",
+  info: "border-blue-200 bg-blue-50 text-blue-950",
   caution: "border-amber-200 bg-amber-50 text-amber-950",
   urgent: "border-red-200 bg-red-50 text-red-950",
 };
@@ -31,26 +32,14 @@ export default function TopicPage({
 }) {
   return (
     <main className="flex-1">
-      <section className="bg-white border-b border-slate-200">
-        <div className="max-w-5xl mx-auto px-4 sm:px-6 py-12">
-          <nav aria-label="Breadcrumb" className="text-sm text-slate-500">
-            <Link href="/" className="hover:text-teal-700">Home</Link>
-            <span className="mx-2">/</span>
-            <Link href="/#topics" className="hover:text-teal-700">Health Topics</Link>
-          </nav>
+      <PageHeader
+        title={title}
+        intro={intro}
+        icon={icon}
+        crumbs={[{ href: "/#topics", label: "Health Topics" }]}
+      />
 
-          <div className="mt-6 flex items-center gap-4">
-            <span aria-hidden className="text-5xl">{icon}</span>
-            <h1 className="text-4xl md:text-5xl font-bold tracking-tight text-slate-900">
-              {title}
-            </h1>
-          </div>
-
-          <p className="mt-5 max-w-3xl text-lg text-slate-600 leading-relaxed">{intro}</p>
-        </div>
-      </section>
-
-      <section className="max-w-5xl mx-auto px-4 sm:px-6 py-12">
+      <section className="max-w-6xl mx-auto px-4 sm:px-6 py-12">
         <h2 className="text-2xl font-bold text-slate-900">{signsTitle}</h2>
 
         <ul className="mt-6 grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -59,7 +48,7 @@ export default function TopicPage({
               key={item}
               className="flex items-start gap-3 rounded-xl border border-slate-200 bg-white p-5 text-slate-800 shadow-sm"
             >
-              <span aria-hidden className="mt-2 h-2 w-2 shrink-0 rounded-full bg-teal-600" />
+              <span aria-hidden className="mt-2 h-2 w-2 shrink-0 rounded-full bg-blue-600" />
               {item}
             </li>
           ))}
@@ -76,18 +65,18 @@ export default function TopicPage({
             className="mt-6 flex flex-col sm:flex-row sm:items-center justify-between gap-3 rounded-2xl bg-slate-900 p-6 text-white hover:bg-slate-800"
           >
             <span>
-              <span className="block text-sm font-semibold text-teal-300">Self-check tool</span>
+              <span className="block text-sm font-semibold text-blue-300">Self-check tool</span>
               <span className="mt-1 block text-xl font-bold">{tool.title}</span>
               <span className="mt-1 block text-slate-300">{tool.text}</span>
             </span>
-            <span className="shrink-0 rounded-lg bg-teal-500 px-4 py-2 font-semibold text-slate-950">
+            <span className="shrink-0 rounded-lg bg-blue-500 px-4 py-2 font-semibold text-slate-950">
               Start →
             </span>
           </Link>
         )}
 
         <div className="mt-10 flex flex-col sm:flex-row flex-wrap gap-3">
-          <AskAIButton className="rounded-lg bg-teal-700 px-5 py-3 font-semibold text-white hover:bg-teal-800">
+          <AskAIButton className="rounded-lg bg-blue-700 px-5 py-3 font-semibold text-white hover:bg-blue-800">
             Ask the Health Assistant
           </AskAIButton>
           <Link

@@ -36,7 +36,7 @@ export default function TobaccoCostCalculator() {
                 <span aria-hidden>{h.icon}</span> {h.label}
               </label>
               <div className="mt-2 flex flex-wrap items-center gap-2">
-                <div className="flex items-center rounded-lg border border-slate-300 focus-within:border-teal-600 focus-within:ring-2 focus-within:ring-teal-600/20">
+                <div className="flex items-center rounded-lg border border-slate-300 focus-within:border-blue-600 focus-within:ring-2 focus-within:ring-blue-600/20">
                   <span className="pl-3 text-slate-500">₹</span>
                   <input
                     id={h.id}
@@ -63,7 +63,7 @@ export default function TobaccoCostCalculator() {
                     onClick={() => setSpend((s) => ({ ...s, [h.id]: p }))}
                     className={`rounded-full border px-3 py-1 text-sm ${
                       spend[h.id] === p
-                        ? "border-teal-600 bg-teal-50 text-teal-800"
+                        ? "border-blue-600 bg-blue-50 text-blue-800"
                         : "border-slate-300 text-slate-600 hover:bg-slate-50"
                     }`}
                   >
@@ -76,7 +76,7 @@ export default function TobaccoCostCalculator() {
 
           <div>
             <label htmlFor="days" className="font-medium text-slate-800">
-              Days per week: <span className="text-teal-700">{daysPerWeek}</span>
+              Days per week: <span className="text-blue-700">{daysPerWeek}</span>
             </label>
             <input
               id="days"
@@ -85,7 +85,7 @@ export default function TobaccoCostCalculator() {
               max={7}
               value={daysPerWeek}
               onChange={(e) => setDaysPerWeek(Number(e.target.value))}
-              className="mt-2 block w-full accent-teal-700"
+              className="mt-2 block w-full accent-blue-700"
             />
           </div>
         </div>
@@ -93,7 +93,7 @@ export default function TobaccoCostCalculator() {
 
       {perDay > 0 ? (
         <div aria-live="polite" className="rounded-2xl bg-slate-900 p-6 text-white">
-          <p className="text-sm font-semibold uppercase tracking-wide text-teal-300">The real cost</p>
+          <p className="text-sm font-semibold uppercase tracking-wide text-blue-300">The real cost</p>
 
           <dl className="mt-4 grid grid-cols-2 sm:grid-cols-4 gap-4">
             {[
@@ -111,9 +111,9 @@ export default function TobaccoCostCalculator() {
 
           <p className="mt-6 text-lg leading-relaxed">
             Cutting down by half would save you{" "}
-            <strong className="text-teal-300">{rupees(perYear / 2)}</strong> every
+            <strong className="text-blue-300">{rupees(perYear / 2)}</strong> every
             year. Quitting completely saves{" "}
-            <strong className="text-teal-300">{rupees(perYear * 10)}</strong>{" "}
+            <strong className="text-blue-300">{rupees(perYear * 10)}</strong>{" "}
             over
             10 years — money for your family, your children&apos;s education, or
             your home.
@@ -126,7 +126,7 @@ export default function TobaccoCostCalculator() {
           <div className="mt-6 flex flex-col sm:flex-row gap-3">
             <a
               href="tel:1800112356"
-              className="rounded-lg bg-teal-500 px-5 py-3 text-center font-semibold text-slate-950 hover:bg-teal-400"
+              className="rounded-lg bg-blue-500 px-5 py-3 text-center font-semibold text-slate-950 hover:bg-blue-400"
             >
               Call free Quitline: 1800-11-2356
             </a>
@@ -138,7 +138,7 @@ export default function TobaccoCostCalculator() {
       )}
 
       <p className="text-center text-sm">
-        <Link href="/tobacco" className="font-semibold text-teal-700 hover:underline">
+        <Link href="/tobacco" className="font-semibold text-blue-700 hover:underline">
           Learn about tobacco &amp; oral health →
         </Link>
       </p>

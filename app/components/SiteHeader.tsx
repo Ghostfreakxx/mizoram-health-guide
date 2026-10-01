@@ -3,14 +3,17 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useState } from "react";
+import AccessibilityBar from "./AccessibilityBar";
+import NewsTicker from "./NewsTicker";
 import { openChat } from "./openChat";
 
 const navLinks = [
   { href: "/", label: "Home" },
   { href: "/#topics", label: "Health Topics" },
   { href: "/tools", label: "Self-Check Tools" },
-  { href: "/#survey", label: "Survey" },
   { href: "/hospitals", label: "Hospitals" },
+  { href: "/helplines", label: "Helplines" },
+  { href: "/#survey", label: "Survey" },
 ];
 
 export default function SiteHeader() {
@@ -18,32 +21,67 @@ export default function SiteHeader() {
   const [menuOpen, setMenuOpen] = useState(false);
 
   return (
-    <header className="sticky top-0 z-40">
-      <div className="bg-red-700 text-white text-sm">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 py-2 flex flex-wrap items-center justify-between gap-2">
-          <span className="hidden sm:inline">For awareness only — not a substitute for medical advice.</span>
-          <a href="tel:108" className="font-semibold underline underline-offset-2">
-            Medical emergency? Call 108
-          </a>
+    <>
+      <header>
+        <AccessibilityBar />
+
+        {/* Masthead */}
+        <div className="bg-white">
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 py-4 flex flex-wrap items-center justify-between gap-4">
+            <Link href="/" className="flex items-center gap-3" onClick={() => setMenuOpen(false)}>
+              <span
+                aria-hidden
+                className="grid h-14 w-14 place-items-center rounded-full border-4 border-blue-900 bg-white text-3xl font-black text-red-600"
+              >
+                +
+              </span>
+              <span className="leading-tight">
+                <span className="block text-xl sm:text-2xl font-bold text-blue-950">
+                  Mizoram Health Guide
+                </span>
+                <span className="block text-sm text-slate-600">
+                  Citizen Health Awareness Portal
+                </span>
+              </span>
+            </Link>
+
+            <div className="flex items-center gap-4">
+              <form action="/search" role="search" className="hidden md:flex">
+                <label htmlFor="site-search" className="sr-only">Search this website</label>
+                <input
+                  id="site-search"
+                  name="q"
+                  type="search"
+                  placeholder="Search health topics…"
+                  className="w-56 rounded-l-md border border-slate-300 px-3 py-2 text-sm outline-none focus:border-blue-700"
+                />
+                <button
+                  type="submit"
+                  className="rounded-r-md bg-blue-900 px-4 text-sm font-semibold text-white hover:bg-blue-800"
+                >
+                  Search
+                </button>
+              </form>
+
+              <a
+                href="tel:108"
+                className="flex items-center gap-2 rounded-md border-2 border-red-600 px-3 py-1.5 text-red-700 hover:bg-red-50"
+              >
+                <span aria-hidden className="text-xl">🚑</span>
+                <span className="leading-tight">
+                  <span className="block text-[11px] font-semibold uppercase">Emergency</span>
+                  <span className="block text-lg font-bold">108</span>
+                </span>
+              </a>
+            </div>
+          </div>
         </div>
-      </div>
+      </header>
 
-      <div className="bg-white/95 backdrop-blur border-b border-slate-200">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 h-16 flex items-center justify-between">
-          <Link href="/" className="flex items-center gap-3" onClick={() => setMenuOpen(false)}>
-            <span
-              aria-hidden
-              className="grid h-9 w-9 place-items-center rounded-lg bg-teal-700 text-lg font-black text-white"
-            >
-              +
-            </span>
-            <span className="leading-tight">
-              <span className="block font-bold text-slate-900">Mizoram Health Guide</span>
-              <span className="block text-xs text-slate-500">Public health awareness</span>
-            </span>
-          </Link>
-
-          <nav aria-label="Main" className="hidden lg:flex items-center gap-1">
+      {/* Main navigation */}
+      <div className="sticky top-0 z-40 bg-blue-900 text-white shadow">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 flex items-center justify-between">
+          <nav aria-label="Main" className="hidden lg:flex">
             {navLinks.map((link) => {
               const active = link.href === pathname;
               return (
@@ -51,65 +89,65 @@ export default function SiteHeader() {
                   key={link.href}
                   href={link.href}
                   aria-current={active ? "page" : undefined}
-                  className={`rounded-lg px-3 py-2 text-sm font-medium transition ${
-                    active
-                      ? "bg-teal-50 text-teal-800"
-                      : "text-slate-600 hover:bg-slate-100 hover:text-slate-900"
+                  className={`border-b-4 px-4 py-3 text-sm font-semibold transition ${
+                    active ? "border-amber-400 bg-blue-950" : "border-transparent hover:bg-blue-800"
                   }`}
                 >
                   {link.label}
                 </Link>
               );
             })}
-            <button
-              type="button"
-              onClick={openChat}
-              className="ml-2 rounded-lg bg-teal-700 px-4 py-2 text-sm font-semibold text-white hover:bg-teal-800"
-            >
-              Ask a Question
-            </button>
           </nav>
 
           <button
             type="button"
-            className="lg:hidden rounded-lg border border-slate-300 px-3 py-2 text-sm font-medium text-slate-700"
+            className="lg:hidden py-3 text-sm font-semibold"
             aria-expanded={menuOpen}
             aria-controls="mobile-nav"
             onClick={() => setMenuOpen((v) => !v)}
           >
-            {menuOpen ? "Close" : "Menu"}
+            {menuOpen ? "✕ Close menu" : "☰ Menu"}
+          </button>
+
+          <button
+            type="button"
+            onClick={openChat}
+            className="my-1.5 rounded bg-amber-400 px-4 py-1.5 text-sm font-bold text-blue-950 hover:bg-amber-300"
+          >
+            Ask a Question
           </button>
         </div>
 
         {menuOpen && (
-          <nav
-            id="mobile-nav"
-            aria-label="Main"
-            className="lg:hidden border-t border-slate-200 px-4 py-3 space-y-1"
-          >
+          <nav id="mobile-nav" aria-label="Main" className="lg:hidden border-t border-blue-800 px-4 py-2">
             {navLinks.map((link) => (
               <Link
                 key={link.href}
                 href={link.href}
                 onClick={() => setMenuOpen(false)}
-                className="block rounded-lg px-3 py-2 text-slate-700 hover:bg-slate-100"
+                className="block rounded px-3 py-2 hover:bg-blue-800"
               >
                 {link.label}
               </Link>
             ))}
-            <button
-              type="button"
-              onClick={() => {
-                setMenuOpen(false);
-                openChat();
-              }}
-              className="w-full rounded-lg bg-teal-700 px-3 py-2 text-left font-semibold text-white"
-            >
-              Ask the Health Assistant
-            </button>
+            <form action="/search" role="search" className="mt-2 flex pb-2">
+              <label htmlFor="site-search-mobile" className="sr-only">Search this website</label>
+              <input
+                id="site-search-mobile"
+                name="q"
+                type="search"
+                placeholder="Search health topics…"
+                className="flex-1 rounded-l-md bg-white px-3 py-2 text-sm text-slate-900 outline-none"
+              />
+              <button type="submit" className="rounded-r-md bg-amber-400 px-4 text-sm font-semibold text-blue-950">
+                Search
+              </button>
+            </form>
           </nav>
         )}
       </div>
-    </header>
+
+      <NewsTicker />
+    </>
   );
 }
