@@ -69,7 +69,7 @@ export default function TopicPage({
 
         <div className="mt-10 flex flex-col sm:flex-row gap-3">
           <AskAIButton className="rounded-lg bg-teal-700 px-5 py-3 font-semibold text-white hover:bg-teal-800">
-            Ask the AI Health Guide
+            Ask the Health Assistant
           </AskAIButton>
           <Link
             href="/hospitals"

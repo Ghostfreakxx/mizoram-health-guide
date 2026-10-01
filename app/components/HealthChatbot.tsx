@@ -1,6 +1,8 @@
 "use client";
 
+import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
+import { findAnswer, type Answer } from "./healthAnswers";
 import { OPEN_CHAT_EVENT } from "./openChat";
 
 const quickQuestions = [
@@ -10,7 +12,7 @@ const quickQuestions = [
   "When should I visit a hospital?",
 ];
 
-type Message = { role: "user" | "bot"; text: string };
+type Message = Answer & { role: "user" | "bot" };
 
 export default function HealthChatbot() {
   const [open, setOpen] = useState(false);
@@ -19,7 +21,7 @@ export default function HealthChatbot() {
   const [messages, setMessages] = useState<Message[]>([
     {
       role: "bot",
-      text: "Hello. I am the AI Health Guide. I give simple health awareness information. I do not diagnose or prescribe medicine.",
+      text: "Hello. I am the Health Assistant. I give simple health awareness information. I do not diagnose or prescribe medicine.",
     },
   ]);
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -39,7 +41,7 @@ export default function HealthChatbot() {
     scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight });
   }, [messages, loading]);
 
-  async function sendMessage(text?: string) {
+  function sendMessage(text?: string) {
     const userText = (text ?? input).trim();
     if (!userText || loading) return;
 
@@ -47,22 +49,11 @@ export default function HealthChatbot() {
     setLoading(true);
     setMessages((prev) => [...prev, { role: "user", text: userText }]);
 
-    let reply: string;
-    try {
-      const res = await fetch("/api/chat", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        // Skip the greeting; send earlier turns so follow-up questions work.
-        body: JSON.stringify({ message: userText, history: messages.slice(1) }),
-      });
-      const data = await res.json();
-      reply = data.reply;
-    } catch {
-      reply = "Sorry, the AI assistant is not working right now.";
-    }
-
-    setMessages((prev) => [...prev, { role: "bot", text: reply }]);
-    setLoading(false);
+    // Short pause so the reply feels like a conversation.
+    setTimeout(() => {
+      setMessages((prev) => [...prev, { role: "bot", ...findAnswer(userText) }]);
+      setLoading(false);
+    }, 400);
   }
 
   return (
@@ -70,12 +61,12 @@ export default function HealthChatbot() {
       {open && (
         <div
           role="dialog"
-          aria-label="AI Health Guide"
+          aria-label="Health Assistant"
           className="mb-3 flex w-[380px] max-w-[calc(100vw-2rem)] flex-col overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-2xl"
         >
           <div className="flex items-center justify-between bg-teal-700 px-4 py-3 text-white">
             <div>
-              <h2 className="font-bold">AI Health Guide</h2>
+              <h2 className="font-bold">Health Assistant</h2>
               <p className="text-xs text-teal-100">Simple health awareness assistant</p>
             </div>
             <button
@@ -103,6 +94,15 @@ export default function HealthChatbot() {
                 }`}
               >
                 {msg.text}
+                {msg.link && (
+                  <Link
+                    href={msg.link.href}
+                    onClick={() => setOpen(false)}
+                    className="mt-2 block font-semibold text-teal-700 hover:underline"
+                  >
+                    {msg.link.label} →
+                  </Link>
+                )}
               </div>
             ))}
 
@@ -167,7 +167,7 @@ export default function HealthChatbot() {
           onClick={() => setOpen(true)}
           className="rounded-full bg-teal-700 px-5 py-3 font-semibold text-white shadow-lg hover:bg-teal-800"
         >
-          💬 Ask AI
+          💬 Ask a question
         </button>
       )}
     </div>

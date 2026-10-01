@@ -2,7 +2,7 @@
 
 A digital public health awareness platform for citizens of Mizoram. It gives
 simple, easy-to-read information on early warning signs, harmful habits, and
-when to see a doctor, plus an AI assistant for basic health questions.
+when to see a doctor, plus a Health Assistant chatbot for basic health questions.
 
 > For awareness only. This site does not diagnose disease or prescribe
 > medicine. In an emergency, call **108**.
@@ -11,9 +11,11 @@ when to see a doctor, plus an AI assistant for basic health questions.
 
 - **Health topics:** cancer, tobacco & oral health, diabetes, heart health,
   and mental wellbeing, each with warning signs and simple advice.
-- **AI Health Guide:** a chatbot (Google Gemini) that answers general health
-  awareness questions in plain English, with safety rules that prevent
-  diagnosis, prescriptions, and dosage advice.
+- **Health Assistant:** a chatbot that answers common health awareness
+  questions in plain English. It runs entirely in the browser from a built-in
+  answer library (`app/components/healthAnswers.ts`), so it needs no API key
+  and has no running cost. It never diagnoses or suggests medicines, and
+  points to 108 / Tele-MANAS 14416 for emergencies.
 - **Hospital & help directory:** emergency numbers and key hospitals.
 - **Citizen health awareness survey:** planned.
 
@@ -21,7 +23,6 @@ when to see a doctor, plus an AI assistant for basic health questions.
 
 - [Next.js](https://nextjs.org) (App Router) with TypeScript
 - Tailwind CSS
-- Google Gemini via `@google/genai`
 
 ## Running locally
 
@@ -31,13 +32,7 @@ when to see a doctor, plus an AI assistant for basic health questions.
    npm install
    ```
 
-2. Create `.env.local` in the project root with your Gemini API key:
-
-   ```bash
-   GEMINI_API_KEY=your-key-here
-   ```
-
-3. Start the development server:
+2. Start the development server:
 
    ```bash
    npm run dev
@@ -56,8 +51,7 @@ when to see a doctor, plus an AI assistant for basic health questions.
 
 ## Deployment
 
-The site is deployed on Vercel. Set `GEMINI_API_KEY` in the Vercel project's
-environment variables.
+The site is deployed on Vercel. No environment variables are needed.
 
 ## Project structure
 
@@ -68,7 +62,6 @@ app/
   topics.ts             List of health topics
   <topic>/page.tsx      Health topic pages
   hospitals/page.tsx    Hospital & help directory
-  api/chat/route.ts     AI chatbot API (Gemini)
   components/           Shared UI components
-  lib/rateLimit.ts      Rate limiting for the chatbot API
+  components/healthAnswers.ts  Health Assistant answer library
 ```

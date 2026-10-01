@@ -65,7 +65,7 @@ export default function SiteHeader() {
               onClick={openChat}
               className="ml-2 rounded-lg bg-teal-700 px-4 py-2 text-sm font-semibold text-white hover:bg-teal-800"
             >
-              Ask AI
+              Ask a Question
             </button>
           </nav>
 
@@ -104,7 +104,7 @@ export default function SiteHeader() {
               }}
               className="w-full rounded-lg bg-teal-700 px-3 py-2 text-left font-semibold text-white"
             >
-              Ask AI Health Guide
+              Ask the Health Assistant
             </button>
           </nav>
         )}

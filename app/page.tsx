@@ -77,7 +77,7 @@ export default function Home() {
                 Explore health topics
               </Link>
               <AskAIButton className="rounded-lg border border-slate-300 bg-white px-6 py-3 font-semibold text-slate-800 hover:bg-slate-50">
-                Ask the AI Health Guide
+                Ask the Health Assistant
               </AskAIButton>
             </div>
 
@@ -133,9 +133,9 @@ export default function Home() {
 
           <div className="rounded-xl bg-teal-700 p-6 text-white shadow-sm">
             <div aria-hidden className="text-4xl">💬</div>
-            <h3 className="mt-4 text-xl font-bold">AI Health Guide</h3>
+            <h3 className="mt-4 text-xl font-bold">Health Assistant</h3>
             <p className="mt-2 text-teal-50 leading-relaxed">
-              Ask simple health questions in easy English. It does not diagnose
+              Ask simple health questions and get instant answers in easy English. It does not diagnose
               or prescribe medicine.
             </p>
             <AskAIButton className="mt-4 rounded-lg bg-white px-4 py-2 text-sm font-semibold text-teal-800 hover:bg-teal-50">
