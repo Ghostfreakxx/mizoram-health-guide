@@ -1,9 +1,13 @@
 // Built-in answers for the Health Assistant. No external API is used:
 // the user's question is matched against keywords and the best answer is shown.
 
+import { detectRedFlags } from "../lib/safety/detect";
+import { getRedFlag } from "../lib/safety/redFlags";
+
 export type Answer = {
   text: string;
   link?: { href: string; label: string };
+  emergency?: boolean;
 };
 
 type Entry = Answer & {
@@ -210,7 +214,53 @@ function matches(question: string, keyword: string) {
   return new RegExp(`\\b${escapeRegExp(keyword)}\\b`).test(question);
 }
 
+const EMERGENCY_LINK = { href: "/ai-hospital/emergency", label: "Open Emergency Mode" };
+
+export const FAILSAFE_ANSWER: Answer = {
+  text: "Sorry, something went wrong. If you feel very unwell or think this may be an emergency, call 108 or 112 now. Otherwise, please see a doctor or health worker.",
+  emergency: true,
+};
+
+function emergencyAnswer(question: string): Answer | null {
+  // The shared AI Hospital red-flag detector always runs first.
+  const d = detectRedFlags(question);
+  if (d.confirmed.length > 0) {
+    const flag = getRedFlag(d.confirmed.includes("suicide") ? "suicide" : d.confirmed[0]);
+    if (flag.crisis) {
+      return {
+        text: "I am sorry you are feeling this way. You are not alone, and help is available right now. Please call Tele-MANAS on 14416 (free, 24 hours) to talk to a trained counsellor. If you are in immediate danger, call 112. Please also tell someone you trust.",
+        link: EMERGENCY_LINK,
+        emergency: true,
+      };
+    }
+    return {
+      text: `This may be an emergency (${flag.title.toLowerCase()}). Call 108 or 112 now, or go to the nearest hospital immediately. Do not wait to see if it gets better.`,
+      link: EMERGENCY_LINK,
+      emergency: true,
+    };
+  }
+  if (d.needsConfirmation.length > 0) {
+    const flag = getRedFlag(d.needsConfirmation[0]);
+    return {
+      text: `You mentioned ${flag.title.toLowerCase()}. If this is happening now, call 108 or 112 immediately. If it is not, you can ask your question again, or use the AI Hospital Triage Desk.`,
+      link: { href: "/ai-hospital/triage", label: "Open the Triage Desk" },
+      emergency: true,
+    };
+  }
+  return null;
+}
+
 export function findAnswer(question: string): Answer {
+  try {
+    const urgent = emergencyAnswer(question);
+    if (urgent) return urgent;
+    return keywordAnswer(question);
+  } catch {
+    return FAILSAFE_ANSWER;
+  }
+}
+
+function keywordAnswer(question: string): Answer {
   const q = question.toLowerCase().replace(/[’‘]/g, "'");
 
   let best: Entry | undefined;
