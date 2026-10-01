@@ -22,6 +22,7 @@ export const importantLinks = [
 
 // Updates to this website, shown in the "What's New" ticker.
 export const whatsNew = [
+  { text: "New: AI Hospital — check how urgent it is, find the right department, and prepare for your doctor", href: "/ai-hospital" },
   { text: "New: Diabetes Risk Check — know your risk in 1 minute", href: "/tools/diabetes-risk" },
   { text: "New: Tobacco & Kuhva Cost Calculator", href: "/tools/tobacco-cost" },
   { text: "Test yourself: Myth or Fact health quiz", href: "/tools/quiz" },
@@ -34,6 +35,12 @@ export type SearchEntry = { title: string; href: string; description: string; ke
 export const siteIndex: SearchEntry[] = [
   ...healthTopics.map((t) => ({ title: t.title, href: t.href, description: t.text, keywords: t.keywords })),
   ...healthTools.map((t) => ({ title: t.title, href: t.href, description: t.text, keywords: t.keywords })),
+  { title: "AI Hospital", href: "/ai-hospital", description: "Digital Front Door to Healthcare: urgency check, departments, visit preparation, and real-doctor guidance.", keywords: "ai hospital triage symptoms urgent sick doctor department emergency" },
+  { title: "Triage Desk", href: "/ai-hospital/triage", description: "Answer simple questions to find out how urgently to seek care.", keywords: "symptoms urgent sick check triage" },
+  { title: "Emergency Mode", href: "/ai-hospital/emergency", description: "Emergency numbers and what to do while waiting for help.", keywords: "emergency ambulance 108 112 help" },
+  { title: "Prepare for a hospital visit", href: "/ai-hospital/prepare", description: "Make a one-page summary to show the doctor.", keywords: "summary visit doctor prepare" },
+  { title: "Find the right department", href: "/ai-hospital/departments", description: "17 hospital departments explained.", keywords: "department opd ent dental eye skin bones paediatrics" },
+  { title: "Talk to a real doctor", href: "/ai-hospital/doctor", description: "How to prepare for a consultation, online or in person.", keywords: "doctor online consultation esanjeevani telemedicine" },
   { title: "Hospital & Help Directory", href: "/hospitals", description: "Hospitals and emergency help in Mizoram.", keywords: "hospital clinic doctor emergency" },
   { title: "Helplines", href: "/helplines", description: "Free health helpline numbers: 108, 112, 14416, tobacco quitline.", keywords: "phone call number ambulance helpline mental quit" },
   { title: "Self-Check Tools", href: "/tools", description: "Quick, private health self-check tools.", keywords: "test check calculator quiz" },

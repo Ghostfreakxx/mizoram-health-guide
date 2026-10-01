@@ -20,6 +20,17 @@ export default function PrivacyPage() {
         cleared when you close or reload the page.
       </p>
 
+      <h2>AI Hospital</h2>
+      <p>
+        AI Hospital (triage, reception, visit preparation, and Emergency Mode)
+        runs entirely in your browser. Your symptoms and answers are kept in
+        memory only while the page is open. They are not saved on your device,
+        not sent to our servers, not put in web addresses, and not used for
+        analytics. If you choose &quot;Share&quot; on your doctor summary, you
+        are first shown exactly what will be shared, and the text is then
+        passed to the app you choose (for example WhatsApp).
+      </p>
+
       <h2>Settings saved on your device</h2>
       <p>
         If you change the text size or turn on high contrast, that choice is

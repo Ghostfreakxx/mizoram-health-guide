@@ -107,14 +107,14 @@ export default function HealthChatbot() {
             ))}
 
             {loading && (
-              <div className="mr-10 rounded-xl border border-slate-200 bg-white px-3 py-2 text-slate-500">
+              <div className="mr-10 rounded-xl border border-slate-200 bg-white px-3 py-2 text-slate-600">
                 Thinking…
               </div>
             )}
 
             {messages.length === 1 && !loading && (
               <div className="pt-2 space-y-2">
-                <p className="text-xs font-medium text-slate-500">Try asking:</p>
+                <p className="text-xs font-medium text-slate-600">Try asking:</p>
                 {quickQuestions.map((q) => (
                   <button
                     key={q}
@@ -154,7 +154,7 @@ export default function HealthChatbot() {
                 Send
               </button>
             </div>
-            <p className="mt-2 text-[11px] text-slate-500">
+            <p className="mt-2 text-[11px] text-slate-600">
               For awareness only. Not medical advice. In an emergency call 108.
             </p>
           </form>

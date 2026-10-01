@@ -9,6 +9,7 @@ import { openChat } from "./openChat";
 
 const navLinks = [
   { href: "/", label: "Home" },
+  { href: "/ai-hospital", label: "AI Hospital" },
   { href: "/#topics", label: "Health Topics" },
   { href: "/tools", label: "Self-Check Tools" },
   { href: "/hospitals", label: "Hospitals" },

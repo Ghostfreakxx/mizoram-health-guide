@@ -37,6 +37,9 @@ export default function SiteFooter() {
         <div>
           <h2 className="font-bold text-white">Self-Check Tools</h2>
           <ul className="mt-4 space-y-2 text-sm">
+            <li>
+              <Link href="/ai-hospital" className="font-semibold text-amber-300 hover:underline">🏥 AI Hospital</Link>
+            </li>
             {healthTools.map((t) => (
               <li key={t.href}>
                 <Link href={t.href} className="hover:text-white hover:underline">{t.title}</Link>

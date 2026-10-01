@@ -6,12 +6,12 @@ import HeroSlider from "./components/HeroSlider";
 import { helplines, importantLinks } from "./site";
 
 const services = [
+  { icon: "🏥", label: "AI Hospital", href: "/ai-hospital" },
   { icon: "📚", label: "Health Topics", href: "/#topics" },
   { icon: "🩺", label: "Self-Check Tools", href: "/tools" },
   { icon: "🏥", label: "Find a Hospital", href: "/hospitals" },
   { icon: "📞", label: "Helplines", href: "/helplines" },
   { icon: "💬", label: "Ask a Question", href: null },
-  { icon: "📝", label: "Health Survey", href: "/#survey" },
 ];
 
 const myths = [
@@ -65,6 +65,28 @@ export default function Home() {
   return (
     <main className="flex-1">
       <HeroSlider />
+
+      {/* AI Hospital */}
+      <section className="bg-gradient-to-r from-blue-950 to-blue-800 text-white">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 py-10 grid md:grid-cols-[1fr_auto] gap-6 items-center">
+          <div>
+            <p className="text-sm font-semibold uppercase tracking-wide text-amber-300">New</p>
+            <h2 className="mt-1 text-3xl font-bold">🏥 AI Hospital — Digital Front Door to Healthcare</h2>
+            <p className="mt-2 max-w-3xl text-lg text-blue-100">
+              Feeling unwell? Find out how urgently you need care, which department to go to, and get a one-page summary
+              for the doctor. It does not diagnose — it helps you reach the right care sooner.
+            </p>
+          </div>
+          <div className="flex flex-col sm:flex-row md:flex-col gap-3">
+            <Link href="/ai-hospital/triage" className="rounded-lg bg-amber-400 px-6 py-3 text-center text-lg font-bold text-blue-950 hover:bg-amber-300">
+              I feel sick →
+            </Link>
+            <Link href="/ai-hospital" className="rounded-lg border-2 border-white/60 px-6 py-3 text-center text-lg font-semibold hover:bg-white/10">
+              Enter AI Hospital
+            </Link>
+          </div>
+        </div>
+      </section>
 
       {/* Citizen services */}
       <section aria-labelledby="services-heading" className="bg-white border-b border-slate-200">
@@ -150,7 +172,7 @@ export default function Home() {
                 <li key={h.tel} className="flex items-center justify-between gap-3 px-5 py-3">
                   <span>
                     <span className="block font-semibold text-slate-900">{h.label}</span>
-                    <span className="block text-xs text-slate-500">{h.text}</span>
+                    <span className="block text-xs text-slate-600">{h.text}</span>
                   </span>
                   <a
                     href={`tel:${h.tel}`}

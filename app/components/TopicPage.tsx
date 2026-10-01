@@ -87,7 +87,7 @@ export default function TopicPage({ content: c }: { content: TopicContent }) {
             <li key={f.label} className="rounded-lg border border-slate-200 bg-white p-5 shadow-md">
               <span className="block text-3xl font-bold text-blue-900">{f.value}</span>
               <span className="mt-1 block text-slate-700 leading-snug">{f.label}</span>
-              <span className="mt-2 block text-xs text-slate-500">Source: {f.source}</span>
+              <span className="mt-2 block text-xs text-slate-600">Source: {f.source}</span>
             </li>
           ))}
         </ul>
@@ -95,7 +95,7 @@ export default function TopicPage({ content: c }: { content: TopicContent }) {
 
       <div className="max-w-6xl mx-auto px-4 sm:px-6 py-12 grid lg:grid-cols-[1fr_300px] gap-10">
         <article className="min-w-0 space-y-14">
-          <p className="flex flex-wrap gap-x-4 gap-y-1 text-sm text-slate-500">
+          <p className="flex flex-wrap gap-x-4 gap-y-1 text-sm text-slate-600">
             <span>⏱ {c.readingTime} read</span>
             <span>📖 Written in simple English</span>
           </p>
@@ -272,7 +272,7 @@ export default function TopicPage({ content: c }: { content: TopicContent }) {
                 </li>
               ))}
             </ul>
-            <p className="mt-4 text-sm text-slate-500">
+            <p className="mt-4 text-sm text-slate-600">
               This page is for awareness only and does not replace advice from a doctor.
             </p>
           </section>
@@ -298,7 +298,7 @@ export default function TopicPage({ content: c }: { content: TopicContent }) {
         {/* Sidebar */}
         <aside className="space-y-6 lg:sticky lg:top-16 lg:self-start">
           <nav aria-label="On this page" className="hidden lg:block rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
-            <h2 className="text-sm font-bold uppercase tracking-wide text-slate-500">On this page</h2>
+            <h2 className="text-sm font-bold uppercase tracking-wide text-slate-600">On this page</h2>
             <ol className="mt-3 space-y-1">
               {sections.map((s, i) => (
                 <li key={s.id}>

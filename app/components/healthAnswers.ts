@@ -191,6 +191,13 @@ const entries: Entry[] = [
     link: { href: "/tools/quiz", label: "Myth or Fact Quiz" },
   },
 
+  // AI Hospital
+  {
+    keywords: ["symptom", "symptoms", "how urgent", "where should i go", "which department", "feel sick", "feel unwell", "not feeling well", "triage"],
+    text: "The AI Hospital Triage Desk asks a few simple questions and tells you how urgently to seek care, which department to go to, and makes a summary for the doctor. It does not diagnose.",
+    link: { href: "/ai-hospital/triage", label: "Open the Triage Desk" },
+  },
+
   // Small talk
   {
     keywords: ["thank", "thanks", "ka lawm"],

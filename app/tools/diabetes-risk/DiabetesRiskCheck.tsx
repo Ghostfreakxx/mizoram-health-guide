@@ -87,7 +87,7 @@ export default function DiabetesRiskCheck() {
           <legend className="sr-only">{q.question}</legend>
           <p className="text-sm font-semibold text-blue-700">Question {i + 1} of {questions.length}</p>
           <p className="mt-1 text-lg font-bold text-slate-900">{q.question}</p>
-          {q.help && <p className="mt-1 text-sm text-slate-500">{q.help}</p>}
+          {q.help && <p className="mt-1 text-sm text-slate-600">{q.help}</p>}
 
           <div className="mt-4 space-y-2">
             {q.options.map((opt) => {
@@ -150,7 +150,7 @@ export default function DiabetesRiskCheck() {
           </div>
         </div>
       ) : (
-        <p className="text-center text-slate-500">
+        <p className="text-center text-slate-600">
           Answer all {questions.length} questions to see your result.
         </p>
       )}

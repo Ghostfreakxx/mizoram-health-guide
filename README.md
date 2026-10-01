@@ -19,6 +19,35 @@ when to see a doctor, plus a Health Assistant chatbot for basic health questions
 - **Hospital & help directory:** emergency numbers and key hospitals.
 - **Citizen health awareness survey:** planned.
 
+## AI Hospital — Digital Front Door to Healthcare
+
+`/ai-hospital` is an automated health-navigation and patient-preparation
+platform: Reception → Triage → Department → Visit preparation → Real doctor.
+It never diagnoses or prescribes.
+
+- **Deterministic safety core** (`app/lib/safety/`): shared red flags,
+  free-text red-flag detection, adaptive rule-based triage
+  (RED/ORANGE/YELLOW/GREEN), receptionist parser, and fixed wording. No
+  generative model makes clinical decisions.
+- **Evidence registry** (`app/lib/sources.ts`): every rule points to a source
+  record. Records stay `awaiting-verification` until a person checks them.
+- **Verified-only data**: hospitals (`app/ai-hospital/data/hospitals.ts`, see
+  `docs/HOSPITAL_DATA.md`) and teleconsult details
+  (`app/ai-hospital/data/teleconsult.ts`) are hidden until verified.
+- **Privacy by default**: no storage, analytics, or network calls with health
+  data — enforced by tests.
+
+## Safety tests (release requirement)
+
+```bash
+npm test
+```
+
+Runs the Vitest safety suite in `tests/safety/` (red-flag detection,
+adversarial phrasing, triage rules, special populations, monotonicity,
+fail-safe, language policy, source integrity, privacy checks). Never weaken a
+safety rule to make a test pass.
+
 ## Tech stack
 
 - [Next.js](https://nextjs.org) (App Router) with TypeScript
@@ -48,6 +77,7 @@ when to see a doctor, plus a Health Assistant chatbot for basic health questions
 | `npm run build` | Build for production             |
 | `npm run start` | Run the production build         |
 | `npm run lint`  | Check the code with ESLint       |
+| `npm test`      | Run the safety test suite        |
 
 ## Deployment
 

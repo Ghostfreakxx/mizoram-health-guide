@@ -8,6 +8,19 @@ export const metadata: Metadata = { title: "Sitemap" };
 
 const groups = [
   { title: "Main", links: [{ href: "/", title: "Home" }, { href: "/hospitals", title: "Hospital & Help Directory" }, { href: "/helplines", title: "Helplines" }, { href: "/search", title: "Search" }] },
+  {
+    title: "AI Hospital",
+    links: [
+      { href: "/ai-hospital", title: "AI Hospital lobby" },
+      { href: "/ai-hospital/reception", title: "Reception" },
+      { href: "/ai-hospital/triage", title: "Triage Desk" },
+      { href: "/ai-hospital/emergency", title: "Emergency Mode" },
+      { href: "/ai-hospital/departments", title: "Departments" },
+      { href: "/ai-hospital/prepare", title: "Prepare for a visit" },
+      { href: "/ai-hospital/doctor", title: "Talk to a real doctor" },
+      { href: "/ai-hospital/hospitals", title: "Find a hospital" },
+    ],
+  },
   { title: "Health Topics", links: healthTopics },
   { title: "Self-Check Tools", links: [{ href: "/tools", title: "All Self-Check Tools" }, ...healthTools] },
   { title: "Website Policies", links: [{ href: "/privacy", title: "Privacy Policy" }, { href: "/disclaimer", title: "Disclaimer" }, { href: "/accessibility", title: "Accessibility Statement" }] },

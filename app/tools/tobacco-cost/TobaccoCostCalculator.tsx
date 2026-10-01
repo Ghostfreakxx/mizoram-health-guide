@@ -27,7 +27,7 @@ export default function TobaccoCostCalculator() {
     <div className="space-y-6">
       <div className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
         <h2 className="text-lg font-bold text-slate-900">How much do you spend in a day?</h2>
-        <p className="mt-1 text-sm text-slate-500">Fill in only the ones you use.</p>
+        <p className="mt-1 text-sm text-slate-600">Fill in only the ones you use.</p>
 
         <div className="mt-5 space-y-5">
           {habits.map((h) => (
@@ -37,7 +37,7 @@ export default function TobaccoCostCalculator() {
               </label>
               <div className="mt-2 flex flex-wrap items-center gap-2">
                 <div className="flex items-center rounded-lg border border-slate-300 focus-within:border-blue-600 focus-within:ring-2 focus-within:ring-blue-600/20">
-                  <span className="pl-3 text-slate-500">₹</span>
+                  <span className="pl-3 text-slate-600">₹</span>
                   <input
                     id={h.id}
                     type="number"
@@ -54,7 +54,7 @@ export default function TobaccoCostCalculator() {
                     }
                     className="w-24 rounded-lg px-2 py-2 text-slate-900 outline-none"
                   />
-                  <span className="pr-3 text-sm text-slate-500">/ day</span>
+                  <span className="pr-3 text-sm text-slate-600">/ day</span>
                 </div>
                 {presets.map((p) => (
                   <button
@@ -134,7 +134,7 @@ export default function TobaccoCostCalculator() {
           </div>
         </div>
       ) : (
-        <p className="text-center text-slate-500">Enter an amount to see your total.</p>
+        <p className="text-center text-slate-600">Enter an amount to see your total.</p>
       )}
 
       <p className="text-center text-sm">
