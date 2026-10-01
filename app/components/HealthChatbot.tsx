@@ -52,7 +52,8 @@ export default function HealthChatbot() {
       const res = await fetch("/api/chat", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ message: userText }),
+        // Skip the greeting; send earlier turns so follow-up questions work.
+        body: JSON.stringify({ message: userText, history: messages.slice(1) }),
       });
       const data = await res.json();
       reply = data.reply;
@@ -141,6 +142,7 @@ export default function HealthChatbot() {
                 aria-label="Your health question"
                 className="flex-1 rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-900 outline-none focus:border-teal-600 focus:ring-2 focus:ring-teal-600/20"
                 placeholder="Ask a health question…"
+                maxLength={1000}
                 value={input}
                 onChange={(e) => setInput(e.target.value)}
               />
