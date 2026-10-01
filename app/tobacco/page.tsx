@@ -17,6 +17,11 @@ export default function TobaccoPage() {
         "Bleeding from gums or mouth",
         "Bad breath that does not improve",
       ]}
+      tool={{
+        href: "/tools/tobacco-cost",
+        title: "Tobacco & Kuhva Cost Calculator",
+        text: "See how much your habit really costs over 10 years.",
+      }}
       advice="If you use tobacco, try to reduce slowly. If you notice mouth wounds, patches, or lumps that continue for more than 2–3 weeks, visit a doctor."
       tone="caution"
     />

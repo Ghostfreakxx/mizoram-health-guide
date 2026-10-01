@@ -17,6 +17,11 @@ export default function DiabetesPage() {
         "Blurred vision",
         "Sudden weight change",
       ]}
+      tool={{
+        href: "/tools/diabetes-risk",
+        title: "Diabetes Risk Check",
+        text: "Answer 4 quick questions to see your risk.",
+      }}
       advice="A simple blood sugar test can help detect diabetes. Regular check-up, walking, balanced food, and reducing sugary drinks can help manage risk."
     />
   );

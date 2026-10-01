@@ -1,5 +1,6 @@
 import Link from "next/link";
 import AskAIButton from "./AskAIButton";
+import ShareButton from "./ShareButton";
 
 const tones = {
   info: "border-teal-200 bg-teal-50 text-teal-950",
@@ -16,6 +17,7 @@ export default function TopicPage({
   adviceTitle = "Simple advice",
   advice,
   tone = "info",
+  tool,
 }: {
   icon: string;
   title: string;
@@ -25,6 +27,7 @@ export default function TopicPage({
   adviceTitle?: string;
   advice: string;
   tone?: keyof typeof tones;
+  tool?: { href: string; title: string; text: string };
 }) {
   return (
     <main className="flex-1">
@@ -67,7 +70,23 @@ export default function TopicPage({
           <p className="mt-3 leading-relaxed">{advice}</p>
         </div>
 
-        <div className="mt-10 flex flex-col sm:flex-row gap-3">
+        {tool && (
+          <Link
+            href={tool.href}
+            className="mt-6 flex flex-col sm:flex-row sm:items-center justify-between gap-3 rounded-2xl bg-slate-900 p-6 text-white hover:bg-slate-800"
+          >
+            <span>
+              <span className="block text-sm font-semibold text-teal-300">Self-check tool</span>
+              <span className="mt-1 block text-xl font-bold">{tool.title}</span>
+              <span className="mt-1 block text-slate-300">{tool.text}</span>
+            </span>
+            <span className="shrink-0 rounded-lg bg-teal-500 px-4 py-2 font-semibold text-slate-950">
+              Start →
+            </span>
+          </Link>
+        )}
+
+        <div className="mt-10 flex flex-col sm:flex-row flex-wrap gap-3">
           <AskAIButton className="rounded-lg bg-teal-700 px-5 py-3 font-semibold text-white hover:bg-teal-800">
             Ask the Health Assistant
           </AskAIButton>
@@ -77,6 +96,7 @@ export default function TopicPage({
           >
             Find a hospital
           </Link>
+          <ShareButton text={`${title} — simple health information for Mizoram:`} />
         </div>
       </section>
     </main>

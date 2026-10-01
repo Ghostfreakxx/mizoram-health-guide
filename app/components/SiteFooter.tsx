@@ -38,6 +38,19 @@ export default function SiteFooter() {
               <a href="tel:112" className="font-semibold text-teal-700">112</a>
             </li>
             <li>
+              Mental health (Tele-MANAS):{" "}
+              <a href="tel:14416" className="font-semibold text-teal-700">14416</a>
+            </li>
+            <li>
+              Tobacco quitline:{" "}
+              <a href="tel:1800112356" className="font-semibold text-teal-700">1800-11-2356</a>
+            </li>
+            <li>
+              <Link href="/tools" className="hover:text-teal-700">
+                Self-check tools
+              </Link>
+            </li>
+            <li>
               <Link href="/hospitals" className="hover:text-teal-700">
                 Hospital &amp; help directory
               </Link>

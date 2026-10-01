@@ -8,6 +8,7 @@ import { openChat } from "./openChat";
 const navLinks = [
   { href: "/", label: "Home" },
   { href: "/#topics", label: "Health Topics" },
+  { href: "/tools", label: "Self-Check Tools" },
   { href: "/#survey", label: "Survey" },
   { href: "/hospitals", label: "Hospitals" },
 ];
@@ -42,7 +43,7 @@ export default function SiteHeader() {
             </span>
           </Link>
 
-          <nav aria-label="Main" className="hidden md:flex items-center gap-1">
+          <nav aria-label="Main" className="hidden lg:flex items-center gap-1">
             {navLinks.map((link) => {
               const active = link.href === pathname;
               return (
@@ -71,7 +72,7 @@ export default function SiteHeader() {
 
           <button
             type="button"
-            className="md:hidden rounded-lg border border-slate-300 px-3 py-2 text-sm font-medium text-slate-700"
+            className="lg:hidden rounded-lg border border-slate-300 px-3 py-2 text-sm font-medium text-slate-700"
             aria-expanded={menuOpen}
             aria-controls="mobile-nav"
             onClick={() => setMenuOpen((v) => !v)}
@@ -84,7 +85,7 @@ export default function SiteHeader() {
           <nav
             id="mobile-nav"
             aria-label="Main"
-            className="md:hidden border-t border-slate-200 px-4 py-3 space-y-1"
+            className="lg:hidden border-t border-slate-200 px-4 py-3 space-y-1"
           >
             {navLinks.map((link) => (
               <Link

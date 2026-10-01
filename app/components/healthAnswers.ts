@@ -141,6 +141,23 @@ const entries: Entry[] = [
     link: { href: "/hospitals", label: "Hospital & help directory" },
   },
 
+  // Tools
+  {
+    keywords: ["diabetes risk", "risk test", "risk check", "am i diabetic", "do i have diabetes", "check my risk"],
+    text: "You can check your diabetes risk in 1 minute with our Diabetes Risk Check. It asks 4 simple questions. Only a blood test can confirm diabetes.",
+    link: { href: "/tools/diabetes-risk", label: "Diabetes Risk Check" },
+  },
+  {
+    keywords: ["cost", "money", "spend", "spending", "expensive", "save money"],
+    text: "Tobacco and kuhva cost more than you think. Our calculator shows how much you spend in a year and in 10 years.",
+    link: { href: "/tools/tobacco-cost", label: "Tobacco & Kuhva Cost Calculator" },
+  },
+  {
+    keywords: ["quiz", "myth", "test my knowledge", "game"],
+    text: "Try our Myth or Fact Quiz — 8 quick questions about common health beliefs.",
+    link: { href: "/tools/quiz", label: "Myth or Fact Quiz" },
+  },
+
   // Small talk
   {
     keywords: ["thank", "thanks", "ka lawm"],

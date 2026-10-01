@@ -1,6 +1,7 @@
 import Link from "next/link";
 import AskAIButton from "./components/AskAIButton";
 import { healthTopics } from "./topics";
+import { healthTools } from "./tools";
 
 const myths = [
   {
@@ -145,6 +146,32 @@ export default function Home() {
         </div>
       </section>
 
+      {/* Tools */}
+      <section id="tools" className="bg-slate-900 text-white">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 py-16">
+          <p className="font-semibold text-teal-300">Interactive · Private · Free</p>
+          <h2 className="mt-2 text-3xl font-bold">Check your health in 1 minute</h2>
+          <p className="mt-2 max-w-2xl text-slate-300">
+            Quick self-check tools. Nothing you enter is saved or sent anywhere.
+          </p>
+
+          <div className="mt-8 grid grid-cols-1 md:grid-cols-3 gap-5">
+            {healthTools.map((tool) => (
+              <Link
+                key={tool.href}
+                href={tool.href}
+                className="group rounded-xl border border-white/10 bg-white/5 p-6 transition hover:border-teal-400 hover:bg-white/10"
+              >
+                <div aria-hidden className="text-4xl">{tool.icon}</div>
+                <h3 className="mt-4 text-xl font-bold group-hover:text-teal-300">{tool.title}</h3>
+                <p className="mt-2 text-slate-300">{tool.text}</p>
+                <p className="mt-4 text-sm font-semibold text-teal-300">Start · {tool.time} →</p>
+              </Link>
+            ))}
+          </div>
+        </div>
+      </section>
+
       {/* Why it matters */}
       <section className="bg-white border-y border-slate-200">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 py-16">
@@ -191,7 +218,12 @@ export default function Home() {
       {/* Myth vs fact */}
       <section className="bg-white border-y border-slate-200">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 py-16">
-          <h2 className="text-3xl font-bold text-slate-900">Myth vs fact</h2>
+          <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-3">
+            <h2 className="text-3xl font-bold text-slate-900">Myth vs fact</h2>
+            <Link href="/tools/quiz" className="font-semibold text-teal-700 hover:underline">
+              Take the full quiz →
+            </Link>
+          </div>
           <div className="mt-8 grid grid-cols-1 lg:grid-cols-3 gap-5">
             {myths.map((item) => (
               <div key={item.myth} className="rounded-xl border border-slate-200 bg-slate-50 p-6">
