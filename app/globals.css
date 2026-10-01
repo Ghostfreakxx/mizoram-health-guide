@@ -64,3 +64,22 @@ html.high-contrast select {
   html { scroll-behavior: auto; }
   .ticker-track { animation: none; }
 }
+
+/* Printing: when a page has a .print-area, print only that. */
+@media print {
+  body:has(.print-area) * {
+    visibility: hidden;
+  }
+  body:has(.print-area) .print-area,
+  body:has(.print-area) .print-area * {
+    visibility: visible;
+  }
+  body:has(.print-area) .print-area {
+    position: absolute;
+    inset: 0 0 auto 0;
+    border: none;
+  }
+  .no-print {
+    display: none !important;
+  }
+}
