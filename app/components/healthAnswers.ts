@@ -76,6 +76,7 @@ const entries: Entry[] = [
   {
     keywords: ["alcohol", "drinking", "drunk", "liquor", "beer", "zu"],
     text: "Alcohol can harm the liver, heart, and brain, and increases the risk of several cancers. Less is better. If you find it hard to control your drinking, talk to a doctor or call Tele-MANAS on 14416 for support.",
+    link: { href: "/drugs", label: "Alcohol & drug use" },
   },
 
   // Diabetes
@@ -126,7 +127,35 @@ const entries: Entry[] = [
   {
     keywords: ["drug", "drugs", "addiction", "addicted", "heroin", "substance"],
     text: "Addiction is a health condition, and recovery is possible with support. Please speak to a doctor or call Tele-MANAS on 14416 (free, 24 hours) for confidential help. Family support makes a big difference.",
-    link: { href: "/mental", label: "Mental wellbeing" },
+    link: { href: "/drugs", label: "Alcohol & drug use" },
+  },
+
+  // HIV, TB, mosquito-borne disease, mother & child
+  {
+    keywords: ["hiv", "aids", "ictc", "antiretroviral", "condom", "pep", "sexually transmitted", "std", "sti"],
+    text: "HIV spreads through unprotected sex, shared needles, and from mother to baby without treatment. It does not spread by touch, sharing food, or mosquitoes. Testing and treatment are free and confidential at government hospitals. If you may have been exposed in the last 72 hours, go to a hospital now and ask about PEP. AIDS Helpline: 1097.",
+    link: { href: "/hiv", label: "HIV & AIDS" },
+  },
+  {
+    keywords: ["tb", "tuberculosis", "phlegm", "night sweats", "cough"],
+    text: "A cough lasting more than 2 weeks should be tested for TB, especially with fever, night sweats, or weight loss. TB is curable, and tests and medicines are free at government health centres. TB Helpline: 1800-11-6666.",
+    link: { href: "/tb", label: "Tuberculosis (TB)" },
+  },
+  {
+    keywords: ["malaria", "dengue", "mosquito", "fever", "chills"],
+    text: "Fever can be a sign of malaria or dengue. Get a blood test the same day — it is free at government health centres and from many ASHAs. Go to hospital urgently for confusion, bleeding, severe stomach pain, or vomiting that won't stop. Sleep under a mosquito net and empty standing water every week.",
+    link: { href: "/malaria", label: "Malaria & Dengue" },
+  },
+  {
+    urgent: true,
+    keywords: ["overdose", "overdosed", "blue lips", "not waking up", "won't wake up"],
+    text: "This may be an overdose. Call 108 now. Try to wake the person. If they are breathing, turn them on their side so they don't choke, and stay with them until help arrives.",
+    link: { href: "/drugs", label: "Alcohol & drug use" },
+  },
+  {
+    keywords: ["pregnant", "pregnancy", "baby", "newborn", "breastfeeding", "breastfeed", "delivery", "vaccine", "vaccination", "immunisation", "immunization"],
+    text: "During pregnancy, register early and go for at least 4 check-ups. Delivery is free in government hospitals. Bleeding, severe headache, fits, swelling of the face, or the baby moving less are emergencies — call 108. Give only breast milk for the first 6 months, and keep vaccines on time.",
+    link: { href: "/mother-child", label: "Mother & Child Health" },
   },
 
   // Getting help
@@ -137,7 +166,7 @@ const entries: Entry[] = [
   },
   {
     keywords: ["helpline", "phone number", "contact", "emergency number", "ambulance"],
-    text: "Useful numbers: Ambulance 108 · National emergency 112 · Tele-MANAS mental health 14416 · National Tobacco Quitline 1800-11-2356.",
+    text: "Useful numbers: Ambulance 108 · National emergency 112 · Tele-MANAS mental health 14416 · National Tobacco Quitline 1800-11-2356 · AIDS Helpline 1097 · TB Helpline 1800-11-6666.",
     link: { href: "/hospitals", label: "Hospital & help directory" },
   },
 

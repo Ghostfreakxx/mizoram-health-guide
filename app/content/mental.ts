@@ -89,5 +89,5 @@ export const mental: TopicContent = {
     { label: "World Health Organization — Adolescent mental health fact sheet", href: "https://www.who.int/news-room/fact-sheets/detail/adolescent-mental-health" },
     { label: "Tele-MANAS, Ministry of Health & Family Welfare", href: "https://telemanas.mohfw.gov.in" },
   ],
-  related: ["/tobacco", "/heart"],
+  related: ["/drugs", "/tobacco"],
 };

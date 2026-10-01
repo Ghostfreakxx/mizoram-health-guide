@@ -13,7 +13,7 @@ export default function PageHeader({
 }) {
   return (
     <section className="bg-gradient-to-r from-blue-900 to-blue-700 text-white">
-      <div className="max-w-6xl mx-auto px-4 sm:px-6 py-10">
+      <div className="max-w-6xl mx-auto px-4 sm:px-6 pt-10 pb-16">
         <nav aria-label="Breadcrumb">
           <ol className="flex flex-wrap items-center gap-2 text-sm text-blue-100">
             <li><Link href="/" className="hover:underline">Home</Link></li>

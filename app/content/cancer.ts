@@ -91,5 +91,5 @@ export const cancer: TopicContent = {
     { label: "ICMR – National Centre for Disease Informatics and Research, National Cancer Registry Programme", href: "https://ncdirindia.org" },
     { label: "Ministry of Health & Family Welfare — National Programme for Prevention and Control of Non-Communicable Diseases", href: "https://mohfw.gov.in" },
   ],
-  related: ["/tobacco", "/diabetes"],
+  related: ["/tobacco", "/hiv"],
 };

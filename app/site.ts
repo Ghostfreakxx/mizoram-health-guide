@@ -6,6 +6,8 @@ export const helplines = [
   { number: "112", tel: "112", label: "National Emergency", text: "Police, fire, and medical emergencies", urgent: true },
   { number: "14416", tel: "14416", label: "Tele-MANAS", text: "Free mental health support, 24 hours" },
   { number: "1800-11-2356", tel: "1800112356", label: "Tobacco Quitline", text: "Free help to quit tobacco" },
+  { number: "1097", tel: "1097", label: "AIDS Helpline", text: "Free, confidential HIV information" },
+  { number: "1800-11-6666", tel: "1800116666", label: "TB Helpline", text: "Ni-kshay Sampark: TB testing and treatment" },
 ];
 
 // Official national health portals. Links open in a new tab.
