@@ -18,7 +18,7 @@ const actions = [
   { href: "/ai-hospital/departments/oncology", icon: "🎗️", label: "Cancer", sub: "Warning signs and screening" },
   { href: "/ai-hospital/departments#hiv-tb", icon: "🛡️", label: "HIV / TB", sub: "Free testing and treatment" },
   { href: "/ai-hospital/hospitals", icon: "🏥", label: "Find a hospital", sub: "Hospitals in Mizoram" },
-  { href: "/ai-hospital/prepare#summary", icon: "🗂️", label: "My visit summary", sub: "Print or show on phone" },
+  { href: "/ai-hospital/passport", icon: "🗂️", label: "My health records", sub: "Health Passport and saved summaries" },
   { href: "/#topics", icon: "📚", label: "Learn about a condition", sub: "Simple health guides" },
 ];
 

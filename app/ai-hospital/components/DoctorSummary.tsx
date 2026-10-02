@@ -1,6 +1,8 @@
 "use client";
 
+import Link from "next/link";
 import { useState } from "react";
+import { saveSummary } from "../../lib/storage";
 import { SUMMARY_LABEL, type SummaryData, formatGenerated, summarySections, summaryText } from "../../lib/summary";
 
 const DEFAULT_QUESTIONS = [
@@ -23,6 +25,7 @@ export default function DoctorSummary({ base, editable = true }: { base: Summary
   const [preview, setPreview] = useState(false);
   const [large, setLarge] = useState(false);
   const [copied, setCopied] = useState(false);
+  const [saved, setSaved] = useState<"idle" | "saved" | "off">("idle");
 
   const data: SummaryData = {
     ...base,
@@ -144,6 +147,23 @@ export default function DoctorSummary({ base, editable = true }: { base: Summary
         <button type="button" onClick={() => setPreview(true)} className="rounded-xl bg-[#1a7f45] px-4 py-4 text-lg font-semibold text-white hover:bg-[#146636]">
           ↗ Share
         </button>
+      </div>
+
+      <div className="no-print rounded-xl border border-slate-200 bg-white p-4">
+        <button
+          type="button"
+          onClick={() => setSaved(saveSummary(text) ? "saved" : "off")}
+          className="w-full rounded-xl border-2 border-blue-900 px-4 py-3 text-lg font-semibold text-blue-900 hover:bg-blue-50"
+        >
+          🗂️ Save to my Health Passport
+        </button>
+        {saved === "saved" && <p role="status" className="mt-2 text-emerald-800">✓ Saved on this phone only. <Link href="/ai-hospital/passport" className="underline">Open my Health Passport</Link></p>}
+        {saved === "off" && (
+          <p role="status" className="mt-2 text-amber-900">
+            Saving is off. To keep summaries, first turn on saving in your{" "}
+            <Link href="/ai-hospital/passport" className="underline">Health Passport</Link>. Until then, you can print or copy it.
+          </p>
+        )}
       </div>
 
       {preview && (
