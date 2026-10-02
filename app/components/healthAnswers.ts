@@ -198,6 +198,22 @@ const entries: Entry[] = [
     link: { href: "/ai-hospital/triage", label: "Open the Triage Desk" },
   },
 
+  {
+    keywords: ["prescription", "od", "bd", "tds", "label", "side effect", "side effects"],
+    text: "AI Hospital's Medicine Information explains what common prescription short forms mean (like OD, BD, TDS) and general medicine safety. It never gives doses — always follow your prescription and ask your pharmacist.",
+    link: { href: "/ai-hospital/medicines", label: "Medicine information" },
+  },
+  {
+    keywords: ["lab report", "report", "test result", "results", "hb", "hba1c", "platelet", "creatinine", "cholesterol"],
+    text: "The Lab Report Explainer tells you what a test measures and what to ask your doctor. Only your doctor can say what your own result means.",
+    link: { href: "/ai-hospital/lab-reports", label: "Lab report explainer" },
+  },
+  {
+    keywords: ["reminder", "remind me", "appointment"],
+    text: "You can add appointment, test, vaccination, and prescribed-medicine reminders to your phone's calendar with AI Hospital's Follow-up reminders.",
+    link: { href: "/ai-hospital/follow-up", label: "Follow-up reminders" },
+  },
+
   // Small talk
   {
     keywords: ["thank", "thanks", "ka lawm"],

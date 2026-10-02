@@ -51,13 +51,15 @@ export default function SimulatorShell({ simulation, departmentHref }: { simulat
     <div className="grid gap-6 lg:grid-cols-[1fr_380px]">
       {/* 3D view */}
       <div className="overflow-hidden rounded-2xl border-2 border-slate-200 bg-slate-100">
-        <div
-          role="img"
-          aria-label={`3D view of a typical ${simulation.name} visit. Step ${active + 1} of ${steps.length}: ${step.title}.`}
-          className="relative h-[340px] sm:h-[460px]"
-        >
+        <div className="relative h-[340px] sm:h-[460px]">
           {started && webgl ? (
-            <Scene3D simulation={simulation} active={active} reducedMotion={reducedMotion} />
+            <div
+              role="img"
+              aria-label={`3D view of a typical ${simulation.name} visit. Step ${active + 1} of ${steps.length}: ${step.title}.`}
+              className="h-full w-full"
+            >
+              <Scene3D simulation={simulation} active={active} reducedMotion={reducedMotion} />
+            </div>
           ) : (
             <div className="grid h-full place-items-center bg-gradient-to-br from-blue-100 to-slate-200 p-6 text-center">
               {webgl === false ? (

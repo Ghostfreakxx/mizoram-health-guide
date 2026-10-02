@@ -111,3 +111,18 @@ describe("robust to odd input", () => {
     expect(detectRedFlags(undefined as any)).toEqual({ confirmed: [], needsConfirmation: [] });
   });
 });
+
+describe("'OD' on prescriptions means once a day, not overdose", () => {
+  it.each(["what does OD mean on my prescription", "tab 1 OD after food", "BD and OD meaning", "Rx: paracetamol OD"])(
+    "%s → no emergency",
+    (text) => {
+      expect(detectRedFlags(text).confirmed).not.toContain("overdose");
+    },
+  );
+  it.each(["he took an OD", "I OD'd last night", "my friend did an od", "she ODd", "took too many tablets, the label says OD"])(
+    "%s → overdose",
+    (text) => {
+      expect(detectRedFlags(text).confirmed).toContain("overdose");
+    },
+  );
+});

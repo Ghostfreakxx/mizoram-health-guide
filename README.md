@@ -37,6 +37,19 @@ It never diagnoses or prescribes.
 - **Privacy by default**: no storage, analytics, or network calls with health
   data — enforced by tests.
 
+### Phase 2
+
+- **3D department tours** (`/ai-hospital/departments/[slug]/simulator`):
+  React Three Fiber scenes built only from department content; the 3D code
+  loads only on request, with a text tour and WebGL fallback.
+- **Health Passport** (`/ai-hospital/passport`): stored only after explicit
+  opt-in, via `app/lib/storage.ts` (the only module allowed to store health
+  data), with delete-everything.
+- **Follow-up reminders** (`/ai-hospital/follow-up`): offline `.ics` calendar
+  files; medicine reminders copy the prescription and never change it.
+- **Medicine information** and **Lab report explainer**: general information
+  only — no doses, and lab values are shown exactly as typed, never judged.
+
 ## Safety tests (release requirement)
 
 ```bash

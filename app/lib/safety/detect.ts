@@ -213,9 +213,13 @@ const COMMON_FIXES: Record<string, string> = {
   breathin: "breathing",
   preg: "pregnant",
   preggo: "pregnant",
-  od: "overdose",
-  "o.d": "overdose",
 };
+
+// On prescriptions in India, "OD" means "once a day". Only treat a bare "OD"
+// as "overdose" when the message is not about a prescription. Explicit forms
+// ("OD'd", "took too many tablets") are always detected by the patterns.
+const PRESCRIPTION_CONTEXT =
+  /\b(prescri\w*|rx|tab|tabs|tablets?|caps?|capsules?|syrup|bd|bid|tds|tid|qid|hs|sos|prn|after food|before food|once a day|daily|label|meaning|mean|stand for|stands for)\b/;
 
 // Real English words that look like typos of medical words. Never "correct"
 // these, or ordinary messages would trigger false alarms
@@ -259,6 +263,7 @@ function correct(word: string): string {
 
 // "|" marks a sentence or clause boundary. Negation never crosses it.
 export function normalize(text: string): string {
+  const prescription = PRESCRIPTION_CONTEXT.test(text.toLowerCase());
   return text
     .toLowerCase()
     .replace(/[’‘`]/g, "'")
@@ -268,6 +273,7 @@ export function normalize(text: string): string {
     .trim()
     .split(" ")
     .map((w) => (w === "|" ? w : correct(w.replace(/^['-]+|['-]+$/g, ""))))
+    .map((w) => (w === "od" && !prescription ? "overdose" : w))
     .join(" ");
 }
 

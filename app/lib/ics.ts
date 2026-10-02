@@ -49,13 +49,13 @@ function isTime(t: string): boolean {
 
 export function validate(f: FollowUp): string | null {
   if (!f.title.trim()) return "Please enter a name for the reminder.";
-  if (!isDate(f.date)) return "Please choose a date.";
-  if (f.times.some((t) => !isTime(t))) return "Please check the times.";
+  if (!isDate(f.date)) return f.kind === "medicine" ? "Please choose the start date." : "Please choose a date.";
   if (f.kind === "medicine") {
-    if (f.times.length === 0) return "Please enter the times written on your prescription.";
     if (!isDate(f.endDate)) return "Please enter the end date written on your prescription, or ask your doctor.";
     if (f.endDate < f.date) return "The end date must be after the start date.";
+    if (f.times.length === 0 || f.times.some((t) => t === "")) return "Please enter the times written on your prescription.";
   }
+  if (f.times.some((t) => !isTime(t))) return "Please check the times.";
   return null;
 }
 

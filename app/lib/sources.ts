@@ -411,6 +411,102 @@ export const sources: Source[] = [
     supports: ["1097 is the national AIDS helpline"],
   },
 
+  // ---- Medicines ----
+  {
+    id: "who-eml-2023",
+    title: "WHO Model List of Essential Medicines, 23rd list",
+    organisation: "World Health Organization",
+    url: "https://www.who.int/publications/i/item/WHO-MHP-HPS-EML-2023.02",
+    published: "2023",
+    ...pending,
+    supports: ["Which medicines are essential and what they are generally used for"],
+  },
+  {
+    id: "who-medication-without-harm",
+    title: "Medication Without Harm — WHO Global Patient Safety Challenge",
+    organisation: "World Health Organization",
+    url: "https://www.who.int/initiatives/medication-without-harm",
+    published: "2017",
+    ...pending,
+    supports: ["Know your medicines, keep a list, ask questions, and check with a health professional before changing medicines"],
+  },
+  {
+    id: "who-amr",
+    title: "Antimicrobial resistance — fact sheet",
+    organisation: "World Health Organization",
+    url: "https://www.who.int/news-room/fact-sheets/detail/antimicrobial-resistance",
+    ...pending,
+    supports: ["Antibiotics do not work against viruses such as colds and flu", "Misuse of antibiotics drives resistance; use only as prescribed"],
+  },
+  {
+    id: "nhs-paracetamol",
+    title: "Paracetamol for adults",
+    organisation: "NHS (UK National Health Service)",
+    url: "https://www.nhs.uk/medicines/paracetamol-for-adults/",
+    ...pending,
+    supports: ["Used for pain and fever", "Taking too much can cause serious liver damage", "Check other medicines do not also contain paracetamol"],
+  },
+  {
+    id: "nhs-ferrous-sulfate",
+    title: "Ferrous sulfate (iron tablets)",
+    organisation: "NHS (UK National Health Service)",
+    url: "https://www.nhs.uk/medicines/ferrous-sulfate/",
+    ...pending,
+    supports: ["Iron is used to treat and prevent iron-deficiency anaemia", "Dark stools are a common effect", "Keep out of reach of children — iron can be very harmful to children"],
+  },
+  {
+    id: "nhs-metformin",
+    title: "Metformin",
+    organisation: "NHS (UK National Health Service)",
+    url: "https://www.nhs.uk/medicines/metformin/",
+    ...pending,
+    supports: ["Used to treat type 2 diabetes", "Stomach upset is common when starting", "Tell the doctor before a scan with contrast dye or surgery"],
+  },
+  {
+    id: "nhs-amlodipine",
+    title: "Amlodipine",
+    organisation: "NHS (UK National Health Service)",
+    url: "https://www.nhs.uk/medicines/amlodipine/",
+    ...pending,
+    supports: ["Used for high blood pressure and some types of angina", "Ankle swelling can happen"],
+  },
+  {
+    id: "nhs-salbutamol",
+    title: "Salbutamol inhaler",
+    organisation: "NHS (UK National Health Service)",
+    url: "https://www.nhs.uk/medicines/salbutamol-inhaler/",
+    ...pending,
+    supports: ["A reliever inhaler for asthma and breathlessness", "Needing it more often, or it not helping, needs medical advice"],
+  },
+  {
+    id: "nhs-insulin",
+    title: "Insulin",
+    organisation: "NHS (UK National Health Service)",
+    url: "https://www.nhs.uk/conditions/type-1-diabetes/insulin/",
+    ...pending,
+    supports: ["Insulin treats diabetes", "Signs of low blood sugar include shaking, sweating, and confusion"],
+  },
+  {
+    id: "rx-abbreviations",
+    title: "Common prescription abbreviations (standard medical usage)",
+    organisation: "Standard medical usage — to be confirmed by a pharmacist",
+    ...pending,
+    supports: ["Meanings of OD, BD, TDS, QID, HS, SOS, AC, PC, STAT, and the 1-0-1 pattern"],
+  },
+
+  // ---- Laboratory tests ----
+  {
+    id: "medlineplus-labs",
+    title: "MedlinePlus Lab Tests",
+    organisation: "U.S. National Library of Medicine",
+    url: "https://medlineplus.gov/lab-tests/",
+    ...pending,
+    supports: [
+      "What common laboratory tests measure and why they are done",
+      "Reference ranges differ between laboratories, and results outside a range do not always mean a problem",
+    ],
+  },
+
   // ---- Internal safety policy (not a clinical claim) ----
   {
     id: "policy-uncertainty",
@@ -443,4 +539,5 @@ export const AUTHORITATIVE_DOMAINS = [
   "nhs.uk",
   "ifrc.org",
   "icmr.gov.in",
+  "medlineplus.gov",
 ];

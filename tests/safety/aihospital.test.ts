@@ -176,3 +176,45 @@ describe("3D department simulators", () => {
     expect(sim.stations.some((s) => s.id === "wait")).toBe(false);
   });
 });
+
+describe("medicine information never prescribes or doses", () => {
+  it("has no dose instructions and every entry is sourced", async () => {
+    const { medicines, generalSafety, labelTerms } = await import("../../app/ai-hospital/data/medicines");
+    const { getSource } = await import("../../app/lib/sources");
+    for (const m of medicines) {
+      for (const t of [m.usedFor, ...m.keyPoints, ...m.getHelp]) {
+        expect(violatesLanguagePolicy(t), t).toBeNull();
+        expect(t, t).not.toMatch(/\b\d+(\.\d+)?\s?(mg|mcg|g|ml|units?|tablets?|puffs?)\b/i);
+      }
+      expect(m.sourceIds.length, m.id).toBeGreaterThan(0);
+      for (const s of m.sourceIds) expect(getSource(s), `${m.id}: ${s}`).toBeDefined();
+    }
+    for (const p of generalSafety.points) expect(violatesLanguagePolicy(p)).toBeNull();
+    expect(labelTerms.length).toBeGreaterThan(5);
+  });
+});
+
+describe("lab report explainer never interprets results", () => {
+  it("preserves values, units, and ranges exactly as typed", async () => {
+    const { preserveEntry } = await import("../../app/ai-hospital/data/labTests");
+    const e = { value: " 9.80 ", unit: "g/dL", range: "12.0 - 15.5" };
+    expect(preserveEntry(e)).toEqual(e);
+  });
+
+  it("test explanations contain no judgement words about a result", async () => {
+    const { labTests, RANGE_EXPLANATION } = await import("../../app/ai-hospital/data/labTests");
+    expect(RANGE_EXPLANATION).toMatch(/Only your doctor can say/);
+    for (const t of labTests) {
+      for (const text of [t.measures, t.whyDone, ...t.notes]) {
+        expect(violatesLanguagePolicy(text), text).toBeNull();
+        expect(text, text).not.toMatch(/\byour (result|value) (is|shows) (high|low|normal|abnormal)\b/i);
+      }
+    }
+  });
+
+  it("the explainer component does not compare or label results", async () => {
+    const { readFileSync } = await import("node:fs");
+    const src = readFileSync("app/ai-hospital/lab-reports/LabExplainer.tsx", "utf8");
+    expect(src).not.toMatch(/parseFloat|Number\(|\bhigh\b.*\blow\b|abnormal/i);
+  });
+});

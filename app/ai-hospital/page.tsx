@@ -28,7 +28,7 @@ const journey = [
   { icon: "🧭", label: "Department", text: "The right service" },
   { icon: "📋", label: "Preparation", text: "Summary for the doctor" },
   { icon: "👩‍⚕️", label: "Real doctor", text: "Online or in person" },
-  { icon: "🔁", label: "Follow-up", text: "Coming soon" },
+  { icon: "🔁", label: "Follow-up", text: "Reminders and records" },
 ];
 
 export default function AiHospitalLobby() {
@@ -79,6 +79,27 @@ export default function AiHospitalLobby() {
               <span>
                 <span className="block text-xl font-bold">{a.label}</span>
                 <span className={`block text-base ${a.style ? "text-white/85" : "text-slate-600"}`}>{a.sub}</span>
+              </span>
+            </Link>
+          ))}
+        </div>
+      </section>
+
+      {/* After the visit */}
+      <section aria-labelledby="after-heading" className="mx-auto max-w-6xl px-4 pb-10 sm:px-6">
+        <h2 id="after-heading" className="text-2xl font-bold text-blue-950">After your visit</h2>
+        <div className="mt-5 grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
+          {[
+            { href: "/ai-hospital/follow-up", icon: "🔔", label: "Reminders", sub: "Appointments, tests, medicines" },
+            { href: "/ai-hospital/medicines", icon: "💊", label: "Medicine information", sub: "Understand your prescription" },
+            { href: "/ai-hospital/lab-reports", icon: "🧪", label: "Lab report explainer", sub: "What a test measures" },
+            { href: "/ai-hospital/passport", icon: "🗂️", label: "Health Passport", sub: "Your records, on your phone" },
+          ].map((a) => (
+            <Link key={a.href} href={a.href} className="flex min-h-24 items-center gap-4 rounded-2xl border-2 border-slate-200 bg-white p-5 text-slate-900 transition hover:border-blue-400 hover:bg-blue-50">
+              <span aria-hidden className="text-4xl">{a.icon}</span>
+              <span>
+                <span className="block text-xl font-bold">{a.label}</span>
+                <span className="block text-base text-slate-600">{a.sub}</span>
               </span>
             </Link>
           ))}

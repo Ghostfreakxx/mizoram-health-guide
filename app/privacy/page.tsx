@@ -31,6 +31,16 @@ export default function PrivacyPage() {
         passed to the app you choose (for example WhatsApp).
       </p>
 
+      <h2>Health Passport and reminders</h2>
+      <p>
+        The Health Passport saves information on your device only if you turn
+        on saving. It stays in your browser on that device and is never sent
+        to us or anyone else. Anyone who uses the same device and browser
+        could open it. &quot;Delete everything&quot; removes all of it and
+        turns saving off. Follow-up reminders are created as a calendar file
+        on your device, which you can import into your phone&apos;s calendar.
+      </p>
+
       <h2>Settings saved on your device</h2>
       <p>
         If you change the text size or turn on high contrast, that choice is
