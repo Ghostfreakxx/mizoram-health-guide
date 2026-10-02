@@ -8,7 +8,9 @@
     "start": "next start",
     "lint": "eslint",
     "test": "vitest run",
-    "test:e2e": "playwright test"
+    "test:e2e": "playwright test",
+    "i18n:export": "tsx scripts/i18n-export.ts",
+    "i18n:import": "tsx scripts/i18n-import.ts"
   },
   "dependencies": {
     "@react-three/fiber": "^9.8.1",
@@ -28,6 +30,7 @@
     "eslint": "^9",
     "eslint-config-next": "16.2.7",
     "tailwindcss": "^4",
+    "tsx": "^4.23.15",
     "typescript": "^5",
     "vitest": "^3.2.7"
   },

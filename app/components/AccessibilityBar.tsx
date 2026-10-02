@@ -2,6 +2,8 @@
 
 import Link from "next/link";
 import { useEffect, useState } from "react";
+import { type Locale, anySurfaceReady, coverage } from "../i18n";
+import { useLanguage } from "../i18n/LanguageProvider";
 
 const SIZES = [87.5, 100, 112.5, 125];
 const DEFAULT_SIZE = 1;
@@ -25,6 +27,9 @@ function save(key: string, value: string) {
 export default function AccessibilityBar() {
   const [size, setSize] = useState(DEFAULT_SIZE);
   const [contrast, setContrast] = useState(false);
+  const { locale, setLocale } = useLanguage();
+  const mizoReady = anySurfaceReady();
+  const mizoProgress = coverage("emergency").percent;
   // The browser's "install this app" offer, when available.
   const [installEvent, setInstallEvent] = useState<(Event & { prompt: () => Promise<void> }) | null>(null);
 
@@ -47,7 +52,8 @@ export default function AccessibilityBar() {
     // eslint-disable-next-line react-hooks/set-state-in-effect -- restoring saved settings after hydration
     if (savedSize >= 0 && savedSize < SIZES.length && load("a11y-size") !== null) setSize(savedSize);
     if (load("a11y-contrast") === "1") setContrast(true);
-  }, []);
+    if (load("a11y-lang") === "lus" && mizoReady) setLocale("lus");
+  }, [mizoReady, setLocale]);
 
   useEffect(() => {
     document.documentElement.style.fontSize = `${SIZES[size]}%`;
@@ -114,11 +120,18 @@ export default function AccessibilityBar() {
           <label htmlFor="language" className="sr-only">Language</label>
           <select
             id="language"
-            defaultValue="en"
+            value={locale}
+            onChange={(e) => {
+              const l = e.target.value as Locale;
+              setLocale(l);
+              save("a11y-lang", l);
+            }}
             className="rounded bg-slate-800 px-2 py-1 text-xs text-slate-100"
           >
             <option value="en">English</option>
-            <option value="lus" disabled>Mizo (coming soon)</option>
+            <option value="lus" disabled={!mizoReady}>
+              {mizoReady ? "Mizo" : `Mizo (translation in progress — ${mizoProgress}% reviewed)`}
+            </option>
           </select>
         </div>
       </div>

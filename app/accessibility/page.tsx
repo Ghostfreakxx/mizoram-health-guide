@@ -39,7 +39,7 @@ export default function AccessibilityPage() {
 
       <h2>Known limitations</h2>
       <ul>
-        <li>Content is currently available in English only. A Mizo version is planned.</li>
+        <li>Content is currently available in English only. A Mizo version is being prepared: each screen switches to Mizo only after its translation has been fully reviewed by fluent Mizo speakers and a health professional.</li>
         <li>High contrast mode changes colours across the whole page; some icons may look different.</li>
       </ul>
 

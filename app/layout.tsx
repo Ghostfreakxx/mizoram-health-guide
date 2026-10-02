@@ -5,6 +5,7 @@ import SiteHeader from "./components/SiteHeader";
 import SiteFooter from "./components/SiteFooter";
 import HealthChatbot from "./components/HealthChatbot";
 import OfflineSupport from "./components/OfflineSupport";
+import { LanguageProvider } from "./i18n/LanguageProvider";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -42,6 +43,7 @@ export default function RootLayout({
       className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
     >
       <body className="min-h-full flex flex-col font-sans">
+        <LanguageProvider>
         <OfflineSupport />
         <SiteHeader />
         <div id="main-content" className="flex-1 flex flex-col">
@@ -49,6 +51,7 @@ export default function RootLayout({
         </div>
         <SiteFooter />
         <HealthChatbot />
+        </LanguageProvider>
       </body>
     </html>
   );

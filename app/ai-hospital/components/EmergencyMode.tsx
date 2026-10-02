@@ -2,6 +2,8 @@
 
 import { useEffect, useRef, useState } from "react";
 import ReadAloud from "../../components/ReadAloud";
+import { effectiveLocale, translate } from "../../i18n";
+import { useLanguage } from "../../i18n/LanguageProvider";
 import { type RedFlagId, getRedFlag, redFlags } from "../../lib/safety/redFlags";
 
 // Full-screen emergency interface. It covers the whole page so nothing else
@@ -9,7 +11,7 @@ import { type RedFlagId, getRedFlag, redFlags } from "../../lib/safety/redFlags"
 export default function EmergencyMode({
   flags = [],
   onExit,
-  exitLabel = "This is not an emergency — go back",
+  exitLabel,
 }: {
   flags?: RedFlagId[];
   onExit: () => void;
@@ -33,6 +35,11 @@ export default function EmergencyMode({
     };
   }, []);
 
+  // Emergency Mode switches to Mizo only when every string is reviewed.
+  const { locale } = useLanguage();
+  const lang = effectiveLocale(locale, "emergency");
+  const tr = (key: string) => translate(lang, key);
+  const flagTitle = (id: RedFlagId) => tr(`redflag.${id}.title`);
   const crisis = selected.some((id) => getRedFlag(id).crisis);
   const active = selected.map(getRedFlag);
 
@@ -41,15 +48,16 @@ export default function EmergencyMode({
       role="alertdialog"
       aria-modal="true"
       aria-labelledby="emergency-heading"
+      lang={lang === "lus" ? "lus" : "en"}
       className="fixed inset-0 z-[100] overflow-y-auto bg-white text-slate-950"
     >
       <div className="bg-red-700 px-4 py-5 text-white">
         <div className="mx-auto max-w-2xl">
           <h1 id="emergency-heading" ref={headingRef} tabIndex={-1} className="text-3xl font-black outline-none sm:text-4xl">
-            {crisis ? "Help is available now" : "Emergency — act now"}
+            {crisis ? tr("emergency.heading.crisis") : tr("emergency.heading")}
           </h1>
           {active.length > 0 && (
-            <p className="mt-1 text-lg font-semibold text-red-50">{active.map((f) => f.title).join(" · ")}</p>
+            <p className="mt-1 text-lg font-semibold text-red-50">{active.map((f) => flagTitle(f.id)).join(" · ")}</p>
           )}
         </div>
       </div>
@@ -60,40 +68,40 @@ export default function EmergencyMode({
           {crisis && (
             <a href="tel:14416" className="flex items-center justify-between rounded-2xl bg-violet-800 px-6 py-5 text-white">
               <span>
-                <span className="block text-sm font-semibold uppercase tracking-wide">Talk to someone now — free, 24 hours</span>
-                <span className="block text-2xl font-bold">Tele-MANAS 14416</span>
+                <span className="block text-sm font-semibold uppercase tracking-wide">{tr("emergency.crisis.talk")}</span>
+                <span className="block text-2xl font-bold">{tr("emergency.crisis.telemanas")}</span>
               </span>
               <span aria-hidden className="text-4xl">📞</span>
             </a>
           )}
           <a href="tel:108" className="flex items-center justify-between rounded-2xl bg-red-700 px-6 py-5 text-white">
             <span>
-              <span className="block text-sm font-semibold uppercase tracking-wide">Ambulance</span>
-              <span className="block text-4xl font-black">Call 108</span>
+              <span className="block text-sm font-semibold uppercase tracking-wide">{tr("emergency.ambulance")}</span>
+              <span className="block text-4xl font-black">{tr("emergency.call108")}</span>
             </span>
             <span aria-hidden className="text-4xl">🚑</span>
           </a>
           <a href="tel:112" className="flex items-center justify-between rounded-2xl border-4 border-red-700 px-6 py-4 text-red-800">
             <span>
-              <span className="block text-sm font-semibold uppercase tracking-wide">National emergency number</span>
-              <span className="block text-3xl font-black">Call 112</span>
+              <span className="block text-sm font-semibold uppercase tracking-wide">{tr("emergency.national")}</span>
+              <span className="block text-3xl font-black">{tr("emergency.call112")}</span>
             </span>
             <span aria-hidden className="text-3xl">📞</span>
           </a>
         </div>
 
         <p className="rounded-xl bg-amber-100 p-4 text-lg font-semibold text-amber-950">
-          👥 Ask someone nearby to help you. If you cannot call, ask them to call. Or go to the nearest hospital emergency now.
+          👥 {tr("emergency.nearby")}
         </p>
 
         {/* Short guidance for the selected situation */}
         {active.length > 0 ? (
           active.map((f) => (
             <section key={f.id} className="rounded-xl border-2 border-slate-200 p-5">
-              <h2 className="text-xl font-bold">While waiting for help</h2>
-              <ReadAloud text={`Call 108 or 112 now. While waiting for help: ${f.guidance.join(" ")}`} className="mt-2" />
+              <h2 className="text-xl font-bold">{tr("emergency.waiting")}</h2>
+              <ReadAloud text={`${tr("emergency.call108")}. ${tr("emergency.call112")}. ${tr("emergency.waiting")}: ${f.guidance.map((_, i) => tr(`redflag.${f.id}.guidance.${i}`)).join(" ")}`} className="mt-2" />
               <ul className="mt-3 space-y-2 text-lg">
-                {f.guidance.map((g) => (
+                {f.guidance.map((_, i) => tr(`redflag.${f.id}.guidance.${i}`)).map((g) => (
                   <li key={g} className="flex gap-3">
                     <span aria-hidden className="font-bold text-red-700">›</span>
                     {g}
@@ -104,8 +112,8 @@ export default function EmergencyMode({
           ))
         ) : (
           <section>
-            <h2 className="text-xl font-bold">What is happening? (optional)</h2>
-            <p className="mt-1 text-slate-600">Tap one to see what to do while waiting for help.</p>
+            <h2 className="text-xl font-bold">{tr("emergency.what")}</h2>
+            <p className="mt-1 text-slate-600">{tr("emergency.what.hint")}</p>
             <div className="mt-3 grid gap-2 sm:grid-cols-2">
               {redFlags.map((f) => (
                 <button
@@ -114,7 +122,7 @@ export default function EmergencyMode({
                   onClick={() => setSelected([f.id])}
                   className="rounded-xl border-2 border-slate-200 px-4 py-3 text-left text-lg font-semibold hover:border-red-400"
                 >
-                  {f.title}
+                  {flagTitle(f.id)}
                 </button>
               ))}
             </div>
@@ -125,12 +133,12 @@ export default function EmergencyMode({
         <section className="rounded-xl border-2 border-slate-200 p-5">
           {!showNote ? (
             <button type="button" onClick={() => setShowNote(true)} className="w-full text-left text-lg font-semibold text-blue-800">
-              📝 Prepare information for the ambulance or doctor (optional)
+              📝 {tr("emergency.note.open")}
             </button>
           ) : (
             <div className="space-y-4">
-              <h2 className="text-xl font-bold">Information for responders</h2>
-              <p className="text-sm text-slate-600">This stays on this screen only. It is not saved or sent.</p>
+              <h2 className="text-xl font-bold">{tr("emergency.note.title")}</h2>
+              <p className="text-sm text-slate-600">{tr("emergency.note.private")}</p>
               <button
                 type="button"
                 onClick={() =>
@@ -138,29 +146,29 @@ export default function EmergencyMode({
                 }
                 className="rounded-lg bg-slate-900 px-5 py-3 text-lg font-semibold text-white"
               >
-                🕒 {noteTime ? `Time noted: ${noteTime}` : "Note the time it started (now)"}
+                🕒 {noteTime ? `${tr("emergency.note.timeNoted")} ${noteTime}` : tr("emergency.note.time")}
               </button>
               <label className="block text-lg font-semibold">
-                What happened
+                {tr("emergency.note.happened")}
                 <textarea value={what} onChange={(e) => setWhat(e.target.value)} rows={2} maxLength={500} className="mt-1 w-full rounded-lg border-2 border-slate-300 p-3 text-lg font-normal" />
               </label>
               <label className="block text-lg font-semibold">
-                Medicines they take
+                {tr("emergency.note.medicines")}
                 <input value={meds} onChange={(e) => setMeds(e.target.value)} maxLength={300} className="mt-1 w-full rounded-lg border-2 border-slate-300 p-3 text-lg font-normal" />
               </label>
               <label className="block text-lg font-semibold">
-                Allergies
+                {tr("emergency.note.allergies")}
                 <input value={allergies} onChange={(e) => setAllergies(e.target.value)} maxLength={200} className="mt-1 w-full rounded-lg border-2 border-slate-300 p-3 text-lg font-normal" />
               </label>
               <button type="button" onClick={() => setShowLarge(true)} className="rounded-lg bg-blue-900 px-5 py-3 text-lg font-semibold text-white">
-                Show this to the responders
+                {tr("emergency.note.show")}
               </button>
             </div>
           )}
         </section>
 
         <button type="button" onClick={onExit} className="w-full py-3 text-center text-slate-600 underline">
-          {exitLabel}
+          {exitLabel ?? tr("emergency.exit")}
         </button>
       </div>
 
