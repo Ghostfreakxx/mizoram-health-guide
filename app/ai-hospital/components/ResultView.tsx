@@ -10,6 +10,7 @@ import { getService } from "../../lib/services";
 import { getSource } from "../../lib/sources";
 import type { SummaryData } from "../../lib/summary";
 import DoctorSummary from "./DoctorSummary";
+import ReadAloud from "../../components/ReadAloud";
 
 const LEVEL_STYLE = {
   RED: { card: "border-red-400 bg-red-50 text-red-950", badge: "bg-red-700 text-white" },
@@ -101,6 +102,7 @@ export default function ResultView({
         </span>
         <p className="mt-4 text-2xl font-bold leading-snug">{text.title}</p>
         <p className="mt-2 text-lg leading-relaxed">{result.now && text.nowMessage ? text.nowMessage : text.message}</p>
+        <ReadAloud text={`${text.title}. ${result.now && text.nowMessage ? text.nowMessage : text.message}`} className="mt-3" />
         {result.level === "ORANGE" && (
           <p className="mt-3 text-base">If things get worse before you get there, call <a href="tel:108" className="font-bold underline">108</a> or <a href="tel:112" className="font-bold underline">112</a>.</p>
         )}

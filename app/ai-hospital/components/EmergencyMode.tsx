@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import ReadAloud from "../../components/ReadAloud";
 import { type RedFlagId, getRedFlag, redFlags } from "../../lib/safety/redFlags";
 
 // Full-screen emergency interface. It covers the whole page so nothing else
@@ -90,6 +91,7 @@ export default function EmergencyMode({
           active.map((f) => (
             <section key={f.id} className="rounded-xl border-2 border-slate-200 p-5">
               <h2 className="text-xl font-bold">While waiting for help</h2>
+              <ReadAloud text={`Call 108 or 112 now. While waiting for help: ${f.guidance.join(" ")}`} className="mt-2" />
               <ul className="mt-3 space-y-2 text-lg">
                 {f.guidance.map((g) => (
                   <li key={g} className="flex gap-3">

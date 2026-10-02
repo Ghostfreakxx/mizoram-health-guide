@@ -64,6 +64,7 @@ const surveyAreas = [
 export default function Home() {
   return (
     <main className="flex-1">
+      <h1 className="sr-only">Mizoram Health Guide — public health information and AI Hospital for Mizoram</h1>
       <HeroSlider />
 
       {/* AI Hospital */}

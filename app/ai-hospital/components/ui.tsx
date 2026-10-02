@@ -1,3 +1,5 @@
+import ReadAloud from "../../components/ReadAloud";
+
 // Large, simple controls for AI Hospital (elderly-friendly, big touch targets).
 
 export function BigChoice({
@@ -31,11 +33,12 @@ export function BigChoice({
   );
 }
 
-export function StepTitle({ children, hint }: { children: React.ReactNode; hint?: React.ReactNode }) {
+export function StepTitle({ children, hint, speak }: { children: React.ReactNode; hint?: React.ReactNode; speak?: string }) {
   return (
     <div>
       <h2 className="text-2xl font-bold leading-snug text-blue-950 sm:text-3xl">{children}</h2>
       {hint && <p className="mt-2 text-lg text-slate-600">{hint}</p>}
+      {speak && <ReadAloud text={speak} className="mt-3" />}
     </div>
   );
 }

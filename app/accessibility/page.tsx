@@ -26,6 +26,9 @@ export default function AccessibilityPage() {
         <li>Moving content (slideshow and news ticker) can be paused, and stops automatically if your device is set to reduce motion.</li>
         <li>Links to external websites are marked and open in a new tab.</li>
         <li>Works on mobile phones and small screens.</li>
+        <li>&quot;Read aloud&quot; buttons on AI Hospital questions, results, Emergency Mode, and 3D tours use your phone&apos;s built-in voice.</li>
+        <li>Can be installed like an app, and key pages (Emergency Mode, Helplines, AI Hospital) work without internet.</li>
+        <li>Every page is checked automatically for accessibility problems (axe-core, WCAG 2.1 A/AA) on desktop and mobile.</li>
       </ul>
 
       <h2>Screen readers</h2>

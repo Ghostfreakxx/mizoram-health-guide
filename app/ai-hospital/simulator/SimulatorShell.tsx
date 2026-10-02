@@ -3,6 +3,7 @@
 import dynamic from "next/dynamic";
 import Link from "next/link";
 import { useEffect, useState } from "react";
+import ReadAloud from "../../components/ReadAloud";
 import type { Simulation } from "../data/simulator";
 
 // The 3D scene is only downloaded when the person chooses to start it.
@@ -99,6 +100,7 @@ export default function SimulatorShell({ simulation, departmentHref }: { simulat
           </p>
           <h2 id="tour-heading" className="mt-1 text-2xl font-bold text-blue-950">{step.title}</h2>
           <p className="mt-2 text-lg leading-relaxed text-slate-800" aria-live="polite">{step.text}</p>
+          <ReadAloud text={`${step.title}. ${step.text}`} className="mt-3" />
           <div className="mt-5 grid grid-cols-2 gap-3">
             <button
               type="button"

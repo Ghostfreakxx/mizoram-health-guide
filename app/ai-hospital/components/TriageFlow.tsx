@@ -136,7 +136,12 @@ export default function TriageFlow({ start = {} }: { start?: TriageStart }) {
   if (current === "check") {
     body = (
       <div className="space-y-5">
-        <StepTitle hint="Tap anything that is happening now.">First — is this an emergency?</StepTitle>
+        <StepTitle
+          hint="Tap anything that is happening now."
+          speak={`First, is this an emergency? Tap anything that is happening now. ${redFlags.filter((f) => f.inChecklist).map((f) => f.label).join(". ")}.`}
+        >
+          First — is this an emergency?
+        </StepTitle>
         <div className="grid gap-3">
           {redFlags
             .filter((f) => f.inChecklist)
@@ -280,7 +285,7 @@ export default function TriageFlow({ start = {} }: { start?: TriageStart }) {
           <p className="text-base font-semibold text-blue-800">
             {getComplaint(context.complaint)?.icon} {getComplaint(context.complaint)?.label}
           </p>
-          <StepTitle hint={q.help}>{q.text}</StepTitle>
+          <StepTitle hint={q.help} speak={`${q.text} ${q.help ?? ""} Answer yes, no, or not sure.`}>{q.text}</StepTitle>
           <div className="grid gap-3 sm:grid-cols-3">
             <BigChoice selected={ans[q.id] === "yes"} onClick={() => answer("yes")} className="text-center">Yes</BigChoice>
             <BigChoice selected={ans[q.id] === "no"} onClick={() => answer("no")} className="text-center">No</BigChoice>

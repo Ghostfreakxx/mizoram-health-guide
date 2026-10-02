@@ -61,6 +61,16 @@ adversarial phrasing, triage rules, special populations, monotonicity,
 fail-safe, language policy, source integrity, privacy checks). Never weaken a
 safety rule to make a test pass.
 
+## Browser and accessibility tests
+
+```bash
+npm run build && npm run test:e2e
+```
+
+Runs Playwright tests in `tests/e2e/`: an axe-core WCAG 2.1 A/AA scan of every
+page on desktop and phone, plus key safety flows (emergency interruption,
+crisis support, consent-gated Health Passport).
+
 ## Tech stack
 
 - [Next.js](https://nextjs.org) (App Router) with TypeScript
