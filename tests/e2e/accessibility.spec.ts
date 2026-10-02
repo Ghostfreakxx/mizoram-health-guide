@@ -34,6 +34,7 @@ const PAGES = [
   "/ai-hospital/follow-up",
   "/ai-hospital/medicines",
   "/ai-hospital/lab-reports",
+  "/ai-hospital/admin",
 ];
 
 for (const path of PAGES) {
@@ -57,5 +58,14 @@ test("every page has exactly one main landmark and a page heading", async ({ pag
     await page.goto(path);
     await expect(page.locator("main")).toHaveCount(1);
     await expect(page.locator("h1").first()).toBeVisible();
+  }
+});
+
+test("no sideways scrolling on small phones (320px)", async ({ page }) => {
+  await page.setViewportSize({ width: 320, height: 800 });
+  for (const path of ["/", "/ai-hospital", "/ai-hospital/triage", "/ai-hospital/admin", "/ai-hospital/emergency"]) {
+    await page.goto(path);
+    const width = await page.evaluate(() => document.documentElement.scrollWidth);
+    expect(width, path).toBeLessThanOrEqual(320);
   }
 });

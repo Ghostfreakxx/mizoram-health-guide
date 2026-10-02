@@ -92,7 +92,7 @@ export default function AccessibilityBar() {
           )}
         </div>
 
-        <div className="flex items-center gap-1">
+        <div className="flex flex-wrap items-center gap-1">
           <span className="mr-1 hidden sm:inline">Text size:</span>
           <button type="button" className={btn} aria-label="Decrease text size" disabled={size === 0} onClick={() => setSize((s) => s - 1)}>
             A-
@@ -126,11 +126,11 @@ export default function AccessibilityBar() {
               setLocale(l);
               save("a11y-lang", l);
             }}
-            className="rounded bg-slate-800 px-2 py-1 text-xs text-slate-100"
+            className="max-w-[9.5rem] rounded bg-slate-800 px-2 py-1 text-xs text-slate-100"
           >
             <option value="en">English</option>
             <option value="lus" disabled={!mizoReady}>
-              {mizoReady ? "Mizo" : `Mizo (translation in progress — ${mizoProgress}% reviewed)`}
+              {mizoReady ? "Mizo" : `Mizo (coming soon, ${mizoProgress}% reviewed)`}
             </option>
           </select>
         </div>

@@ -50,6 +50,20 @@ It never diagnoses or prescribes.
 - **Medicine information** and **Lab report explainer**: general information
   only — no doses, and lab values are shown exactly as typed, never judged.
 
+### Phase 3
+
+- **Live consultation with real doctors** (`/ai-hospital/consult`,
+  `/ai-hospital/doctor-desk`): self-hosted Jitsi video, off until
+  `NEXT_PUBLIC_LIVE_CONSULT_DOMAIN` is set. See `docs/LIVE_CONSULTATION.md`.
+- **Offline / installable app**: service worker, offline page, install button.
+- **Read aloud** on triage, results, emergency and tours.
+- **Mizo language**: built in, but switched on only for reviewed translations.
+  See `docs/TRANSLATION.md`.
+- **Health Department dashboard** (`/ai-hospital/admin`): demonstration data
+  only. `app/lib/metrics.ts` accepts category codes only (no text, identifiers
+  or exact times) and hides any count below 5. Nothing is collected or sent
+  until the Health Department decides where counts go.
+
 ## Safety tests (release requirement)
 
 ```bash

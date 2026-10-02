@@ -165,6 +165,12 @@ export default function AiHospitalLobby() {
             </p>
           </div>
         </div>
+        <p className="mt-6 text-sm text-slate-600">
+          For staff:{" "}
+          <Link href="/ai-hospital/doctor-desk" className="font-semibold text-blue-800 underline">Doctor&apos;s Desk</Link>
+          {" · "}
+          <Link href="/ai-hospital/admin" className="font-semibold text-blue-800 underline">Health Department dashboard (demonstration)</Link>
+        </p>
       </section>
     </main>
   );
