@@ -41,6 +41,14 @@ export default function PrivacyPage() {
         on your device, which you can import into your phone&apos;s calendar.
       </p>
 
+      <h2>Offline use</h2>
+      <p>
+        To work without internet, this website saves copies of its own public
+        pages (such as Emergency Mode and Helplines) on your device. These
+        copies contain only the website itself — never anything you typed or
+        answered.
+      </p>
+
       <h2>Settings saved on your device</h2>
       <p>
         If you change the text size or turn on high contrast, that choice is

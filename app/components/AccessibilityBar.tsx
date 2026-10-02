@@ -25,6 +25,22 @@ function save(key: string, value: string) {
 export default function AccessibilityBar() {
   const [size, setSize] = useState(DEFAULT_SIZE);
   const [contrast, setContrast] = useState(false);
+  // The browser's "install this app" offer, when available.
+  const [installEvent, setInstallEvent] = useState<(Event & { prompt: () => Promise<void> }) | null>(null);
+
+  useEffect(() => {
+    const onPrompt = (e: Event) => {
+      e.preventDefault();
+      setInstallEvent(e as Event & { prompt: () => Promise<void> });
+    };
+    const onInstalled = () => setInstallEvent(null);
+    window.addEventListener("beforeinstallprompt", onPrompt);
+    window.addEventListener("appinstalled", onInstalled);
+    return () => {
+      window.removeEventListener("beforeinstallprompt", onPrompt);
+      window.removeEventListener("appinstalled", onInstalled);
+    };
+  }, []);
 
   useEffect(() => {
     const savedSize = Number(load("a11y-size"));
@@ -53,6 +69,21 @@ export default function AccessibilityBar() {
           <a href="#main-content" className="hover:underline">Skip to main content</a>
           <span aria-hidden className="text-slate-600">|</span>
           <Link href="/accessibility" className="hover:underline">Screen reader access</Link>
+          {installEvent && (
+            <>
+              <span aria-hidden className="text-slate-600">|</span>
+              <button
+                type="button"
+                onClick={async () => {
+                  await installEvent.prompt();
+                  setInstallEvent(null);
+                }}
+                className="rounded bg-amber-400 px-2 py-1 font-semibold text-blue-950"
+              >
+                📲 Install app
+              </button>
+            </>
+          )}
         </div>
 
         <div className="flex items-center gap-1">
