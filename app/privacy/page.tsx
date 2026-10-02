@@ -41,6 +41,15 @@ export default function PrivacyPage() {
         on your device, which you can import into your phone&apos;s calendar.
       </p>
 
+      <h2>Live consultations with doctors</h2>
+      <p>
+        When live video consultations are available, the video goes directly
+        between you and the Health Department&apos;s own video server. This
+        website does not receive, record, or store the video. The link you
+        receive contains only a random code. The camera and microphone check
+        in the consulting room runs only on your phone.
+      </p>
+
       <h2>Offline use</h2>
       <p>
         To work without internet, this website saves copies of its own public

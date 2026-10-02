@@ -154,7 +154,7 @@ export default function ResultView({
             </Link>
           ))}
           {result.teleconsultSuitable && (
-            <Link href="/ai-hospital/doctor" className="rounded-xl border-2 border-slate-200 p-5 hover:border-blue-400 hover:bg-blue-50">
+            <Link href="/ai-hospital/consult" className="rounded-xl border-2 border-slate-200 p-5 hover:border-blue-400 hover:bg-blue-50">
               <span className="text-sm font-semibold text-slate-600">Talk to a real doctor</span>
               <span className="mt-1 flex items-center gap-2 text-xl font-bold text-blue-900">
                 <span aria-hidden className="text-2xl">💻</span> Online consultation

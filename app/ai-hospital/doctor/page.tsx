@@ -37,6 +37,14 @@ export default function DoctorPage() {
           <a href="tel:112" className="font-bold underline">112</a>, or go to the nearest emergency now.
         </div>
 
+        <Link href="/ai-hospital/consult" className="flex flex-col gap-3 rounded-2xl bg-gradient-to-r from-blue-900 to-blue-700 p-6 text-white sm:flex-row sm:items-center sm:justify-between">
+          <span>
+            <span className="block text-2xl font-bold">🩺 Enter the consulting room</span>
+            <span className="mt-1 block text-blue-100">Check your camera, get your summary ready, and talk to a real doctor in real time.</span>
+          </span>
+          <span className="shrink-0 rounded-xl bg-amber-400 px-5 py-3 text-center text-lg font-bold text-blue-950">Go →</span>
+        </Link>
+
         {/* Step 1: prepare */}
         <section className="rounded-2xl border-2 border-slate-200 bg-white p-6 sm:p-8">
           <h2 className="text-2xl font-bold text-blue-950">Step 1 — Get your summary ready</h2>

@@ -11,7 +11,7 @@ const actions = [
   { href: "/ai-hospital/triage", icon: "🤒", label: "I feel sick", sub: "Check how urgent it is", style: "bg-blue-900 text-white border-blue-900 hover:bg-blue-800" },
   { href: "/ai-hospital/emergency", icon: "🚨", label: "Emergency", sub: "Call for help now", style: "bg-red-700 text-white border-red-700 hover:bg-red-800" },
   { href: "/ai-hospital/departments", icon: "🧭", label: "Find the right department", sub: "Where should I go?" },
-  { href: "/ai-hospital/doctor", icon: "👩‍⚕️", label: "Talk to a real doctor", sub: "Online or in person" },
+  { href: "/ai-hospital/consult", icon: "👩‍⚕️", label: "Talk to a real doctor", sub: "Live, in real time" },
   { href: "/ai-hospital/prepare", icon: "📋", label: "Prepare for a hospital visit", sub: "Make a summary for the doctor" },
   { href: "/ai-hospital/departments/obstetrics-gynaecology", icon: "🤱", label: "Mother & Child", sub: "Pregnancy, babies, children" },
   { href: "/ai-hospital/departments/mental-health", icon: "🧠", label: "Mental Health", sub: "Stress, sadness, worry" },

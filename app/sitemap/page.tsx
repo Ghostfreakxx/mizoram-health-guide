@@ -18,6 +18,7 @@ const groups = [
       { href: "/ai-hospital/departments", title: "Departments" },
       { href: "/ai-hospital/prepare", title: "Prepare for a visit" },
       { href: "/ai-hospital/doctor", title: "Talk to a real doctor" },
+      { href: "/ai-hospital/consult", title: "Consulting room (live doctor)" },
       { href: "/ai-hospital/hospitals", title: "Find a hospital" },
       { href: "/ai-hospital/passport", title: "Health Passport" },
       { href: "/ai-hospital/follow-up", title: "Follow-up reminders" },
