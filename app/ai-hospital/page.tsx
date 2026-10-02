@@ -85,6 +85,29 @@ export default function AiHospitalLobby() {
         </div>
       </section>
 
+      {/* 3D tours */}
+      <section className="mx-auto max-w-6xl px-4 pb-10 sm:px-6">
+        <div className="rounded-2xl border-2 border-amber-300 bg-amber-50 p-6">
+          <h2 className="text-2xl font-bold text-blue-950">🧊 Visit a department in 3D before you go</h2>
+          <p className="mt-1 text-lg text-slate-700">Walk through a typical visit, so you know what to expect.</p>
+          <div className="mt-4 flex flex-wrap gap-2">
+            {[
+              ["general-medicine", "General doctor"],
+              ["emergency", "Emergency"],
+              ["obstetrics-gynaecology", "Pregnancy care"],
+              ["paediatrics", "Children's health"],
+              ["dental", "Teeth and mouth"],
+              ["eye-care", "Eye care"],
+            ].map(([slug, label]) => (
+              <Link key={slug} href={`/ai-hospital/departments/${slug}/simulator`} className="rounded-xl border-2 border-blue-900 bg-white px-4 py-2 text-lg font-semibold text-blue-900 hover:bg-blue-50">
+                {label}
+              </Link>
+            ))}
+            <Link href="/ai-hospital/departments" className="rounded-xl px-4 py-2 text-lg font-semibold text-blue-700 underline">All 17 →</Link>
+          </div>
+        </div>
+      </section>
+
       {/* Journey */}
       <section className="border-y border-slate-200 bg-white">
         <div className="mx-auto max-w-6xl px-4 py-10 sm:px-6">

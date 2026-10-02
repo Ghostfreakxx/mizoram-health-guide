@@ -121,6 +121,10 @@ export default async function DepartmentPage({ params }: { params: Promise<{ slu
         </div>
 
         <aside className="space-y-5 lg:sticky lg:top-16 lg:self-start">
+          <Link href={`/ai-hospital/departments/${d.slug}/simulator`} className="block rounded-2xl border-2 border-amber-300 bg-amber-50 p-6 hover:border-amber-500">
+            <span className="block text-xl font-bold text-blue-950">🧊 Take the 3D tour</span>
+            <span className="mt-1 block text-slate-700">See what usually happens on a visit, step by step.</span>
+          </Link>
           <Link href="/ai-hospital/triage" className="block rounded-2xl bg-blue-900 p-6 text-white hover:bg-blue-800">
             <span className="block text-xl font-bold">Check how urgent it is</span>
             <span className="mt-1 block text-blue-100">The Triage Desk takes about 2 minutes.</span>
