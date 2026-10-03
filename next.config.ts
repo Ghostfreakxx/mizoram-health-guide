@@ -2,7 +2,24 @@ import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
   async headers() {
+    const common = [
+      { key: "X-Content-Type-Options", value: "nosniff" },
+      { key: "Referrer-Policy", value: "strict-origin-when-cross-origin" },
+      { key: "X-Frame-Options", value: "SAMEORIGIN" },
+    ];
     return [
+      {
+        // Every page: no location access; camera off; microphone only for this
+        // site (on-device spoken answers, when switched on).
+        source: "/((?!ai-hospital/consult|ai-hospital/doctor-desk).*)",
+        headers: [...common, { key: "Permissions-Policy", value: "camera=(), geolocation=(), microphone=(self), payment=(), usb=()" }],
+      },
+      {
+        // Live video consultations with a real doctor need the camera and
+        // microphone inside the video service's frame; still no location.
+        source: "/ai-hospital/(consult|doctor-desk)/:path*",
+        headers: [...common, { key: "Permissions-Policy", value: "geolocation=(), payment=(), usb=()" }],
+      },
       {
         // The service worker must always be re-checked so updates arrive quickly.
         source: "/sw.js",

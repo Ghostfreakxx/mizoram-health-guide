@@ -478,6 +478,8 @@ export function chartOf(s: ConsultState): Chart {
   const qs = s.complaint ? questionsFor(ctx) : [];
   const said = (a: Answer, emergencyOnly: boolean) =>
     qs.filter((q) => s.answers[q.id] === a && !s.prefilled.includes(q.id) && ("emergency" in q.yes) === emergencyOnly);
+  // Answers taken from the patient's own opening words (only ever "yes").
+  const fromWords = qs.filter((q) => s.prefilled.includes(q.id) && s.answers[q.id] === "yes").map((q) => `${q.positive} (from what you said)`);
 
   const reported: ChartRow[] = [
     row("Main concern", s.concernText),
@@ -498,7 +500,7 @@ export function chartOf(s: ConsultState): Chart {
     row("Duration", label(DURATIONS, s.duration)),
     row("Change", label(PROGRESSIONS, s.progression)),
     row("How bad", label(SEVERITIES, s.severity)),
-    row("Symptoms reported", said("yes", false).map((q) => q.positive).join("; ")),
+    row("Symptoms reported", [...fromWords, ...said("yes", false).map((q) => q.positive)].join("; ")),
     row("Relevant negatives", said("no", false).map((q) => q.negative).join("; ")),
   );
   const unsure = qs.filter((q) => s.answers[q.id] === "unsure" && !s.prefilled.includes(q.id));

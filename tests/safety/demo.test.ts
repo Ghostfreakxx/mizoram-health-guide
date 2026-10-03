@@ -63,6 +63,13 @@ describe("presentation-critical safety properties", () => {
     }
   });
 
+  it("symptoms taken from the patient's own words are shown, and marked as such", () => {
+    const { s } = play("cough");
+    const sym = chartOf(s).reported.find((r) => r.label === "Symptoms reported")!;
+    expect(sym.provided).toBe(true);
+    expect(sym.value).toMatch(/\(from what you said\)/);
+  });
+
   it("missing information stays 'Not provided' — never guessed", () => {
     const { s } = play("fever");
     const c = chartOf(s);

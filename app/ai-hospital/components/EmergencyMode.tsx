@@ -103,7 +103,10 @@ export default function EmergencyMode({
         {active.length > 0 ? (
           active.map((f) => (
             <section key={f.id} className="rounded-xl border-2 border-slate-200 p-5">
-              <h2 className="text-xl font-bold">{tr("emergency.waiting")}</h2>
+              <h2 className="text-xl font-bold">
+                {tr("emergency.waiting")}
+                {active.length > 1 && <span className="font-semibold text-red-800"> — {flagTitle(f.id)}</span>}
+              </h2>
               <ReadAloud text={`${tr("emergency.call108")}. ${tr("emergency.call112")}. ${tr("emergency.waiting")}: ${f.guidance.map((_, i) => tr(`redflag.${f.id}.guidance.${i}`)).join(" ")}`} className="mt-2" />
               <ul className="mt-3 space-y-2 text-lg">
                 {f.guidance.map((_, i) => tr(`redflag.${f.id}.guidance.${i}`)).map((g) => (
