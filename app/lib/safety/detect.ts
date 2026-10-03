@@ -98,8 +98,8 @@ const patterns: Pattern[] = [
     negatable: false,
     match: [
       /\boverdos\w*\b|\bo\.?d\.?'?d\b/,
-      /\btoo many (pills|tablets|medicines?)\b/,
-      /\btook (too much|a lot of|all (my|the|his|her)) (medicine|medicines|pills|tablets|drugs?)\b/,
+      /\btoo many (\w+ ){0,2}(pills|tablets|medicines?|capsules)\b/,
+      /\b(took|taken|swallowed|ate) (too much|a lot of|lots of|all (of )?(my|the|his|her|their)|a (whole|full) (bottle|strip|packet) of) (\w+ ){0,2}(medicine|medicines|pills|tablets|drugs?|capsules)\b/,
     ],
   },
   {
