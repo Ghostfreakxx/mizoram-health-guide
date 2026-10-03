@@ -4,6 +4,9 @@
 // it shows first, and a small "prop pack" of equipment and wall material.
 // Emergency has no seated room: it opens Emergency Mode directly.
 
+import { defaultIntro } from "../../lib/consultation";
+import type { Attire } from "./doctor/DoctorAvatar";
+
 export type Prop =
   | "bp-monitor"
   | "stethoscope"
@@ -37,10 +40,12 @@ export type RoomStyle = {
   greeting: string; // department name used by the guide
   intro: string; // what the guide says first (spoken and shown)
   focus: string[]; // complaint ids shown first when the person's words are unclear
+  attire: Attire; // what the doctor wears in this department
 };
 
-const intro = (dept: string, extra = "") =>
-  `Hello. Welcome to ${dept}. I'm your AI Hospital virtual health guide. I'll ask you a few questions to help determine how urgently you may need care, and help prepare information for a healthcare professional.${extra} What brings you here today?`;
+// Every department uses the same introduction, so patients always hear the
+// same promise: questions, appropriate care, and emergencies said at once.
+const intro = (dept: string) => defaultIntro(dept);
 
 export const ROOMS: Record<string, RoomStyle> = {
   "general-medicine": {
@@ -54,6 +59,7 @@ export const ROOMS: Record<string, RoomStyle> = {
     greeting: "General Medicine",
     intro: intro("General Medicine"),
     focus: ["fever", "cough", "stomach", "headache"],
+    attire: { coat: true, scrubsColor: "#2f5d73" },
   },
   cardiology: {
     slug: "cardiology",
@@ -64,8 +70,9 @@ export const ROOMS: Record<string, RoomStyle> = {
     floor: "#d5d4d2",
     props: ["ecg-cart", "heart-poster", "bp-monitor", "stethoscope", "sanitizer", "couch", "curtain"],
     greeting: "Cardiology",
-    intro: intro("Cardiology", " If you have chest pain right now, tell me straight away."),
+    intro: intro("Cardiology"),
     focus: ["heart", "headache", "other"],
+    attire: { coat: true, scrubsColor: "#283a5c" },
   },
   respiratory: {
     slug: "respiratory",
@@ -78,6 +85,7 @@ export const ROOMS: Record<string, RoomStyle> = {
     greeting: "Respiratory Medicine",
     intro: intro("Respiratory Medicine"),
     focus: ["cough", "fever", "heart"],
+    attire: { coat: true, scrubsColor: "#2c6460" },
   },
   paediatrics: {
     slug: "paediatrics",
@@ -88,8 +96,9 @@ export const ROOMS: Record<string, RoomStyle> = {
     floor: "#dcd6cb",
     props: ["toy-shelf", "height-chart", "scale", "stethoscope", "sanitizer", "rug"],
     greeting: "Paediatrics",
-    intro: intro("Paediatrics", " If you are here for a child, I'll ask about them."),
+    intro: intro("Paediatrics"),
     focus: ["child", "fever", "cough", "stomach"],
+    attire: { coat: false, scrubsColor: "#3d7aa6" },
   },
   "mental-health": {
     slug: "mental-health",
@@ -100,9 +109,9 @@ export const ROOMS: Record<string, RoomStyle> = {
     floor: "#d8d2c6",
     props: ["armchairs", "lamp", "plant", "rug"],
     greeting: "Mental Health",
-    intro:
-      "Hello. Welcome. I'm your AI Hospital virtual health guide. This is a private space, and you can take your time. I'll ask a few questions to help find the right support and prepare information for a counsellor or doctor. What brings you here today?",
+    intro: intro("Mental Health"),
     focus: ["mental", "substance", "headache"],
+    attire: { coat: false, scrubsColor: "#5f6b62" },
   },
   "obstetrics-gynaecology": {
     slug: "obstetrics-gynaecology",
@@ -113,8 +122,9 @@ export const ROOMS: Record<string, RoomStyle> = {
     floor: "#d9d3cf",
     props: ["pregnancy-poster", "doppler", "scale", "bp-monitor", "sanitizer", "couch", "curtain"],
     greeting: "Obstetrics and Gynaecology",
-    intro: intro("Obstetrics and Gynaecology", " If you are pregnant and have bleeding, severe pain or fits, tell me straight away."),
+    intro: intro("Obstetrics and Gynaecology"),
     focus: ["pregnancy", "urine", "stomach"],
+    attire: { coat: true, scrubsColor: "#6e3550" },
   },
 };
 

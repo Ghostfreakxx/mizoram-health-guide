@@ -99,6 +99,7 @@ class Targets:
 
 def shape(V: np.ndarray, T: Targets, age_years=35.0, asian=0.9, caucasian=0.1) -> None:
     """Macro modifiers: female, average muscle and weight, given age and ethnicity."""
+    T.apply(V, "torso/torso-scale-horiz-decr", 0.25)
     # MakeHuman ages: young = 25, old = 90 (linear between)
     old = max(0.0, min(1.0, (age_years - 25.0) / 65.0))
     ages = {"young": 1 - old, "old": old}
@@ -107,6 +108,9 @@ def shape(V: np.ndarray, T: Targets, age_years=35.0, asian=0.9, caucasian=0.1) -
         for race, rw in (("asian", asian), ("caucasian", caucasian)):
             T.apply(V, f"macrodetails/{race}-female-{age}", aw * rw)
         T.apply(V, f"macrodetails/proportions/female-{age}-averagemuscle-averageweight-idealproportions", aw * 0.5)
+        # Modest bust and slightly narrower torso: reads as professional
+        # under a coat rather than a mannequin silhouette.
+        T.apply(V, f"breast/female-{age}-averagemuscle-averageweight-mincup-averagefirmness", aw * 0.55)
         # A little taller than MakeHuman's Asian average (~1.49 m)
         T.apply(V, f"macrodetails/height/female-{age}-averagemuscle-averageweight-maxheight", aw * 0.06)
 
@@ -398,6 +402,8 @@ def main(cache: Path, out: Path) -> None:
     V, faces, groups = load_obj(cache / "3dobjs/base.obj")
     T = Targets(cache / "targets.npz")
     shape(V, T)
+    # A relaxed, closed mouth at rest: the base mesh's lips sit slightly apart.
+    T.apply(V, "expression/units/asian/mouth-compression", 0.35)
     n = len(V)
     rng = np.random.default_rng(7)
 
@@ -448,30 +454,30 @@ def main(cache: Path, out: Path) -> None:
     f_skin = np.minimum(np.minimum(f_neck, f_hands), f_v)
 
     # ---- skin colours (vertex colours, sRGB here, linearised on export)
-    skin = hexrgb("#c99a7b")
+    skin = hexrgb("#c48d6b")
     C = np.tile(skin, (n, 1))
     C *= (1 + rng.normal(0, 0.012, (n, 1)))
     lips = np.maximum(mask_from_target(T, n, "mouth/mouth-lowerlip-volume-incr", 0.25),
                       mask_from_target(T, n, "mouth/mouth-upperlip-height-incr", 0.35))
     lips = smooth_mask(lips, F_all["body"], 2)
-    C = C * (1 - lips[:, None] * 0.55) + hexrgb("#a55a55") * lips[:, None] * 0.55
+    C = C * (1 - lips[:, None] * 0.5) + hexrgb("#a8645c") * lips[:, None] * 0.5
     # Eyebrows: a soft arched band above each eye (front of the face only)
     ax = np.abs(V[:, 0])
     along = np.clip((ax - 0.1) / 0.55, 0, 1)
     brow_y = eye_y + 0.13 + 0.05 * np.sin(np.pi * np.clip(along * 1.15, 0, 1))
-    width = 0.05 * (1 - 0.5 * along)
+    width = 0.058 * (1 - 0.45 * along)
     brows = np.exp(-((V[:, 1] - brow_y) / width) ** 2) * np.clip((ax - 0.12) / 0.06, 0, 1) * (ax < 0.7) * (V[:, 2] > eyeL[2] - 0.25)
     brows *= np.clip((0.72 - ax) / 0.12, 0, 1)
     brows = smooth_mask(brows, F_all["body"], 2)
     brows = np.clip(brows * 1.25, 0, 1)
-    C = C * (1 - brows[:, None] * 0.62) + hexrgb("#2b1e17") * brows[:, None] * 0.62
+    C = C * (1 - brows[:, None] * 0.8) + hexrgb("#271a14") * brows[:, None] * 0.8
     # Lash line: the eyelid rim where it meets the eyeball (upper lid darker)
     for ec in (eyeL, eyeR):
         r_eye = np.linalg.norm(V[np.unique(F_all["helper-l-eye"])] - eyeL, axis=1).mean()
         dist = np.linalg.norm(V - ec, axis=1) - r_eye
-        rim = np.exp(-(dist / 0.025) ** 2) * (np.linalg.norm(V[:, :2] - ec[:2], axis=1) < 0.32) * (V[:, 2] > ec[2] - 0.05)
-        rim *= np.where(V[:, 1] > ec[1], 1.0, 0.35)
-        C = C * (1 - rim[:, None] * 0.75) + hexrgb("#1a1210") * rim[:, None] * 0.75
+        rim = np.exp(-(dist / 0.032) ** 2) * (np.linalg.norm(V[:, :2] - ec[:2], axis=1) < 0.32) * (V[:, 2] > ec[2] - 0.05)
+        rim *= np.where(V[:, 1] > ec[1], 1.0, 0.3)
+        C = C * (1 - rim[:, None] * 0.82) + hexrgb("#17100d") * rim[:, None] * 0.82
     # Inside of the mouth: darker towards the back
     lip_idx = np.where(lips > 0.3)[0]
     mc = V[lip_idx].mean(0)
@@ -484,7 +490,19 @@ def main(cache: Path, out: Path) -> None:
     depth = np.clip((lip_front - 0.06 - V[:, 2]) / 0.2, 0, 1)
     C = np.where(inside[:, None], C * (1 - depth[:, None]) + hexrgb("#4a2224") * depth[:, None], C)
     cheeks = np.exp(-(((np.abs(V[:, 0]) - 0.55) / 0.35) ** 2 + ((V[:, 1] - (eye_y - 0.45)) / 0.3) ** 2)) * (V[:, 2] > 0.8)
-    C = C * (1 - cheeks[:, None] * 0.12) + hexrgb("#c97f73") * cheeks[:, None] * 0.12
+    C = C * (1 - cheeks[:, None] * 0.16) + hexrgb("#c47468") * cheeks[:, None] * 0.16
+    # Natural variation: a slightly warmer nose tip and ears, a lighter forehead,
+    # a little shadow in the eye sockets. Never a uniform "painted" tone.
+    nose = np.exp(-((V[:, 0] / 0.12) ** 2 + ((V[:, 1] - (eye_y - 0.32)) / 0.14) ** 2)) * (V[:, 2] > eyeL[2])
+    C = C * (1 - nose[:, None] * 0.12) + hexrgb("#c2766a") * nose[:, None] * 0.12
+    ears = np.clip((np.abs(V[:, 0]) - 0.66) / 0.08, 0, 1) * (np.abs(V[:, 1] - (eye_y - 0.2)) < 0.45) * (V[:, 1] > neck_y + 0.6)
+    C = C * (1 - ears[:, None] * 0.12) + hexrgb("#bf7a68") * ears[:, None] * 0.12
+    forehead = np.clip((V[:, 1] - (eye_y + 0.25)) / 0.4, 0, 1) * (V[:, 2] > eyeL[2] - 0.3)
+    C = C * (1 + forehead[:, None] * 0.04)
+    for ec in (eyeL, eyeR):
+        socket = np.exp(-(((V[:, 0] - ec[0]) / 0.22) ** 2 + ((V[:, 1] - ec[1] + 0.03) / 0.16) ** 2)) * (V[:, 2] > ec[2] - 0.2)
+        C = C * (1 - socket[:, None] * 0.08) + hexrgb("#8f6658") * socket[:, None] * 0.08
+    C *= (1 + smooth_mask(rng.normal(0, 0.03, n), F_all["body"], 3)[:, None])
     C = np.clip(C, 0, 1)
 
     parts = []
@@ -492,12 +510,33 @@ def main(cache: Path, out: Path) -> None:
     parts.append(Part("skin", "skin", P, Fl, near, C[near]))
 
     # ---- clothing shells from the CC0 "tights" and "skirt" helpers
-    def shell(group, offset, field, color, name, material):
+    def drape(P, F, N, iterations):
+        """Laplacian smoothing that never moves a point inwards: fabric hangs
+        over the body instead of following every curve of it."""
+        n_ = len(P)
+        for _ in range(iterations):
+            acc = np.zeros_like(P)
+            cnt = np.zeros(n_)
+            for a, b in ((0, 1), (1, 2), (2, 0)):
+                np.add.at(acc, F[:, a], P[F[:, b]])
+                np.add.at(cnt, F[:, a], 1)
+            m = cnt > 0
+            target = P.copy()
+            target[m] = acc[m] / cnt[m][:, None]
+            d = target - P
+            inward = np.einsum("ij,ij->i", d, N)
+            d -= N * np.minimum(inward, 0)[:, None]
+            P = P + d * 0.6
+        return P
+
+    def shell(group, offset, field, color, name, material, smooth=0):
         F = F_all[group]
         u = np.unique(F)
         N = vertex_normals(V, F)
         Pg = V.copy()
         Pg[u] = V[u] + N[u] * offset
+        if smooth:
+            Pg = drape(Pg, F, N, smooth)
         Pc, Fc, nr = clip(Pg, F, field(Pg))
         col = np.tile(hexrgb(color), (len(Pc), 1)) * (1 + rng.normal(0, 0.01, (len(Pc), 1)))
         parts.append(Part(name, material, Pc, Fc, nr, np.clip(col, 0, 1)))
@@ -505,10 +544,21 @@ def main(cache: Path, out: Path) -> None:
     def torso_field(P, top):
         return np.maximum.reduce([P[:, 1] - top, thigh_y - P[:, 1], -wrist_field(P, -0.05)])
 
-    shell("helper-tights", 0.035, lambda P: np.maximum(torso_field(P, scrub_top), -v_field(P, scrub_top, 0.95, 0.62)), "#1f6470", "scrubs", "scrubs")
+    def elbow_field(P, margin):
+        """Negative on the shoulder side of a plane across each upper arm."""
+        out = np.full(len(P), -1.0)
+        for side, sgn in (("L", 1), ("R", -1)):
+            e = jp[skel["bones"][f"lowerarm01.{side}"]["head"]]
+            sh = jp[skel["bones"][f"upperarm01.{side}"]["head"]]
+            d = (e - sh) / np.linalg.norm(e - sh)
+            m = (np.sign(P[:, 0]) == sgn)
+            out = np.where(m, ((P - e) @ d) + margin, out)
+        return out
+
+    shell("helper-tights", 0.035, lambda P: np.maximum.reduce([torso_field(P, scrub_top), -v_field(P, scrub_top, 0.95, 0.62), elbow_field(P, 0.9)]), "#1f6470", "scrubs", "scrubs", smooth=4)
     coat_top = neck_y + 0.12
-    shell("helper-tights", 0.085, lambda P: np.maximum(torso_field(P, coat_top), -v_field(P, coat_top, 2.2, 0.45)), "#f4f5f6", "coat", "coat")
-    shell("helper-skirt", 0.07, lambda P: np.maximum(P[:, 1] - 0.9, -2.4 - P[:, 1]), "#f1f2f4", "coat-skirt", "coat")
+    shell("helper-tights", 0.07, lambda P: np.maximum(torso_field(P, coat_top), -v_field(P, coat_top, 2.2, 0.45)), "#f4f5f6", "coat", "coat", smooth=8)
+    shell("helper-skirt", 0.07, lambda P: np.maximum(P[:, 1] - 0.9, -2.4 - P[:, 1]), "#f1f2f4", "coat-skirt", "coat", smooth=4)
 
     # ---- hair: a shell over the scalp with a clean, natural hairline, plus a low bun
     head_c = np.array([0.0, eye_y + 0.1, eyeL[2] - 1.0])
@@ -526,10 +576,16 @@ def main(cache: Path, out: Path) -> None:
     Ph = V + bN * thick[:, None]
     Ph[:, 1] += 0.0
     P, Fl, near = clip(Ph, F_all["body"], f_hair)
-    hc = np.tile(hexrgb("#2a1f19"), (len(P), 1)) * (1 + rng.normal(0, 0.04, (len(P), 1)))
+    hc = np.tile(hexrgb("#241a15"), (len(P), 1)) * (1 + rng.normal(0, 0.05, (len(P), 1)))
     rh = P - head_c
     hair_uv = np.stack([np.arctan2(rh[:, 0], rh[:, 1]) / np.pi * 3.0, np.arctan2(rh[:, 2], rh[:, 1]) / np.pi * 1.5], -1)
     parts.append(Part("hair", "hair", P, Fl, near, np.clip(hc, 0, 1), uv=hair_uv))
+    # Soft hairline: skin just outside the hair edge takes a little of the
+    # hair colour, so the edge is not a hard cut-out line.
+    sk = parts[0]
+    fh = f_hair[sk.src]
+    roots = np.clip(1 - fh / 0.14, 0, 1) * (fh >= 0) * (V[sk.src][:, 1] > eye_y)
+    sk.color = sk.color * (1 - roots[:, None] * 0.45) + hexrgb("#4a3a30") * roots[:, None] * 0.45
     bun_c = head_c + np.array([0.0, -0.4, -0.86])
     th, ph = np.meshgrid(np.linspace(0, np.pi, 16), np.linspace(0, 2 * np.pi, 26, endpoint=False), indexing="ij")
     bp = np.stack([np.sin(th) * np.cos(ph) * 0.44, np.cos(th) * 0.38, np.sin(th) * np.sin(ph) * 0.34], -1).reshape(-1, 3) + bun_c
@@ -543,10 +599,26 @@ def main(cache: Path, out: Path) -> None:
     bun_uv = np.stack([ph.reshape(-1) / np.pi * 2.0, th.reshape(-1) / np.pi * 1.0], -1)
     parts.append(Part("bun", "hair", bp, np.array(bf), -np.ones(len(bp), dtype=np.int64), np.clip(bcol, 0, 1), uv=bun_uv))
 
+    # ---- mouth interior: a dark cavity behind the lips. Without it the head is
+    # hollow and the background shows through the gap between the lips.
+    lipv = np.where(lips > 0.3)[0]
+    mcen = V[lipv].mean(0)
+    mfront = V[lipv][:, 2].max()
+    th2, ph2 = np.meshgrid(np.linspace(0, np.pi, 12), np.linspace(0, 2 * np.pi, 18, endpoint=False), indexing="ij")
+    mb = np.stack([np.sin(th2) * np.cos(ph2) * 0.27, np.cos(th2) * 0.2, np.sin(th2) * np.sin(ph2) * 0.3], -1).reshape(-1, 3)
+    mb += np.array([mcen[0], mcen[1] - 0.04, mfront - 0.38])
+    mf = []
+    R2, C2 = th2.shape
+    for i in range(R2 - 1):
+        for j in range(C2):
+            a_, b_, c_, d_ = i * C2 + j, i * C2 + (j + 1) % C2, (i + 1) * C2 + (j + 1) % C2, (i + 1) * C2 + j
+            mf += [[a_, c_, d_], [a_, b_, c_]]  # inward-facing: seen from inside the mouth
+    parts.append(Part("mouth-cavity", "mouth", mb, np.array(mf), -np.ones(len(mb), dtype=np.int64), np.tile(hexrgb("#2e1416"), (len(mb), 1))))
+
     # ---- eyelashes, teeth, tongue (CC0 helper geometry)
     for g, col, mat in (("helper-upper-teeth", "#ece6da", "teeth"), ("helper-lower-teeth", "#e8e1d4", "teeth"), ("helper-tongue", "#9c4a4a", "mouth")):
         u, Fl_ = compact(F_all[g])
-        P = V[u] - np.array([0, 0, 0.07])  # set back so closed lips hide them
+        P = V[u] - np.array([0, 0, 0.12])  # set back so closed lips hide them
         parts.append(Part(g, mat, P, Fl_, u, np.tile(hexrgb(col), (len(u), 1))))
 
     # ---- eyes: CC0 high-poly eye proxy, coloured by angle from the eye's forward axis
@@ -563,12 +635,29 @@ def main(cache: Path, out: Path) -> None:
         d = P - c0
         d /= np.linalg.norm(d, axis=1, keepdims=True)
         ang = np.arccos(np.clip(d[:, 2], -1, 1))
-        col = np.tile(hexrgb("#f1ede6"), (len(u), 1))
-        iris = ang < 0.62
-        ring = np.clip((ang - 0.18) / 0.44, 0, 1)
-        col[iris] = (hexrgb("#4a2d1b") * (1 - ring[iris, None] * 0.5) + hexrgb("#24150c") * ring[iris, None] * 0.5)
-        col[ang < 0.2] = hexrgb("#060403")
-        parts.append(Part(f"eye.{side}", "eye", P, Fl_, eye_src[u], col))
+        side_ang = np.arctan2(d[:, 0], d[:, 2])
+        col = np.tile(hexrgb("#e9e3da"), (len(u), 1))
+        corner = np.clip((np.abs(side_ang) - 0.75) / 0.6, 0, 1)[:, None]
+        col = col * (1 - corner * 0.25) + hexrgb("#d9b9ae") * corner * 0.25
+        iris = ang < 0.6
+        ring = np.clip((ang - 0.2) / 0.4, 0, 1)
+        streak = 1 + 0.12 * np.sin(np.arctan2(d[:, 1], d[:, 0]) * 23) * (1 - ring)
+        col[iris] = (hexrgb("#6b4428") * (1 - ring[iris, None]) + hexrgb("#3a2415") * ring[iris, None]) * streak[iris, None]
+        limbus = (ang > 0.52) & (ang < 0.64)
+        col[limbus] = hexrgb("#1f130b")
+        col[ang < 0.21] = hexrgb("#050303")
+        parts.append(Part(f"eye.{side}", "eye", P, Fl_, eye_src[u], np.clip(col, 0, 1)))
+        # Wet cornea: a thin clear cap over the front, for natural highlights
+        r = np.linalg.norm(P - c0, axis=1).mean()
+        th_, ph_ = np.meshgrid(np.linspace(0, 0.95, 8), np.linspace(0, 2 * np.pi, 24, endpoint=False), indexing="ij")
+        cp = np.stack([np.sin(th_) * np.cos(ph_), np.sin(th_) * np.sin(ph_), np.cos(th_)], -1).reshape(-1, 3) * r * 1.035 + c0
+        cf = []
+        Rr, Cc_ = th_.shape
+        for i in range(Rr - 1):
+            for j in range(Cc_):
+                a, b, c2, dd = i * Cc_ + j, i * Cc_ + (j + 1) % Cc_, (i + 1) * Cc_ + (j + 1) % Cc_, (i + 1) * Cc_ + j
+                cf += [[a, c2, dd], [a, b, c2]]
+        parts.append(Part(f"cornea.{side}", "cornea", cp, np.array(cf), -np.ones(len(cp), dtype=np.int64), np.ones((len(cp), 3))))
 
     # ---- skeleton
     bones = skel["bones"]
@@ -581,11 +670,11 @@ def main(cache: Path, out: Path) -> None:
 
     # Eyes follow their eye bones exactly; the bun follows the head.
     for p in parts:
-        if p.name.startswith("eye."):
-            j = ex_index[p.name.replace("eye.", "eye.")]
+        if p.name.startswith("eye.") or p.name.startswith("cornea."):
+            j = ex_index["eye." + p.name.split(".")[1]]
             p.joints = np.tile([j, 0, 0, 0], (len(p.pos), 1))
             p.weights = np.tile([1.0, 0, 0, 0], (len(p.pos), 1))
-        elif p.name == "bun":
+        elif p.name in ("bun", "mouth-cavity"):
             p.joints = np.tile([ex_index["head"], 0, 0, 0], (len(p.pos), 1))
             p.weights = np.tile([1.0, 0, 0, 0], (len(p.pos), 1))
         else:
@@ -606,11 +695,12 @@ MATERIALS = {
     "skin": {"color": [1, 1, 1, 1], "rough": 0.62, "metal": 0.0},
     "scrubs": {"color": [1, 1, 1, 1], "rough": 0.9, "metal": 0.0},
     "coat": {"color": [1, 1, 1, 1], "rough": 0.88, "metal": 0.0},
-    "hair": {"color": [1, 1, 1, 1], "rough": 0.62, "metal": 0.0},
+    "hair": {"color": [1, 1, 1, 1], "rough": 0.72, "metal": 0.0},
     "lashes": {"color": [1, 1, 1, 1], "rough": 0.8, "metal": 0.0, "double": True},
     "teeth": {"color": [1, 1, 1, 1], "rough": 0.35, "metal": 0.0},
     "mouth": {"color": [1, 1, 1, 1], "rough": 0.6, "metal": 0.0},
     "eye": {"color": [1, 1, 1, 1], "rough": 0.12, "metal": 0.0},
+    "cornea": {"color": [1, 1, 1, 0.08], "rough": 0.03, "metal": 0.0, "blend": True},
 }
 
 
@@ -663,7 +753,10 @@ def write(parts, bone_names, parents, heads, morph_full, out: Path, ground: floa
         pbr = {"baseColorFactor": m["color"], "roughnessFactor": m["rough"], "metallicFactor": m["metal"]}
         if mname == "hair":
             pbr["baseColorTexture"] = {"index": 0}
-        materials.append({"name": mname, "pbrMetallicRoughness": pbr, "doubleSided": bool(m.get("double"))})
+        mat = {"name": mname, "pbrMetallicRoughness": pbr, "doubleSided": bool(m.get("double"))}
+        if m.get("blend"):
+            mat["alphaMode"] = "BLEND"
+        materials.append(mat)
         F = np.concatenate(flist)
         idx = g.accessor(F.reshape(-1), "SCALAR", 5125 if base > 65535 else 5123, 34963)
         primitives.append({

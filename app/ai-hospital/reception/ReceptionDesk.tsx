@@ -9,6 +9,7 @@ import { getService } from "../../lib/services";
 import { getDepartment } from "../data/departments";
 import EmergencyMode from "../components/EmergencyMode";
 import { roomForDepartments, setPendingConcern } from "../consult-room/handoff";
+import { preloadConsultation } from "../consult-room/preload";
 import { roomFor } from "../consult-room/rooms";
 import TriageFlow from "../components/TriageFlow";
 import { BigChoice, StepTitle } from "../components/ui";
@@ -139,6 +140,8 @@ export default function ReceptionDesk() {
             return (
               <button
                 type="button"
+                onPointerEnter={preloadConsultation}
+                onFocus={preloadConsultation}
                 onClick={() => {
                   setPendingConcern(text);
                   router.push(`/ai-hospital/departments/${slug}/room`);

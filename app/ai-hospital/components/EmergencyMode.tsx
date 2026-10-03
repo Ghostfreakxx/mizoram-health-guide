@@ -13,12 +13,16 @@ export default function EmergencyMode({
   onExit,
   exitLabel,
   notice,
+  inline = false,
 }: {
   flags?: RedFlagId[];
   onExit: () => void;
   exitLabel?: string;
   // Why Emergency Mode opened, e.g. from a consultation ("Your answers include warning signs…").
   notice?: string;
+  // Inside a consultation room: shown in the page (with the doctor beside it)
+  // instead of covering the whole screen. Same content and actions.
+  inline?: boolean;
 }) {
   const [selected, setSelected] = useState<RedFlagId[]>(flags);
   const [showNote, setShowNote] = useState(false);
@@ -31,12 +35,13 @@ export default function EmergencyMode({
 
   useEffect(() => {
     headingRef.current?.focus();
+    if (inline) return;
     const prev = document.body.style.overflow;
     document.body.style.overflow = "hidden";
     return () => {
       document.body.style.overflow = prev;
     };
-  }, []);
+  }, [inline]);
 
   // Emergency Mode switches to Mizo only when every string is reviewed.
   const { locale } = useLanguage();
@@ -45,21 +50,22 @@ export default function EmergencyMode({
   const flagTitle = (id: RedFlagId) => tr(`redflag.${id}.title`);
   const crisis = selected.some((id) => getRedFlag(id).crisis);
   const active = selected.map(getRedFlag);
+  const Heading = inline ? "h2" : "h1"; // the room page already has its own h1
 
   return (
     <div
-      role="alertdialog"
-      aria-modal="true"
+      role={inline ? "region" : "alertdialog"}
+      aria-modal={inline ? undefined : true}
       aria-labelledby="emergency-heading"
       lang={lang === "lus" ? "lus" : "en"}
-      className="fixed inset-0 z-[100] overflow-y-auto bg-white text-slate-950"
+      className={inline ? "overflow-hidden rounded-2xl border-2 border-red-700 bg-white text-slate-950" : "fixed inset-0 z-[100] overflow-y-auto bg-white text-slate-950"}
     >
       <div className="bg-red-700 px-4 py-5 text-white">
         <div className="mx-auto max-w-2xl">
           {notice && <p className="text-sm font-bold uppercase tracking-widest text-red-100">Urgent medical attention</p>}
-          <h1 id="emergency-heading" ref={headingRef} tabIndex={-1} className="text-3xl font-black outline-none sm:text-4xl">
+          <Heading id="emergency-heading" ref={headingRef} tabIndex={-1} className="text-3xl font-black outline-none sm:text-4xl">
             {crisis ? tr("emergency.heading.crisis") : tr("emergency.heading")}
-          </h1>
+          </Heading>
           {active.length > 0 && (
             <p className="mt-1 text-lg font-semibold text-red-50">{active.map((f) => flagTitle(f.id)).join(" · ")}</p>
           )}

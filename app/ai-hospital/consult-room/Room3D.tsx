@@ -3,6 +3,7 @@
 import { useMemo } from "react";
 import * as THREE from "three";
 import type { Tier } from "./capability";
+import { LAYOUT } from "./doctor/scene";
 import type { Prop, RoomStyle } from "./rooms";
 
 // A consulting room in a modern Indian clinic, seen from the patient's chair.
@@ -71,7 +72,16 @@ function useSign(room: RoomStyle) {
         g.fillText("MIZORAM AI HOSPITAL · PROTOTYPE", 34, 50);
         g.font = "800 64px system-ui, sans-serif";
         g.fillStyle = "#fde68a";
-        g.fillText(room.title, 34, 130);
+        g.fillText(room.title, 34, 124);
+        // A thin, muted stripe band: a quiet nod to Mizo textile colours,
+        // not decoration. (Mizo signage text is added only once reviewed.)
+        const stripes = ["#7f1d1d", "#111827", "#f8fafc", "#166534", "#ca8a04", "#111827", "#7f1d1d"];
+        stripes.forEach((c, i) => {
+          g.fillStyle = c;
+          g.globalAlpha = 0.85;
+          g.fillRect(0, 172 + i * 2.6, w, 2.6);
+        });
+        g.globalAlpha = 1;
       }, 1024, 190),
     [room],
   );
@@ -272,21 +282,45 @@ function useClock() {
   );
 }
 
-function useScreen() {
+export type ChartLine = [label: string, value: string];
+
+// The desk screen shows this patient's own visit record, as it is filled in.
+function useChartScreen(lines: ChartLine[]) {
+  const key = JSON.stringify(lines);
   return useMemo(
     () =>
       canvasTexture((g, w, h) => {
-        g.fillStyle = "#eef2f7";
+        const rows = JSON.parse(key) as ChartLine[];
+        g.fillStyle = "#f8fafc";
         g.fillRect(0, 0, w, h);
         g.fillStyle = "#1e3a8a";
-        g.fillRect(0, 0, w, 34);
+        g.fillRect(0, 0, w, 54);
         g.fillStyle = "#fff";
-        g.font = "700 18px system-ui";
-        g.fillText("OPD · Patient queue", 12, 23);
-        g.fillStyle = "#cbd5e1";
-        for (let i = 0; i < 6; i++) g.fillRect(12, 50 + i * 28, w - 24, 16);
-      }, 400, 240),
-    [],
+        g.font = "800 26px system-ui";
+        g.fillText("CURRENT VISIT", 18, 36);
+        g.font = "600 17px system-ui";
+        g.textAlign = "right";
+        g.fillText("Not a diagnosis", w - 16, 35);
+        g.textAlign = "left";
+        if (!rows.length) {
+          g.fillStyle = "#64748b";
+          g.font = "italic 20px system-ui";
+          g.fillText("Waiting for your answers…", 18, 100);
+        }
+        rows.slice(0, 9).forEach(([label, value], i) => {
+          const y = 88 + i * 38;
+          g.fillStyle = "#64748b";
+          g.font = "700 17px system-ui";
+          g.fillText(label, 18, y);
+          g.fillStyle = value === "Not provided" ? "#94a3b8" : "#0f172a";
+          g.font = value === "Not provided" ? "italic 19px system-ui" : "600 19px system-ui";
+          const v = value.length > 26 ? value.slice(0, 25) + "…" : value;
+          g.fillText(v, 230, y);
+          g.fillStyle = "#e2e8f0";
+          g.fillRect(18, y + 12, w - 36, 1);
+        });
+      }, 560, 420),
+    [key],
   );
 }
 
@@ -466,12 +500,13 @@ function Poster({ kind, position, size }: { kind: "heart" | "lungs" | "pregnancy
   return <Picture texture={tex} size={size} position={position} />;
 }
 
-export default function Room3D({ room, tier }: { room: RoomStyle; tier: Exclude<Tier, "lite"> }) {
+export default function Room3D({ room, tier, chart }: { room: RoomStyle; tier: Exclude<Tier, "fallback">; chart: ChartLine[] }) {
   const sign = useSign(room);
   const poster = useHandwashPoster();
   const clock = useClock();
-  const screen = useScreen();
-  const full = tier === "full";
+  const screen = useChartScreen(chart);
+  const full = tier === "high";
+  const minimal = tier === "low";
 
   return (
     <group>
@@ -506,7 +541,7 @@ export default function Room3D({ room, tier }: { room: RoomStyle; tier: Exclude<
         <planeGeometry args={[1.0, 0.185]} />
         <meshBasicMaterial map={sign} toneMapped={false} />
       </mesh>
-      <Picture texture={poster} size={[0.42, 0.36]} position={[-1.0, 1.34, -2.08]} />
+      {!minimal && <Picture texture={poster} size={[0.42, 0.36]} position={[-1.0, 1.34, -2.08]} />}
       <mesh position={[0.32, 1.9, -2.085]}>
         <circleGeometry args={[0.13, 32]} />
         <meshStandardMaterial map={clock} roughness={0.6} />
@@ -544,26 +579,45 @@ export default function Room3D({ room, tier }: { room: RoomStyle; tier: Exclude<
 
       {/* Doctor's chair (behind her) */}
       <group position={[0, 0, -1.2]}>
-        <Box size={[0.5, 0.62, 0.07]} position={[0, 1.02, -0.06]} color="#1f2937" rough={0.7} />
-        <Box size={[0.5, 0.07, 0.48]} position={[0, 0.48, 0.18]} color="#1f2937" rough={0.7} />
-        <Cyl r={0.025} h={0.4} position={[0, 0.25, 0.18]} color="#4b5563" metal={0.7} rough={0.3} />
+        {/* upholstered back, slightly curved and reclined */}
+        <mesh position={[0, 1.0, -0.07]} rotation={[-0.12, 0, 0]} scale={[1, 1, 0.22]} castShadow>
+          <cylinderGeometry args={[0.27, 0.25, 0.6, 24, 1, false, -0.9, 1.8]} />
+          <meshStandardMaterial color="#4a5563" roughness={0.95} side={2} />
+        </mesh>
+        <Box size={[0.5, 0.08, 0.48]} position={[0, 0.48, 0.18]} color="#4a5563" rough={0.95} />
+        <Cyl r={0.025} h={0.4} position={[0, 0.25, 0.18]} color="#6b7280" metal={0.7} rough={0.3} />
       </group>
 
-      {/* Desk items: monitor turned towards her (we see its back), keyboard, notepad, pen */}
-      <group position={[-0.62, 0.78, -1.0]} rotation={[0, Math.PI - 0.7, 0]} scale={0.72}>
+      {/* The chart screen: turned so both doctor and patient can see the visit record */}
+      <group position={[LAYOUT.chart.position[0], LAYOUT.deskY, LAYOUT.chart.position[2]]} rotation={[0, LAYOUT.chart.rotationY, 0]}>
         <Box size={[0.2, 0.012, 0.14]} position={[0, 0.006, 0]} color="#1f2937" metal={0.3} rough={0.4} />
-        <Box size={[0.04, 0.24, 0.03]} position={[0, 0.13, -0.03]} color="#1f2937" metal={0.3} rough={0.4} />
-        <Box size={[0.54, 0.33, 0.035]} position={[0, 0.36, -0.01]} color="#2b313a" rough={0.5} />
-        <mesh position={[0, 0.36, 0.0085]}>
-          <planeGeometry args={[0.5, 0.29]} />
+        <Box size={[0.04, 0.17, 0.03]} position={[0, 0.09, -0.03]} color="#1f2937" metal={0.3} rough={0.4} />
+        <Box size={[0.44, 0.33, 0.025]} position={[0, LAYOUT.chart.position[1] - LAYOUT.deskY, -0.01]} color="#1f2937" rough={0.4} />
+        <mesh position={[0, LAYOUT.chart.position[1] - LAYOUT.deskY, 0.0035]}>
+          <planeGeometry args={[0.41, 0.3]} />
           <meshBasicMaterial map={screen} toneMapped={false} />
         </mesh>
       </group>
+      {/* Tablet beside the doctor's right hand */}
+      <group position={LAYOUT.tablet.position} rotation={[0, -0.25, 0]}>
+        <Box size={[0.17, 0.008, 0.24]} position={[0, 0.004, 0]} color="#111827" rough={0.3} />
+        <mesh position={[0, 0.0085, 0]} rotation={[-Math.PI / 2, 0, 0]}>
+          <planeGeometry args={[0.155, 0.22]} />
+          <meshStandardMaterial color="#1e293b" emissive="#334155" emissiveIntensity={0.4} roughness={0.15} />
+        </mesh>
+      </group>
+      {/* Pedal waste bin */}
+      {!minimal && (
+        <group position={[0.95, 0, -0.95]}>
+          <Cyl r={[0.13, 0.11]} h={0.36} position={[0, 0.18, 0]} color="#94a3b8" metal={0.5} rough={0.35} />
+          <Cyl r={0.135} h={0.02} position={[0, 0.37, 0]} color="#cbd5e1" metal={0.5} rough={0.3} />
+        </group>
+      )}
       <Box size={[0.38, 0.015, 0.13]} position={[-0.32, 0.787, -0.78]} rotation={[0, 0.35, 0]} color="#e5e7eb" rough={0.5} />
       <Box size={[0.17, 0.006, 0.24]} position={[0.12, 0.783, -0.4]} rotation={[0, -0.12, 0]} color="#ffffff" rough={0.9} />
       <Cyl r={0.0045} h={0.14} position={[0.24, 0.787, -0.4]} rotation={[Math.PI / 2, 0, 0.35]} color="#1e3a8a" />
 
-      {room.props.map((p) => (
+      {room.props.filter((p) => !minimal || p.endsWith("poster") || p === "anatomy-chart").map((p) => (
         <PropItem key={p} prop={p} />
       ))}
     </group>

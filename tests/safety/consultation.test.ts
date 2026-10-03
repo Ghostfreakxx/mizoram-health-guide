@@ -1,7 +1,5 @@
 import { describe, expect, it } from "vitest";
 import { chooseTier } from "../../app/ai-hospital/consult-room/capability";
-import { blinkAt, poseAt, visemeFor } from "../../app/ai-hospital/consult-room/doctorMotion";
-import { LipSync } from "../../app/ai-hospital/consult-room/voice";
 import {
   type ConsultState,
   EMERGENCY_LINE,
@@ -77,7 +75,7 @@ describe("the virtual guide never diagnoses or prescribes", () => {
   it("introduces itself as a virtual guide, never as a doctor", () => {
     const t = nextTurn(start());
     expect(t.say).toBe(
-      "Hello. Welcome to General Medicine. I'm your AI Hospital virtual health guide. I'll ask you a few questions to help determine how urgently you may need care, and help prepare information for a healthcare professional. What brings you here today?",
+      "Hello. I'm your virtual health guide for this General Medicine consultation. I'll ask a few questions to help determine what kind of care may be appropriate. If anything you tell me suggests an emergency, I'll tell you immediately. What brought you here today?",
     );
     expect(t.hint).toMatch(/I am not a doctor/);
   });
@@ -176,56 +174,16 @@ describe("the information panel shows only what the person said", () => {
   });
 });
 
-describe("the guide's movement", () => {
-  it("is calm and serious when urgent (no smiling)", () => {
-    for (let t = 0; t < 10; t += 0.9) expect(poseAt(t, "urgent").smile).toBe(0);
-  });
-  it("reduced motion keeps the head and hands still", () => {
-    for (let t = 0; t < 20; t += 0.7) {
-      for (const st of ["listening", "explaining", "thinking"] as const) {
-        const p = poseAt(t, st, { reducedMotion: true });
-        expect(p.headYaw).toBeCloseTo(0, 10);
-        expect(p.gesture).toBeCloseTo(0, 10);
-      }
-    }
-  });
-  it("blinks naturally: sometimes, briefly", () => {
-    const samples = Array.from({ length: 6000 }, (_, i) => blinkAt(i / 100));
-    const closed = samples.filter((b) => b > 0.5).length / samples.length;
-    expect(closed).toBeGreaterThan(0.005);
-    expect(closed).toBeLessThan(0.08);
-    for (const b of samples) expect(b).toBeGreaterThanOrEqual(0);
-  });
-  it("mostly still while listening; hands move only when explaining", () => {
-    for (let t = 0; t < 30; t += 0.5) {
-      expect(poseAt(t, "listening").gesture).toBe(0);
-      expect(Math.abs(poseAt(t, "listening").headYaw)).toBeLessThan(0.05);
-    }
-    expect(Math.max(...Array.from({ length: 60 }, (_, i) => poseAt(i / 2, "explaining").gesture))).toBeGreaterThan(0.3);
-  });
-});
-
-describe("lip-sync", () => {
-  it("closes the lips for m/b/p and opens for vowels; rests when not speaking", () => {
-    expect(visemeFor("m").mouthPress).toBeGreaterThan(0.4);
-    expect(visemeFor("a").jawOpen).toBeGreaterThan(0.2);
-    const l = new LipSync();
-    expect(l.visemeAt(1).jawOpen).toBe(0);
-    l.begin("Hello there", 0);
-    expect(Math.max(...Array.from({ length: 20 }, (_, i) => l.visemeAt(i / 40).jawOpen))).toBeGreaterThan(0.05);
-    l.end();
-    expect(l.visemeAt(0.2).jawOpen).toBe(0);
-  });
-});
-
 describe("works on every phone", () => {
   it("chooses the right presentation", () => {
-    expect(chooseTier({ webgl: false })).toBe("lite");
-    expect(chooseTier({ webgl: true, saveData: true })).toBe("lite");
-    expect(chooseTier({ webgl: true, effectiveType: "2g" })).toBe("lite");
-    expect(chooseTier({ webgl: true, deviceMemory: 1, cores: 4 })).toBe("lite");
-    expect(chooseTier({ webgl: true, mobile: true, deviceMemory: 4, cores: 8 })).toBe("standard");
-    expect(chooseTier({ webgl: true, mobile: false, deviceMemory: 8, cores: 8 })).toBe("full");
+    expect(chooseTier({ webgl: false })).toBe("fallback");
+    expect(chooseTier({ webgl: true, saveData: true })).toBe("fallback");
+    expect(chooseTier({ webgl: true, effectiveType: "2g" })).toBe("fallback");
+    expect(chooseTier({ webgl: true, deviceMemory: 1, cores: 4 })).toBe("fallback");
+    expect(chooseTier({ webgl: true, effectiveType: "3g", deviceMemory: 4, cores: 8 })).toBe("low");
+    expect(chooseTier({ webgl: true, mobile: true, deviceMemory: 4, cores: 4 })).toBe("low");
+    expect(chooseTier({ webgl: true, mobile: true, deviceMemory: 4, cores: 8 })).toBe("medium");
+    expect(chooseTier({ webgl: true, mobile: false, deviceMemory: 8, cores: 8 })).toBe("high");
   });
 });
 

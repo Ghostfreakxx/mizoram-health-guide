@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import RoomLink from "./consult-room/RoomLink";
 import { AI_HOSPITAL } from "../config";
 
 export const metadata: Metadata = {
@@ -71,8 +72,11 @@ export default function AiHospitalLobby() {
       <section aria-labelledby="actions-heading" className="mx-auto max-w-6xl px-4 py-10 sm:px-6">
         <h2 id="actions-heading" className="text-2xl font-bold text-blue-950">What do you need?</h2>
         <div className="mt-5 grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
-          {actions.map((a) => (
-            <Link
+          {actions.map((a) => {
+            // Links into a consultation room warm up the 3D doctor on hover/focus.
+            const L = a.href.endsWith("/room") ? RoomLink : Link;
+            return (
+            <L
               key={a.label}
               href={a.href}
               className={`flex min-h-24 items-center gap-4 rounded-2xl border-2 p-5 transition ${a.style ?? "border-slate-200 bg-white text-slate-900 hover:border-blue-400 hover:bg-blue-50"}`}
@@ -82,8 +86,9 @@ export default function AiHospitalLobby() {
                 <span className="block text-xl font-bold">{a.label}</span>
                 <span className={`block text-base ${a.style ? "text-white/85" : "text-slate-600"}`}>{a.sub}</span>
               </span>
-            </Link>
-          ))}
+            </L>
+            );
+          })}
         </div>
       </section>
 

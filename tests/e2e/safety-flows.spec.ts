@@ -61,7 +61,7 @@ test("consultation room: 'chest feels very tight… struggling to breathe' inter
   await page.getByRole("textbox", { name: "Your answer" }).fill("My chest feels very tight and I'm struggling to breathe.");
   await page.getByRole("button", { name: "Send" }).click();
   await expect(page.getByText("Urgent medical attention")).toBeVisible();
-  await expect(page.getByText("Your answers include warning signs")).toBeVisible();
+  await expect(page.getByText("These symptoms may need emergency medical attention").first()).toBeVisible();
   await expect(page.getByRole("link", { name: /108/ }).first()).toBeVisible();
   await expect(page.getByRole("button", { name: "This is not an emergency — go back" })).toBeVisible();
   // Routine questions are not shown.
@@ -75,13 +75,14 @@ test("consultation room: a three-week cough gets follow-up questions, a chart an
   await page.getByRole("textbox", { name: "Your answer" }).fill("I've been coughing for about three weeks");
   await page.getByRole("button", { name: "Send" }).click();
   await page.getByRole("button", { name: "None of these — continue" }).click();
-  await expect(page.getByRole("heading", { name: "Is this for you, or for someone else?" })).toBeVisible();
+  // "I've been…" already says who the visit is for: the doctor remembers it and does not ask again.
+  await expect(page.getByRole("heading", { name: "How old are you?" })).toBeVisible();
   const chart = page.getByRole("complementary", { name: "Patient chart" });
   await expect(chart).toContainText("I've been coughing for about three weeks");
+  await expect(chart).toContainText("Self");
   await expect(chart).toContainText("More than 2 weeks");
   await expect(chart).toContainText("Not provided");
-  // Answer the rest: myself, adult, female, nothing special, cough, then "No" / first option / skip.
-  await page.getByRole("button", { name: "Myself" }).click();
+  // Answer the rest: adult, female, nothing special, cough, then "No" / first option / skip.
   await page.getByRole("button", { name: "18 to 59 years" }).click();
   await page.getByRole("button", { name: "Female" }).click();
   await page.getByRole("button", { name: "None of these — continue" }).click();
@@ -154,4 +155,29 @@ test("reception: 'My mother has been having chest pain' goes straight to Emergen
   await page.getByRole("button", { name: "“My mother has been having chest pain.”" }).click();
   await expect(page.getByRole("alertdialog")).toBeVisible();
   await expect(page.getByRole("link", { name: /108/ }).first()).toBeVisible();
+});
+
+test("consultation room: own-words answers are understood, or the doctor asks again", async ({ page }) => {
+  await page.goto("/ai-hospital/departments/general-medicine/room");
+  await page.getByLabel("Display").selectOption("text");
+  await page.getByRole("button", { name: "Begin consultation" }).click();
+  await page.getByRole("textbox", { name: "Your answer" }).fill("I have had a headache since yesterday");
+  await page.getByRole("button", { name: "Send" }).click();
+  // A choice question can still be answered in words; unclear words get a gentle retry.
+  const words = page.getByRole("textbox", { name: "Or answer in your own words" });
+  await words.fill("banana");
+  await page.getByRole("button", { name: "Send" }).click();
+  await expect(page.getByRole("status").filter({ hasText: "Sorry, I didn't quite catch that." })).toBeVisible();
+  for (const name of ["Talk", "Type instead", "Repeat", "Stop"]) await expect(page.getByRole("button", { name: new RegExp(name) }).first()).toBeVisible();
+});
+
+test("consultation room: an emergency is shown in the page, with the doctor beside it", async ({ page }) => {
+  await page.goto("/ai-hospital/departments/general-medicine/room");
+  await page.getByLabel("Display").selectOption("2d");
+  await page.getByRole("button", { name: "Begin consultation" }).first().click();
+  await page.getByRole("textbox", { name: "Your answer" }).fill("I have severe chest pain right now");
+  await page.getByRole("button", { name: "Send" }).click();
+  await expect(page.getByRole("region", { name: /Emergency/ })).toBeVisible();
+  await expect(page.getByRole("link", { name: /108/ }).first()).toBeVisible();
+  await expect(page.getByRole("img", { name: /Urgent/ })).toBeVisible();
 });

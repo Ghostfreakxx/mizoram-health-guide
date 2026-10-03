@@ -12,11 +12,22 @@ options + **patient-prepared visit summary** (print / PDF / copy / share) →
 follow-up. A red flag at any point → **Urgent medical attention**
 (full-screen Emergency Mode) immediately.
 
-## Guide states (`doctorMotion.ts`)
+## Doctor states (`consult-room/doctor/state.ts`)
 
-WAITING · GREETING · LISTENING · THINKING · ASKING · EXPLAINING · URGENT ·
-HANDOFF · COMPLETE. The screen (state chip, journey bar) and the guide's
-behaviour follow the same state.
+One state machine drives the screen, the voice and the 3D/2D doctor:
+IDLE · GREETING · LISTENING · PROCESSING · ASKING · EXPLAINING · REASSURING ·
+CONCERNED · EMERGENCY · HANDOFF · COMPLETE. Each state has a restrained
+expression (neutral, welcoming, listening, thinking, reassuring, concerned,
+urgent), a gaze policy, a posture and a gesture level (`PERFORMANCE`). The
+state never decides anything medical: the screen sets it from the engine's
+result (RED/ORANGE → concerned, GREEN → reassuring, otherwise explaining).
+
+Sequencing: Begin → *Preparing your consultation…* (progress) → greeting (the
+doctor looks up from the chart, then speaks) → listening → processing (~0.5 s
+glance at the chart) → asking → … → explaining → handoff → complete. An
+emergency skips every pause: speech stops, the emergency line is said at once
+and the emergency guidance appears in the page with the concerned doctor
+beside it (first on a phone).
 
 ## Demo mode (`app/lib/demoScenarios.ts`)
 
@@ -44,9 +55,16 @@ app/lib/safety/*          ← detectRedFlags, receive, triage  (AUTHORITATIVE)
         │
         ▼
 consult-room/ConsultationRoom.tsx   ← screen, controls, information panel
-consult-room/doctorMotion.ts        ← blink, breathing, nods, gaze, gestures (pure)
+consult-room/ConversationControls  ← Talk · Type instead · Repeat · Stop · Slower
+consult-room/doctor/               ← the virtual doctor (pure planners + one renderer)
+   state.ts    states and their performance      gaze.ts   where she looks
+   face.ts     expressions and blinking          body.ts   breathing, posture, hands
+   lipsync.ts  visemes timed to the voice         perform.ts one frame of all the above
+   scene.ts    shared room layout                 DoctorAvatar.tsx  three.js renderer
 consult-room/Doctor3D.tsx | Doctor2D.tsx | text only
-consult-room/voice.ts               ← on-device speech output; input reserved
+consult-room/voice.ts               ← speech output; Talk input with consent
+consult-room/capability.ts         ← quality manager (high/medium/low/fallback)
+consult-room/preload.ts, RoomLink  ← warms up the 3D doctor from links to a room
 ```
 
 The avatar only *presents* what the engine decided. It has no medical logic.
@@ -57,7 +75,7 @@ The avatar only *presents* what the engine decided. It has no medical logic.
   every modern mobile browser with WebGL; no plug-ins.
 - The 3D code is loaded with `next/dynamic` only when the room opens.
 - The guide is a **real human model** built from MakeHuman CC0 data
-  (`scripts/avatar/`, ~370 KB high / ~230 KB balanced, meshopt-compressed,
+  (`scripts/avatar/`, ~370 KB / ~32k triangles for every 3D tier, meshopt-compressed,
   one skeleton, 16 facial morph targets). The room is built from code.
 - Errors in 3D fall back to the 2D guide (error boundary). WebGL missing →
   2D guide automatically.
@@ -66,10 +84,15 @@ The avatar only *presents* what the engine decided. It has no medical logic.
 
 | Tier | Who gets it | What they see |
 |---|---|---|
-| full | desktop / strong devices | 3D guide and full room, up to 2× resolution |
-| standard | phones, ≤4 GB memory or ≤4 cores | 3D guide, simpler room, ≤1.25× resolution, no antialiasing |
-| lite | no WebGL, Data Saver, 2G, <2 GB memory, ≤2 cores | 2D guide (SVG), same consultation |
+| high | desktops / strong devices | soft shadows, room reflections, skin micro-detail, full room, up to 2× resolution |
+| medium | phones and laptops (≤4 GB or ≤4 cores) | same doctor, reflections, no shadows, ≤1.4× resolution |
+| low | 3G, ≤2 GB, or phones with ≤4 cores | same doctor, minimal room, 1× resolution, no antialiasing |
+| fallback | no WebGL, Data Saver, 2G, <2 GB, ≤2 cores | 2D doctor (SVG) driven by the same planner |
 | text only | person's choice | no picture at all |
+
+All 3D tiers load the same doctor: automatically simplified models creased
+the face (an uncanny look), so tiers change rendering cost instead. Below
+22 fps for 4 s the stage steps down one tier by itself.
 
 The person can always switch with the **Display** control.
 
@@ -109,24 +132,29 @@ made, rigged human model:
 - **licensed for government use**, with attribution if required
 
 Options: commission a model of a Mizo doctor (with consent of the person
-modelled), or license one from a character marketplace. `Doctor3D.tsx`'s
-`<Guide />` is the only part that changes — `poseAt()` already outputs blink,
-brow, smile, mouth-open, head and gesture values that map onto blendshapes and
+modelled), or license one from a character marketplace. Only
+`doctor/DoctorAvatar.tsx` changes — `performAt()` already outputs blink,
+expression, viseme, gaze, head and hand values that map onto blendshapes and
 bones. The 2D and text tiers stay as they are.
 
 ## Voice
 
-- Output: the phone's own text-to-speech (`speechSynthesis`) — nothing is sent
-  anywhere. Mute, replay, pause and subtitles are always available. Lips only
-  move while the voice is actually speaking.
-- Input: built (`listenOnDevice` in `voice.ts`) but **off by default**
-  (`NEXT_PUBLIC_VOICE_INPUT=on-device` to enable). It only uses on-device
-  recognition (`processLocally`); the availability check is never run on page
-  load because it crashed browser tabs in testing. Browser speech
-  recognition in some browsers sends audio to an outside cloud service. It
-  needs a Health Department decision (on-device or government-hosted
-  recogniser) and an explicit microphone button with the browser's permission
-  prompt. Spoken text would go through `respond()` exactly like typed text.
+- Output: the phone's own text-to-speech (`speechSynthesis`), preferring an
+  Indian English voice at a calm rate (0.92; **Slower** = 0.78). Lips follow the
+  engine's word-boundary events with letter-pair visemes; without them, timing
+  is estimated from the text, including pauses at punctuation. Lips only move
+  while the voice is actually speaking. Mute, Repeat, Stop, Pause and
+  subtitles are always available.
+- Interruption: typing, **Talk**, **Type instead** or **Stop** stops the doctor
+  at once; anything not yet said is still written in the conversation.
+- Input (**Talk**): `NEXT_PUBLIC_VOICE_INPUT` = `consent` (default) | `on-device`
+  | `off`. In `consent` mode, the first press explains in plain words that the
+  browser's speech service (in Chrome: Google) turns the audio into text, and
+  listening starts only after the patient agrees (remembered in page memory
+  only). The words appear in the answer box to be checked or corrected before
+  **Send**, then go through exactly the same safety checks as typed text
+  (`respondText`: red flags first, then the answer). Set `off` if the Health
+  Department does not accept a third-party speech service.
 - Mizo: no Mizo voice ships on phones today; the voice uses Indian English. Mizo
   subtitles follow the translation review process (docs/TRANSLATION.md).
 
@@ -134,7 +162,8 @@ bones. The 2D and text tiers stay as they are.
 
 - The camera is never used. "Eye contact" means the guide looks at the 3D
   camera position (the patient's viewpoint) — no face or gaze tracking.
-- The microphone is never used.
+- The microphone is used only after the patient presses Talk (and, in
+  `consent` mode, agrees to the explanation); the privacy line says when it is on.
 - Nothing typed is stored or sent; the information panel lives in page memory.
 
 ## Safety tests

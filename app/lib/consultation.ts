@@ -94,16 +94,18 @@ export type ConsultState = {
   conditions?: string;
   conditionsDone: boolean;
   emergency: EmergencyState | null;
+  remembered: string[]; // fields taken from the patient's own words ("who", "age", "sex")
 };
 
 export const MAX_TEXT = 300;
 
-export const EMERGENCY_LINE = "Your answers include warning signs that may require emergency medical care. Please get emergency help now.";
+export const EMERGENCY_LINE = "These symptoms may need emergency medical attention. Please seek emergency care now.";
 export const HANDOFF_LINE =
-  "I've prepared a summary of the information you provided. You can show this to a healthcare professional so you don't have to explain everything again.";
+  "I've prepared a summary of what you told me. You can take this with you when you speak with a healthcare professional.";
+export const UNCLEAR_LINE = "Sorry, I didn't quite catch that. Could you choose one of the answers below, or say it another way?";
 
 export function defaultIntro(department: string) {
-  return `Hello. Welcome to ${department}. I'm your AI Hospital virtual health guide. I'll ask you a few questions to help determine how urgently you may need care, and help prepare information for a healthcare professional. What brings you here today?`;
+  return `Hello. I'm your virtual health guide for this ${department} consultation. I'll ask a few questions to help determine what kind of care may be appropriate. If anything you tell me suggests an emergency, I'll tell you immediately. What brought you here today?`;
 }
 
 export function startConsultation(department: string, intro = defaultIntro(department), focus: string[] = []): ConsultState {
@@ -125,6 +127,7 @@ export function startConsultation(department: string, intro = defaultIntro(depar
     allergiesDone: false,
     conditionsDone: false,
     emergency: null,
+    remembered: [],
   };
 }
 
@@ -364,8 +367,11 @@ export function respond(s: ConsultState, step: string, value: string | string[])
     const text = clip(one);
     if (!text) return s;
     const r = receive(text);
+    const mem = rememberFromWords(text, r.who, r.relation, r.ageHint);
     const next: ConsultState = {
       ...s,
+      ...mem.fields,
+      remembered: mem.remembered,
       concernText: text,
       relation: r.relation,
       special: [...new Set([...s.special, ...r.special])],
@@ -459,6 +465,154 @@ export function respond(s: ConsultState, step: string, value: string | string[])
   return s;
 }
 
+// ---------------- Remembering what the patient said ----------------
+
+const FEMALE = /\b(mother|mom|mum|mummy|daughter|wife|sister|grandmother|grandma|granny|aunt|niece|she|her|girl|woman|lady)\b/;
+const MALE = /\b(father|dad|daddy|papa|son|husband|brother|grandfather|grandpa|uncle|nephew|he|him|boy|man)\b/;
+
+export function ageGroupFromYears(years: number): AgeGroup {
+  const months = years * 12;
+  if (months < 2) return "young-infant";
+  if (months < 60) return "child-under-5";
+  if (years < 18) return "child";
+  if (years < 60) return "adult";
+  return "older";
+}
+
+// Only clear, explicit facts are remembered; anything uncertain is still asked.
+export function rememberFromWords(text: string, who?: "self" | "other", relation?: string, ageHint?: AgeGroup) {
+  const t = text.toLowerCase();
+  const fields: Partial<ConsultState> = {};
+  const remembered: string[] = [];
+  if (who) {
+    fields.who = who;
+    remembered.push("who");
+  }
+  const self = t.match(/\b(?:i am|i'm|im|aged?)\s+(\d{1,3})\b(?!\s*(?:days?|weeks?|months?|kg|cm))/);
+  if (self && who !== "other") {
+    fields.age = ageGroupFromYears(parseInt(self[1], 10));
+    remembered.push("age");
+  } else if (ageHint) {
+    fields.age = ageHint;
+    remembered.push("age");
+  }
+  if (who === "other" && relation) {
+    if (FEMALE.test(relation)) fields.sex = "female";
+    else if (MALE.test(relation)) fields.sex = "male";
+    if (fields.sex) remembered.push("sex");
+  }
+  return { fields, remembered };
+}
+
+// ---------------- Understanding typed or spoken answers ----------------
+
+const YES = /^(yes|yeah|yep|yup|haan|ha|aw|correct|right|i do|i have|i am|it is|it does|there is|sure|ok yes)\b/;
+const NO = /^(no|nope|nah|not really|never|none|nothing|i don'?t|i do not|i haven'?t|i have not|it isn'?t|it is not|there isn'?t|not at all)\b/;
+const UNSURE = /\b(not sure|unsure|don'?t know|do not know|maybe|perhaps|i think so|possibly|no idea|can'?t say)\b/;
+
+const clean = (t: string) => t.toLowerCase().replace(/[^a-z0-9' ]+/g, " ").replace(/\s+/g, " ").trim();
+
+const NEGATION = /\b(no|not|never|none|nothing|nope|nah)\b|n't\b/;
+
+function yesNo(t: string): string | null {
+  if (UNSURE.test(t)) return "unsure";
+  if (NO.test(t)) return "no";
+  if (YES.test(t) && NEGATION.test(t)) return /^(yes|yeah|yep|yup|haan|ha|aw|sure)\b/.test(t) ? null : "no"; // "yes but not much" → ask; "I have no fever" → no
+  if (YES.test(t)) return "yes";
+  if (NEGATION.test(t)) return "no"; // "I have no fever"
+  return null;
+}
+
+// Maps free text to one of the current question's answers, or null if it
+// cannot be understood confidently. Never guesses.
+export function interpretText(turn: Turn, text: string): string | string[] | null {
+  const t = clean(text);
+  if (!t) return null;
+  const inp = turn.input;
+  if (inp.kind === "text") return text;
+  const step = turn.step;
+  if (step.startsWith("q:") || step.startsWith("confirm:")) return yesNo(t);
+  if (step === "check") return NO.test(t) || /\b(none|nothing|no)\b/.test(t) ? "none" : null;
+  if (step === "who") {
+    if (/\b(me|myself|i am|i'm|for me|self|mine)\b/.test(t) && !FEMALE.test(t) && !MALE.test(t)) return "self";
+    if (/\b(someone|somebody|other|my \w+|for my|for him|for her)\b/.test(t) || FEMALE.test(t) || MALE.test(t)) return "other";
+    return null;
+  }
+  if (step === "age") {
+    const n = t.match(/\b(\d{1,3})\s*(days?|weeks?|months?|years?|yrs?)?\b/);
+    if (n) {
+      const v = parseInt(n[1], 10);
+      const unit = n[2] ?? "years";
+      const years = unit.startsWith("day") ? v / 365 : unit.startsWith("week") ? v / 52 : unit.startsWith("month") ? v / 12 : v;
+      return ageGroupFromYears(years);
+    }
+    if (/\b(newborn|new born)\b/.test(t)) return "young-infant";
+    return null;
+  }
+  if (step === "sex") {
+    if (/\b(prefer not|rather not|don'?t want)\b/.test(t)) return "unspecified";
+    if (/\b(female|woman|girl|lady|f)\b/.test(t)) return "female";
+    if (/\b(male|man|boy|m)\b/.test(t)) return "male";
+    return null;
+  }
+  if (step === "special") {
+    if (NO.test(t) || /\b(none|nothing)\b/.test(t)) return [];
+    const out: string[] = [];
+    if (/\bpregnan/.test(t)) out.push("pregnant");
+    if (/\b(gave birth|delivered|just had a baby|after delivery)\b/.test(t)) out.push("postpartum");
+    if (/\b(immune|hiv|chemo|cancer treatment|steroid|transplant)\b/.test(t)) out.push("immunocompromised");
+    return out.length ? out : null;
+  }
+  if (step === "complaint") {
+    const ids = receive(text).complaintIds;
+    return ids[0] ?? null;
+  }
+  if (step === "duration") {
+    if (/\b(today|this morning|tonight|few hours|hours)\b/.test(t)) return "today";
+    if (/\b(yesterday|last night)\b/.test(t)) return "1-3-days";
+    const d = receive(`for ${text}`).duration ?? receive(text).duration;
+    return d ?? null;
+  }
+  if (step === "progression") {
+    if (/\b(better|improv\w*|less)\b/.test(t)) return "better";
+    if (/\b(worse|worsen\w*|more|increas\w*)\b/.test(t)) return "worse";
+    if (/\b(same|no change|unchanged|similar|not changed)\b/.test(t)) return "same";
+    return null;
+  }
+  if (step === "severity") {
+    if (/\b(severe|very bad|terrible|unbearable|can'?t do anything|cannot do anything|worst)\b/.test(t)) return "severe";
+    if (/\b(moderate|quite bad|fairly bad|hard to)\b/.test(t)) return "moderate";
+    if (/\b(mild|slight|a little|not bad|manageable|okay|ok)\b/.test(t)) return "mild";
+    return null;
+  }
+  if (inp.kind === "single" || inp.kind === "body") {
+    if (inp.kind === "body" && /\b(skip|not sure|don'?t know)\b/.test(t)) return "skip";
+    const hits = inp.options.filter((o) => {
+      const label = clean(o.label.replace(/^[^a-z0-9]+/i, ""));
+      return label && (t === label || t.includes(label) || label.split(" ").filter((w) => w.length > 3).some((w) => t.includes(w)));
+    });
+    return hits.length === 1 ? hits[0].id : null;
+  }
+  return null;
+}
+
+export type TextResult = { state: ConsultState; understood: boolean };
+
+// A typed or spoken answer. The safety check ALWAYS runs first: red flags in
+// the words open Emergency Mode even if the words also answer the question.
+export function respondText(s: ConsultState, turn: Turn, text: string): TextResult {
+  if (s.emergency) return { state: s, understood: true };
+  const words = clip(text);
+  if (!words) return { state: s, understood: false };
+  if (turn.step === "concern") return { state: respond(s, "concern", words), understood: true };
+  const flagged = withTextFlags(s, words);
+  if (flagged.emergency) return { state: flagged, understood: true };
+  const value = interpretText(turn, words);
+  if (value === null) return { state: flagged, understood: flagged !== s };
+  const next = respond(flagged, turn.step, value);
+  return { state: next, understood: next !== flagged };
+}
+
 // ---------------- The live patient chart ----------------
 
 export const NOT_PROVIDED = "Not provided";
@@ -485,7 +639,7 @@ export function chartOf(s: ConsultState): Chart {
     row("Main concern", s.concernText),
     row("Closest problem (chosen)", s.complaint ? getComplaint(s.complaint)?.label : undefined),
     row("For", s.who ? (s.who === "self" ? "Self" : `Someone else${s.relation ? ` (${s.relation})` : ""}`) : undefined),
-    row("Age group", label(AGE_GROUPS, s.age)),
+    row("Age group", label(AGE_GROUPS, s.age) && `${label(AGE_GROUPS, s.age)}${s.remembered.includes("age") ? " (from what you said)" : ""}`),
   ];
   if (s.specialDone && canBePregnant(s.age, s.sex)) {
     reported.push(

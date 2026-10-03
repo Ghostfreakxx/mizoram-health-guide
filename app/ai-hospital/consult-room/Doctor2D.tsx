@@ -1,21 +1,25 @@
 "use client";
 
 import { useEffect, useRef } from "react";
-import { type GuideState, poseAt } from "./doctorMotion";
+import type { LipSync } from "./doctor/lipsync";
+import { performAt } from "./doctor/perform";
+import type { DoctorState } from "./doctor/state";
 import type { RoomStyle } from "./rooms";
-import type { LipSync } from "./voice";
 
-// Low-resource guide: a small SVG portrait driven by the same behaviour as
-// the 3D guide (blinks, nods, expressions, lip-sync). No WebGL, no downloads.
+// Fallback doctor: a small SVG portrait driven by the same performance planner
+// as the 3D doctor (state, gaze, blinks, expressions, lip-sync). No WebGL, no
+// downloads.
 
 export default function Doctor2D({
   state,
+  since,
   lips,
   reducedMotion,
   paused,
   room,
 }: {
-  state: React.RefObject<GuideState>;
+  state: React.RefObject<DoctorState>;
+  since: React.RefObject<number>;
   lips: React.RefObject<LipSync | null>;
   reducedMotion: boolean;
   paused: boolean;
@@ -30,6 +34,7 @@ export default function Doctor2D({
   const browR = useRef<SVGPathElement>(null);
   const body = useRef<SVGGElement>(null);
   const hand = useRef<SVGGElement>(null);
+  const eyes = useRef<SVGGElement>(null);
   const motion = useRef(reducedMotion);
   useEffect(() => {
     motion.current = reducedMotion;
@@ -38,15 +43,19 @@ export default function Doctor2D({
   useEffect(() => {
     if (paused) return;
     let raf = 0;
-    const t0 = performance.now();
     const tick = (now: number) => {
-      const p = poseAt((now - t0) / 1000, state.current ?? "waiting", { reducedMotion: motion.current });
-      const v = lips.current?.visemeAt(now / 1000);
+      const t = now / 1000;
+      const r = lips.current?.rhythm(t);
+      const f = performAt(t, state.current ?? "idle", since.current ?? 0, { reducedMotion: motion.current, ...r });
+      const v = lips.current?.visemeAt(t);
+      const p = { ...f.body, ...f.face, smile: f.face.mouthSmile };
       const deg = 180 / Math.PI;
-      head.current?.setAttribute("transform", `translate(${p.headYaw * 60} ${p.headPitch * 40}) rotate(${p.headRoll * deg} 160 120)`);
+      const look = f.gaze.target === "chart" ? [4, 1] : f.gaze.target === "down" ? [0, 2.5] : f.gaze.target === "away" ? [-3, -0.5] : [f.gaze.sx * 80, f.gaze.sy * 80];
+      eyes.current?.setAttribute("transform", `translate(${look[0]} ${look[1]})`);
+      head.current?.setAttribute("transform", `translate(${p.headYaw * 60} ${p.headPitch * 40 + p.lean * 3}) rotate(${p.headRoll * deg} 160 120)`);
       body.current?.setAttribute("transform", `translate(0 ${p.breath * 1.2})`);
       hand.current?.setAttribute("transform", `translate(0 ${-p.gesture * 14})`);
-      const lidH = 2 + p.blink * 16;
+      const lidH = 2 + f.blink * 16 + (f.gaze.target === "down" ? 3 : 0);
       lidL.current?.setAttribute("height", String(lidH));
       lidR.current?.setAttribute("height", String(lidH));
       mouth.current?.setAttribute("ry", String(0.5 + (v?.jawOpen ?? 0) * 16));
@@ -58,7 +67,7 @@ export default function Doctor2D({
     };
     raf = requestAnimationFrame(tick);
     return () => cancelAnimationFrame(raf);
-  }, [paused, state, lips]);
+  }, [paused, state, since, lips]);
 
   return (
     <svg viewBox="-90 -10 500 310" className="h-full w-full" preserveAspectRatio="xMidYMid slice" aria-hidden>
@@ -83,11 +92,17 @@ export default function Doctor2D({
           {[138, 182].map((x) => (
             <g key={x}>
               <ellipse cx={x} cy="114" rx="9" ry="5.5" fill="#f1ede6" />
-              <circle cx={x} cy="114" r="4.2" fill="#4a2d1b" />
-              <circle cx={x} cy="114" r="1.9" fill="#060403" />
-              <circle cx={x + 1.3} cy="112.6" r="0.9" fill="#fff" />
             </g>
           ))}
+          <g ref={eyes}>
+            {[138, 182].map((x) => (
+              <g key={x}>
+                <circle cx={x} cy="114" r="4.2" fill="#4a2d1b" />
+                <circle cx={x} cy="114" r="1.9" fill="#060403" />
+                <circle cx={x + 1.3} cy="112.6" r="0.9" fill="#fff" />
+              </g>
+            ))}
+          </g>
           <rect ref={lidL} x="128" y="108" width="20" height="2" fill="#b9876a" />
           <rect ref={lidR} x="172" y="108" width="20" height="2" fill="#b9876a" />
           <path ref={browL} d="M126 100 Q138 94 150 99" stroke="#2b1e17" strokeWidth="3" fill="none" strokeLinecap="round" />

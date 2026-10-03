@@ -1,6 +1,6 @@
 # The AI Hospital virtual guide (3D model)
 
-`public/models/guide-high.glb` (~370 KB) and `guide-balanced.glb` (~230 KB) are
+`public/models/guide-high.glb` (~370 KB, ~32k triangles; used by every 3D quality tier) is
 built by `build.sh` from **MakeHuman** data:
 
 - base mesh, shape targets, skeleton, skin weights, facial expression units
@@ -22,8 +22,8 @@ built by `build.sh` from **MakeHuman** data:
 4. keeps a simplified skeleton (bones have no rest rotation)
 5. bakes 16 facial morph targets (ARKit-style names: `eyeBlink_L`, `jawOpen`,
    `mouthSmile`, …) from the CC0 Asian expression units
-6. writes glTF; `build.sh` compresses with meshopt and makes a simplified
-   "balanced" version for ordinary phones
+6. writes glTF; `build.sh` compresses it with meshopt (no automatic
+   simplification: it creased the face and looked unsettling)
 
 Limits: no photographic skin scan or strand hair. A commissioned, licensed
 scan of a real (consenting) Mizo doctor could replace it later: any glTF with
