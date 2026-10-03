@@ -228,3 +228,21 @@ describe("works on every phone", () => {
     expect(chooseTier({ webgl: true, mobile: false, deviceMemory: 8, cores: 8 })).toBe("full");
   });
 });
+
+describe("department rooms share one engine", () => {
+  it("every room greets as a virtual guide, passes the language policy, and has a valid focus list", async () => {
+    const { ROOMS } = await import("../../app/ai-hospital/consult-room/rooms");
+    const { getComplaint } = await import("../../app/lib/safety/triage");
+    for (const r of Object.values(ROOMS)) {
+      expect(r.intro, r.slug).toMatch(/virtual health guide/);
+      expect(r.intro).not.toMatch(/\bI am a doctor\b|\bI'm a doctor\b/i);
+      expect(violatesLanguagePolicy(r.intro), r.slug).toBeNull();
+      for (const c of r.focus) expect(getComplaint(c), `${r.slug}: ${c}`).toBeDefined();
+      // The room's focus problems are offered first when the words are unclear
+      const s = respond(respond(respond(respond(respond(respond(startConsultation(r.greeting, r.intro, r.focus), "concern", "not well"), "check", "none"), "who", "self"), "age", "adult"), "sex", "female"), "special", []);
+      const t = nextTurn(s);
+      expect(t.step).toBe("complaint");
+      if (t.input.kind === "single") expect(t.input.options[0].id).toBe(r.focus[0]);
+    }
+  });
+});

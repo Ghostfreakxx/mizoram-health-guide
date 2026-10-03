@@ -87,7 +87,7 @@ test("consultation room: a three-week cough gets follow-up questions, a chart an
   await page.getByRole("button", { name: "None of these — continue" }).click();
   await page.getByRole("button", { name: /Cough or breathing problem/ }).click();
   for (let i = 0; i < 40; i++) {
-    if (await page.getByText("Patient-prepared visit summary").count()) break;
+    if (await page.getByRole("heading", { name: "📋 Patient-prepared visit summary" }).count()) break;
     if (await page.getByText("Urgent medical attention").count()) break;
     const no = page.getByRole("button", { name: "No", exact: true });
     const skip = page.getByRole("button", { name: "Skip", exact: true });
@@ -97,7 +97,9 @@ test("consultation room: a three-week cough gets follow-up questions, a chart an
     else if (await page.getByRole("button", { name: /^Mild/ }).count()) await page.getByRole("button", { name: /^Mild/ }).click();
     else await page.locator("main button.min-h-14").first().click();
   }
-  await expect(page.getByText("Patient-prepared visit summary")).toBeVisible();
+  await expect(page.getByRole("heading", { name: "📋 Patient-prepared visit summary" })).toBeVisible();
+  await expect(page.getByText("PATIENT-PREPARED VISIT SUMMARY", { exact: true })).toBeVisible();
+  await expect(page.getByText("Not a medical diagnosis").first()).toBeVisible();
   await expect(page.getByText("Next: a real healthcare professional")).toBeVisible();
   await expect(chart).toContainText("System routing information");
   await expect(chart).toContainText("Navigation urgency");
@@ -135,7 +137,8 @@ test("reception hands the patient's words to the consultation room (in memory, n
   await page.getByLabel("What is the problem?").fill("I have been coughing for three weeks.");
   await page.getByRole("button", { name: "Continue →" }).click();
   await page.getByRole("button", { name: /Start your consultation/ }).click();
-  await expect(page).toHaveURL(/\/ai-hospital\/departments\/general-medicine\/room$/);
+  // A cough is routed to the Respiratory room; nothing about it is in the address.
+  await expect(page).toHaveURL(/\/ai-hospital\/departments\/respiratory\/room$/);
   await expect(page.getByText("From Reception:")).toBeVisible();
   await page.getByLabel("Display").selectOption("text");
   await page.getByRole("button", { name: "Begin consultation" }).click();

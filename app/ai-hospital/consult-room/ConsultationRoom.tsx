@@ -72,7 +72,7 @@ function answerLabel(t: Turn, value: string | string[]): string {
 }
 
 export default function ConsultationRoom({ room }: { room: RoomStyle }) {
-  const fresh = useCallback(() => startConsultation(room.greeting, room.intro), [room]);
+  const fresh = useCallback(() => startConsultation(room.greeting, room.intro, room.focus), [room]);
   const [history, setHistory] = useState<ConsultState[]>(() => [fresh()]);
   const state = history[history.length - 1];
   const turn = useMemo(() => nextTurn(state), [state]);

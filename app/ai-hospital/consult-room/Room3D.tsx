@@ -165,6 +165,78 @@ function useBodyChart() {
   );
 }
 
+// A simple educational poster: title, an illustration and short labels.
+function usePoster(kind: "heart" | "lungs" | "pregnancy" | "height") {
+  return useMemo(
+    () =>
+      canvasTexture((g, w, h) => {
+        const title: Record<typeof kind, [string, string]> = {
+          heart: ["YOUR HEART", "#9f1239"],
+          lungs: ["YOUR LUNGS", "#115e59"],
+          pregnancy: ["CARE IN PREGNANCY", "#9d174d"],
+          height: ["HOW TALL AM I?", "#0369a1"],
+        };
+        const [t, c] = title[kind];
+        g.fillStyle = "#fffdf8";
+        g.fillRect(0, 0, w, h);
+        g.fillStyle = c;
+        g.fillRect(0, 0, w, 64);
+        g.fillStyle = "#fff";
+        g.font = "800 30px system-ui";
+        g.textAlign = "center";
+        g.fillText(t, w / 2, 43);
+        g.textAlign = "left";
+        g.font = "600 22px system-ui";
+        const label = (x: number, y: number, s: string) => {
+          g.fillStyle = "#334155";
+          g.fillText(s, x, y);
+        };
+        if (kind === "heart") {
+          g.fillStyle = "#e11d48";
+          g.beginPath();
+          g.moveTo(w / 2, 400);
+          g.bezierCurveTo(w / 2 - 210, 270, w / 2 - 120, 110, w / 2, 200);
+          g.bezierCurveTo(w / 2 + 120, 110, w / 2 + 210, 270, w / 2, 400);
+          g.fill();
+          label(40, 470, "Know your blood pressure");
+          label(40, 505, "Stay active · Avoid tobacco");
+          label(40, 540, "Eat less salt");
+        } else if (kind === "lungs") {
+          g.fillStyle = "#94a3b8";
+          g.fillRect(w / 2 - 8, 100, 16, 120);
+          g.fillStyle = "#f9a8b4";
+          g.beginPath();
+          g.ellipse(w / 2 - 90, 300, 80, 150, 0.1, 0, Math.PI * 2);
+          g.ellipse(w / 2 + 90, 300, 80, 150, -0.1, 0, Math.PI * 2);
+          g.fill();
+          label(40, 500, "Windpipe · Lungs");
+          label(40, 535, "Avoid smoke and tobacco");
+        } else if (kind === "pregnancy") {
+          g.fillStyle = "#fbcfe8";
+          g.beginPath();
+          g.ellipse(w / 2, 280, 120, 160, 0, 0, Math.PI * 2);
+          g.fill();
+          g.fillStyle = "#f472b6";
+          g.beginPath();
+          g.ellipse(w / 2 + 10, 300, 50, 70, 0.4, 0, Math.PI * 2);
+          g.fill();
+          label(40, 485, "Regular check-ups");
+          label(40, 520, "Keep your MCP card safe");
+          label(40, 555, "Danger signs: go to hospital");
+        } else {
+          for (let i = 0; i < 10; i++) {
+            g.fillStyle = i % 2 ? "#bae6fd" : "#fde68a";
+            g.fillRect(w / 2 - 50, 80 + i * 50, 100, 50);
+            g.fillStyle = "#334155";
+            g.font = "700 20px system-ui";
+            g.fillText(`${150 - i * 10} cm`, w / 2 + 60, 112 + i * 50);
+          }
+        }
+      }, 400, kind === "height" ? 600 : 580),
+    [kind],
+  );
+}
+
 function useClock() {
   return useMemo(
     () =>
@@ -256,7 +328,7 @@ function PropItem({ prop }: { prop: Prop }) {
         </group>
       );
     case "anatomy-chart":
-      return <Picture texture={chart} size={[0.45, 0.6]} position={[0.95, 1.55, -2.08]} />;
+      return <Picture texture={chart} size={[0.4, 0.53]} position={[0.74, 1.45, -2.08]} />;
     case "couch":
       return (
         <group position={[1.75, 0, -1.35]}>
@@ -279,9 +351,119 @@ function PropItem({ prop }: { prop: Prop }) {
           ))}
         </group>
       );
+    case "ecg-cart":
+      return (
+        <group position={[0.8, 0, -1.5]} rotation={[0, -0.45, 0]}>
+          <Box size={[0.5, 0.75, 0.4]} position={[0, 0.45, 0]} color="#e5e7eb" rough={0.5} />
+          <Box size={[0.42, 0.3, 0.04]} position={[0, 1.02, 0.05]} rotation={[-0.2, 0, 0]} color="#1f2937" />
+          <mesh position={[0, 1.02, 0.075]} rotation={[-0.2, 0, 0]}>
+            <planeGeometry args={[0.37, 0.24]} />
+            <meshBasicMaterial color="#052e2b" />
+          </mesh>
+          {[0.03, 0.1, 0.17].map((x, i) => (
+            <Box key={x} size={[0.06, 0.012, 0.004]} position={[-0.12 + x * 1.4, 1.0 + (i === 1 ? 0.05 : 0), 0.08]} rotation={[-0.2, 0, i === 1 ? 0.9 : 0]} color="#34d399" emissive="#34d399" />
+          ))}
+          {[-0.2, 0.2].map((x) => <Cyl key={x} r={0.03} h={0.06} position={[x, 0.03, 0.15]} color="#374151" />)}
+        </group>
+      );
+    case "heart-poster":
+      return <Poster kind="heart" position={[0.74, 1.45, -2.08]} size={[0.38, 0.55]} />;
+    case "lung-poster":
+      return <Poster kind="lungs" position={[0.74, 1.45, -2.08]} size={[0.38, 0.55]} />;
+    case "pregnancy-poster":
+      return <Poster kind="pregnancy" position={[0.74, 1.45, -2.08]} size={[0.38, 0.55]} />;
+    case "height-chart":
+      return <Poster kind="height" position={[0.74, 1.3, -2.08]} size={[0.3, 0.45]} />;
+    case "peak-flow":
+      return (
+        <group position={[0.42, 0.79, -0.5]} rotation={[0, -0.4, Math.PI / 2]}>
+          <Cyl r={0.022} h={0.16} position={[0, 0, 0]} color="#e0f2fe" rough={0.2} />
+          <Cyl r={0.012} h={0.05} position={[0, 0.1, 0]} color="#93c5fd" />
+        </group>
+      );
+    case "oxygen":
+      return (
+        <group position={[0.82, 0, -1.55]}>
+          <Cyl r={0.11} h={1.1} position={[0, 0.55, 0]} color="#e5e7eb" rough={0.35} metal={0.3} />
+          <Cyl r={0.11} h={0.18} position={[0, 1.15, 0]} color="#15803d" rough={0.4} />
+          <Cyl r={0.03} h={0.1} position={[0, 1.29, 0]} color="#9ca3af" metal={0.8} />
+        </group>
+      );
+    case "toy-shelf":
+      return (
+        <group position={[0.95, 0, -1.85]} rotation={[0, -0.2, 0]}>
+          <Box size={[0.9, 0.9, 0.35]} position={[0, 0.45, 0]} color="#fef3c7" rough={0.6} />
+          {[0.3, 0.62].map((y) => <Box key={y} size={[0.86, 0.02, 0.3]} position={[0, y, 0.02]} color="#fcd34d" />)}
+          {([[-0.3, 0.38, "#ef4444"], [-0.12, 0.38, "#3b82f6"], [0.08, 0.38, "#22c55e"], [0.28, 0.38, "#f59e0b"], [-0.22, 0.7, "#a855f7"], [0.1, 0.7, "#06b6d4"]] as [number, number, string][]).map(([x, y, c]) => (
+            <Box key={`${x}${y}`} size={[0.12, 0.12, 0.12]} position={[x, y + 0.02, 0.05]} color={c} rough={0.5} />
+          ))}
+        </group>
+      );
+    case "scale":
+      return (
+        <group position={[1.6, 0, -1.2]}>
+          <Box size={[0.36, 0.06, 0.36]} position={[0, 0.03, 0]} color="#e5e7eb" rough={0.4} />
+          <Box size={[0.2, 0.012, 0.1]} position={[0, 0.066, -0.08]} color="#0f172a" />
+        </group>
+      );
+    case "armchairs":
+      return (
+        <group>
+          {[[-1.25, -1.45, 0.6], [0.95, -1.55, -0.6]].map(([x, z, r]) => (
+            <group key={x} position={[x, 0, z]} rotation={[0, r, 0]}>
+              <Box size={[0.75, 0.42, 0.75]} position={[0, 0.21, 0]} color="#64748b" rough={0.9} />
+              <Box size={[0.75, 0.55, 0.16]} position={[0, 0.6, -0.3]} color="#64748b" rough={0.9} />
+              <Box size={[0.14, 0.26, 0.7]} position={[0.31, 0.5, 0]} color="#64748b" rough={0.9} />
+              <Box size={[0.14, 0.26, 0.7]} position={[-0.31, 0.5, 0]} color="#64748b" rough={0.9} />
+              <Box size={[0.5, 0.1, 0.5]} position={[0, 0.46, 0.04]} color="#94a3b8" rough={0.95} />
+            </group>
+          ))}
+        </group>
+      );
+    case "lamp":
+      return (
+        <group position={[0.55, 0, -1.95]}>
+          <Cyl r={0.12} h={0.03} position={[0, 0.015, 0]} color="#78716c" />
+          <Cyl r={0.012} h={1.4} position={[0, 0.72, 0]} color="#78716c" metal={0.4} />
+          <Cyl r={[0.12, 0.2]} h={0.22} position={[0, 1.48, 0]} color="#fef3c7" />
+          <pointLight position={[0, 1.4, 0.1]} intensity={0.5} distance={2} color="#ffe4b5" />
+        </group>
+      );
+    case "plant":
+      return (
+        <group position={[-1.75, 0, -1.65]}>
+          <Cyl r={[0.17, 0.13]} h={0.42} position={[0, 0.21, 0]} color="#e7e5e4" />
+          {[0, 1, 2, 3, 4, 5].map((i) => (
+            <mesh key={i} position={[Math.sin(i * 1.3) * 0.13, 0.62 + (i % 3) * 0.12, Math.cos(i * 1.3) * 0.11]}>
+              <sphereGeometry args={[0.16, 12, 12]} />
+              <meshStandardMaterial color={i % 2 ? "#3f7d4e" : "#4f9460"} roughness={0.85} />
+            </mesh>
+          ))}
+        </group>
+      );
+    case "rug":
+      return (
+        <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.004, -0.9]}>
+          <planeGeometry args={[2.4, 1.6]} />
+          <meshStandardMaterial color="#c7b9a3" roughness={1} />
+        </mesh>
+      );
+    case "doppler":
+      return (
+        <group position={[0.48, 0.785, -0.66]} rotation={[0, -0.4, 0]}>
+          <Box size={[0.12, 0.05, 0.18]} position={[0, 0.025, 0]} color="#f8fafc" rough={0.3} />
+          <Box size={[0.08, 0.002, 0.05]} position={[0, 0.051, -0.04]} color="#0f766e" emissive="#14b8a6" />
+          <Cyl r={0.018} h={0.1} position={[0.1, 0.02, 0.05]} rotation={[Math.PI / 2, 0, 0]} color="#e2e8f0" />
+        </group>
+      );
     default:
       return null;
   }
+}
+
+function Poster({ kind, position, size }: { kind: "heart" | "lungs" | "pregnancy" | "height"; position: V3; size: [number, number] }) {
+  const tex = usePoster(kind);
+  return <Picture texture={tex} size={size} position={position} />;
 }
 
 export default function Room3D({ room, tier }: { room: RoomStyle; tier: Exclude<Tier, "lite"> }) {
@@ -320,12 +502,12 @@ export default function Room3D({ room, tier }: { room: RoomStyle; tier: Exclude<
       <Box size={[1.2, 0.03, 0.6]} position={[0, 2.78, -0.7]} color="#ffffff" emissive="#ffffff" />
 
       {/* Signage and wall items */}
-      <mesh position={[-0.75, 2.12, -2.09]}>
-        <planeGeometry args={[1.25, 0.23]} />
+      <mesh position={[-0.7, 1.74, -2.09]}>
+        <planeGeometry args={[1.0, 0.185]} />
         <meshBasicMaterial map={sign} toneMapped={false} />
       </mesh>
-      <Picture texture={poster} size={[0.42, 0.36]} position={[-1.15, 1.45, -2.08]} />
-      <mesh position={[0.25, 2.2, -2.085]}>
+      <Picture texture={poster} size={[0.42, 0.36]} position={[-1.0, 1.34, -2.08]} />
+      <mesh position={[0.32, 1.9, -2.085]}>
         <circleGeometry args={[0.13, 32]} />
         <meshStandardMaterial map={clock} roughness={0.6} />
       </mesh>

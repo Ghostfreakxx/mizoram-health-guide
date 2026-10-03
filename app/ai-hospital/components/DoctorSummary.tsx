@@ -53,7 +53,7 @@ export default function DoctorSummary({ base, editable = true }: { base: Summary
     setPreview(false);
     try {
       if (navigator.share) {
-        await navigator.share({ title: "Patient-prepared health summary", text });
+        await navigator.share({ title: "Patient-prepared visit summary", text });
         return;
       }
     } catch {
@@ -113,7 +113,8 @@ export default function DoctorSummary({ base, editable = true }: { base: Summary
       {/* The one-page summary */}
       <article className="print-area rounded-xl border-2 border-slate-300 bg-white p-6 text-slate-900">
         <header className="border-b-2 border-slate-200 pb-3">
-          <p className="text-xl font-bold">Patient-prepared health summary</p>
+          <p className="text-xl font-black tracking-wide">PATIENT-PREPARED VISIT SUMMARY</p>
+          <p className="text-base font-bold text-slate-700">Not a medical diagnosis</p>
           <p className="mt-1 inline-block rounded bg-amber-100 px-2 py-1 text-sm font-bold text-amber-950">{SUMMARY_LABEL}</p>
           <p className="mt-1 text-sm text-slate-600">Generated: {formatGenerated(base.generatedAt)}</p>
         </header>
@@ -136,7 +137,7 @@ export default function DoctorSummary({ base, editable = true }: { base: Summary
 
       <div className="no-print grid gap-3 sm:grid-cols-4">
         <button type="button" onClick={() => window.print()} className="rounded-xl bg-blue-900 px-4 py-4 text-lg font-semibold text-white hover:bg-blue-800">
-          🖨️ Print / PDF
+          🖨️ Print / Save as PDF
         </button>
         <button type="button" onClick={() => setLarge(true)} className="rounded-xl bg-slate-800 px-4 py-4 text-lg font-semibold text-white hover:bg-slate-700">
           📱 Show on phone
@@ -187,7 +188,7 @@ export default function DoctorSummary({ base, editable = true }: { base: Summary
       {large && (
         <div role="dialog" aria-modal="true" aria-label="Summary for the doctor" className="no-print fixed inset-0 z-[90] overflow-y-auto bg-white p-5">
           <div className="mx-auto max-w-2xl text-xl leading-relaxed">
-            <p className="font-bold">Patient-prepared health summary</p>
+            <p className="font-bold">Patient-prepared visit summary</p>
             <p className="mt-1 rounded bg-amber-100 px-2 py-1 text-base font-bold text-amber-950">{SUMMARY_LABEL}</p>
             {sections.map((s) => (
               <div key={s.heading} className="mt-5">

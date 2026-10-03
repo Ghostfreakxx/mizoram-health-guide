@@ -66,6 +66,7 @@ export type EmergencyState = { flags: RedFlagId[]; clear: { kind: "answer"; id: 
 export type ConsultState = {
   department: string; // display name, e.g. "General Medicine"
   intro: string;
+  focus: string[]; // complaint ids this department shows first
   concernText?: string;
   pendingFlags: RedFlagId[]; // mentioned in free text; need a yes/no
   dismissedFlags: RedFlagId[];
@@ -105,10 +106,11 @@ export function defaultIntro(department: string) {
   return `Hello. Welcome to ${department}. I'm your AI Hospital virtual health guide. I'll ask you a few questions to help determine how urgently you may need care, and help prepare information for a healthcare professional. What brings you here today?`;
 }
 
-export function startConsultation(department: string, intro = defaultIntro(department)): ConsultState {
+export function startConsultation(department: string, intro = defaultIntro(department), focus: string[] = []): ConsultState {
   return {
     department,
     intro,
+    focus,
     pendingFlags: [],
     dismissedFlags: [],
     checkDone: false,
@@ -250,13 +252,15 @@ export function nextTurn(s: ConsultState): Turn {
   }
   if (!s.complaint) {
     const suggested = s.suggested.map(getComplaint).filter((c): c is NonNullable<typeof c> => !!c);
-    const rest = complaints.filter((c) => !s.suggested.includes(c.id));
+    const focused = s.focus.filter((id) => !s.suggested.includes(id)).map(getComplaint).filter((c): c is NonNullable<typeof c> => !!c);
+    const shown = new Set([...suggested, ...focused].map((c) => c.id));
+    const rest = complaints.filter((c) => !shown.has(c.id));
     return {
       step: "complaint",
       say: suggested.length
         ? `From what you told me, this sounds closest to: ${suggested[0].label.toLowerCase()}. Which of these fits best?`
         : "Which of these is closest to the main problem?",
-      input: { kind: "single", options: [...suggested, ...rest].map((c) => ({ id: c.id, label: `${c.icon} ${c.label}` })) },
+      input: { kind: "single", options: [...suggested, ...focused, ...rest].map((c) => ({ id: c.id, label: `${c.icon} ${c.label}` })) },
       mood: "attentive",
     };
   }

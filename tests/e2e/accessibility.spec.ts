@@ -40,6 +40,9 @@ const PAGES = [
   "/ai-hospital/calm",
   "/ai-hospital/first-aid",
   "/ai-hospital/departments/general-medicine/room",
+  "/ai-hospital/departments/cardiology/room",
+  "/ai-hospital/departments/mental-health/room",
+  "/ai-hospital/departments/paediatrics/room",
 ];
 
 for (const path of PAGES) {
