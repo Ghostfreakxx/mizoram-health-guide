@@ -1,4 +1,5 @@
 import ReadAloud from "../../components/ReadAloud";
+import { sourcesFor } from "../../lib/sources";
 
 // Large, simple controls for AI Hospital (elderly-friendly, big touch targets).
 
@@ -48,6 +49,20 @@ export function BoundaryNote({ text }: { text: string }) {
     <p className="flex gap-2 rounded-lg bg-slate-100 px-4 py-3 text-sm text-slate-700">
       <span aria-hidden>ℹ️</span>
       <span>{text}</span>
+    </p>
+  );
+}
+
+// Names the organisations behind a piece of guidance, and says plainly that
+// the source has not yet been checked against the live official page.
+export function SourceNote({ ids, className = "" }: { ids: string[]; className?: string }) {
+  const list = sourcesFor(ids);
+  if (!list.length) return null;
+  const pending = list.some((s) => s.status !== "verified");
+  return (
+    <p className={`text-sm text-slate-600 ${className}`}>
+      Source: {[...new Set(list.map((s) => s.organisation))].join("; ")}
+      {pending && " (awaiting verification against the official source)"}
     </p>
   );
 }

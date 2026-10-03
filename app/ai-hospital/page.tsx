@@ -106,6 +106,27 @@ export default function AiHospitalLobby() {
         </div>
       </section>
 
+      {/* Stay healthy */}
+      <section aria-labelledby="healthy-heading" className="mx-auto max-w-6xl px-4 pb-10 sm:px-6">
+        <h2 id="healthy-heading" className="text-2xl font-bold text-blue-950">Stay healthy</h2>
+        <div className="mt-5 grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
+          {[
+            { href: "/ai-hospital/vaccinations", icon: "💉", label: "Child vaccines", sub: "When each visit is due" },
+            { href: "/ai-hospital/screening", icon: "🩺", label: "Free check-ups", sub: "BP, sugar, and cancer checks" },
+            { href: "/ai-hospital/calm", icon: "🌿", label: "Calm corner", sub: "Exercises for stress" },
+            { href: "/ai-hospital/first-aid", icon: "⛑️", label: "First aid", sub: "Steps to help someone now" },
+          ].map((a) => (
+            <Link key={a.href} href={a.href} className="flex min-h-24 items-center gap-4 rounded-2xl border-2 border-slate-200 bg-white p-5 text-slate-900 transition hover:border-blue-400 hover:bg-blue-50">
+              <span aria-hidden className="text-4xl">{a.icon}</span>
+              <span>
+                <span className="block text-xl font-bold">{a.label}</span>
+                <span className="block text-base text-slate-600">{a.sub}</span>
+              </span>
+            </Link>
+          ))}
+        </div>
+      </section>
+
       {/* 3D tours */}
       <section className="mx-auto max-w-6xl px-4 pb-10 sm:px-6">
         <div className="rounded-2xl border-2 border-amber-300 bg-amber-50 p-6">
