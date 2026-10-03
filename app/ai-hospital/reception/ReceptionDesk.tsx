@@ -1,5 +1,6 @@
 "use client";
 
+import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { type RedFlagId, getRedFlag } from "../../lib/safety/redFlags";
 import { type Reception, receive } from "../../lib/safety/reception";
@@ -7,15 +8,17 @@ import { AGE_GROUPS, DURATIONS, complaints, getComplaint } from "../../lib/safet
 import { getService } from "../../lib/services";
 import { getDepartment } from "../data/departments";
 import EmergencyMode from "../components/EmergencyMode";
+import { roomForDepartments, setPendingConcern } from "../consult-room/handoff";
+import { roomFor } from "../consult-room/rooms";
 import TriageFlow from "../components/TriageFlow";
 import { BigChoice, StepTitle } from "../components/ui";
 
 const EXAMPLES = [
-  "My mother has been coughing for three weeks",
-  "I have had a fever since yesterday",
-  "My baby is not feeding well",
-  "I feel sad all the time",
-  "I had possible HIV exposure yesterday",
+  "My mother has been having chest pain.",
+  "I have been coughing for three weeks.",
+  "My child has a fever.",
+  "I think I was exposed to HIV.",
+  "I'm pregnant and bleeding.",
 ];
 
 type Stage =
@@ -28,6 +31,7 @@ export default function ReceptionDesk() {
   const [text, setText] = useState("");
   const [stage, setStage] = useState<Stage>({ kind: "ask" });
   const [emergency, setEmergency] = useState<RedFlagId[] | null>(null);
+  const router = useRouter();
 
   function submit(message: string) {
     const r = receive(message);
@@ -128,14 +132,30 @@ export default function ReceptionDesk() {
         )}
 
         <div className="rounded-2xl bg-blue-900 p-6 text-white">
-          <p className="text-lg">To decide how urgent this is and whether an online consultation is suitable, I need to ask a few quick questions.</p>
+          <p className="text-lg">Next, the virtual health guide will ask a few questions — one at a time — to find out how urgent this is and prepare a summary for a doctor.</p>
+          {(() => {
+            const slug = roomForDepartments(c?.departments ?? [], (d) => !!roomFor(d));
+            const rm = roomFor(slug);
+            return (
+              <button
+                type="button"
+                onClick={() => {
+                  setPendingConcern(text);
+                  router.push(`/ai-hospital/departments/${slug}/room`);
+                }}
+                className="mt-4 w-full rounded-xl bg-amber-400 px-6 py-4 text-xl font-bold text-blue-950"
+              >
+                Start your consultation{rm ? ` — ${rm.greeting}` : ""} →
+              </button>
+            );
+          })()}
           <button
             type="button"
             disabled={!stage.complaint}
             onClick={() => stage.complaint && setStage({ kind: "triage", reception: r, complaint: stage.complaint })}
-            className="mt-4 w-full rounded-xl bg-amber-400 px-6 py-4 text-xl font-bold text-blue-950 disabled:opacity-50"
+            className="mt-3 w-full rounded-xl border-2 border-white/70 px-6 py-3 text-lg font-semibold text-white disabled:opacity-50"
           >
-            Continue to quick questions →
+            Or answer quick questions here (text only)
           </button>
         </div>
         <button type="button" onClick={() => setStage({ kind: "ask" })} className="text-lg text-blue-700 underline">← Change what I wrote</button>

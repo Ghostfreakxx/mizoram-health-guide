@@ -129,3 +129,24 @@ test("demo mode plays a scenario through the real engine and resets", async ({ p
   await expect(page.getByText("Urgent medical attention")).toHaveCount(0);
   await expect(page.getByRole("button", { name: /B\. Persistent cough/ })).toBeVisible();
 });
+
+test("reception hands the patient's words to the consultation room (in memory, not the URL)", async ({ page }) => {
+  await page.goto("/ai-hospital/reception");
+  await page.getByLabel("What is the problem?").fill("I have been coughing for three weeks.");
+  await page.getByRole("button", { name: "Continue →" }).click();
+  await page.getByRole("button", { name: /Start your consultation/ }).click();
+  await expect(page).toHaveURL(/\/ai-hospital\/departments\/general-medicine\/room$/);
+  await expect(page.getByText("From Reception:")).toBeVisible();
+  await page.getByLabel("Display").selectOption("text");
+  await page.getByRole("button", { name: "Begin consultation" }).click();
+  const chart = page.getByRole("complementary", { name: "Patient chart" });
+  await expect(chart).toContainText("I have been coughing for three weeks.", { timeout: 20000 });
+  await expect(chart).toContainText("More than 2 weeks");
+});
+
+test("reception: 'My mother has been having chest pain' goes straight to Emergency Mode", async ({ page }) => {
+  await page.goto("/ai-hospital/reception");
+  await page.getByRole("button", { name: "“My mother has been having chest pain.”" }).click();
+  await expect(page.getByRole("alertdialog")).toBeVisible();
+  await expect(page.getByRole("link", { name: /108/ }).first()).toBeVisible();
+});

@@ -8,8 +8,10 @@ export const metadata: Metadata = {
 };
 
 const actions = [
-  { href: "/ai-hospital/triage", icon: "🤒", label: "I feel sick", sub: "Check how urgent it is", style: "bg-blue-900 text-white border-blue-900 hover:bg-blue-800" },
+  { href: "/ai-hospital/reception", icon: "🛎️", label: "Tell us what is wrong", sub: "Start at Reception", style: "bg-blue-900 text-white border-blue-900 hover:bg-blue-800" },
   { href: "/ai-hospital/emergency", icon: "🚨", label: "Emergency", sub: "Call for help now", style: "bg-red-700 text-white border-red-700 hover:bg-red-800" },
+  { href: "/ai-hospital/departments/general-medicine/room", icon: "🪑", label: "General Medicine consultation", sub: "Sit with the virtual health guide" },
+  { href: "/ai-hospital/triage", icon: "🤒", label: "Quick urgency check", sub: "A few questions, text only" },
   { href: "/ai-hospital/departments", icon: "🧭", label: "Find the right department", sub: "Where should I go?" },
   { href: "/ai-hospital/consult", icon: "👩‍⚕️", label: "Talk to a real doctor", sub: "Live, in real time" },
   { href: "/ai-hospital/prepare", icon: "📋", label: "Prepare for a hospital visit", sub: "Make a summary for the doctor" },

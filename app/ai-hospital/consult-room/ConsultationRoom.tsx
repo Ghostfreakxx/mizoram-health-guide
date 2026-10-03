@@ -14,6 +14,7 @@ import DemoPanel from "./DemoPanel";
 import Doctor2D from "./Doctor2D";
 import { type GuideState, STATE_LABEL } from "./doctorMotion";
 import HandoffPanel from "./HandoffPanel";
+import { takePendingConcern } from "./handoff";
 import JourneyBar, { type JourneyStep } from "./JourneyBar";
 import PatientChart from "./PatientChart";
 import type { RoomStyle } from "./rooms";
@@ -102,6 +103,7 @@ export default function ConsultationRoom({ room }: { room: RoomStyle }) {
   const [micNote, setMicNote] = useState("");
   const [demoMode, setDemoMode] = useState(false);
   const [demo, setDemo] = useState<string | null>(null);
+  const [fromReception, setFromReception] = useState<string | null>(null);
   const speech = useRef<SpeechOutput | null>(null);
   const timers = useRef<ReturnType<typeof setTimeout>[]>([]);
   const stopMic = useRef<(() => void) | null>(null);
@@ -122,6 +124,7 @@ export default function ConsultationRoom({ room }: { room: RoomStyle }) {
     setDetected(chooseTier(readDevice()));
     setReducedMotion(window.matchMedia("(prefers-reduced-motion: reduce)").matches);
     setDemoMode(new URLSearchParams(window.location.search).has("demo"));
+    setFromReception(takePendingConcern());
     // Only a cheap setting check here; the browser is not asked anything until the microphone is pressed.
     setMic(voiceInputSetting());
     const t = timers.current;
@@ -159,13 +162,19 @@ export default function ConsultationRoom({ room }: { room: RoomStyle }) {
         setGuide(l.state);
         setLog((g) => [...g, { who: "guide", text: l.text }]);
         if (voiceOn && speech.current?.available) {
+          // Some phones never report the end of speech: never wait forever.
+          let finished = false;
+          const finish = () => {
+            if (finished) return;
+            finished = true;
+            lips.current?.end();
+            step(i + 1);
+          };
+          later(finish, Math.max(4000, l.text.length * 110));
           speech.current.speak(l.text, {
             onStart: () => lips.current?.begin(l.text, performance.now() / 1000),
             onWord: (ci) => lips.current?.word(ci, performance.now() / 1000),
-            onEnd: () => {
-              lips.current?.end();
-              step(i + 1);
-            },
+            onEnd: finish,
           });
         } else {
           // Muted: the guide "speaks" through subtitles; lips stay still.
@@ -213,6 +222,16 @@ export default function ConsultationRoom({ room }: { room: RoomStyle }) {
     },
     [state, turn],
   );
+
+  // Words typed at Reception are sent as the first answer, once, after the greeting.
+  useEffect(() => {
+    if (!fromReception || !begun || demo || turn.step !== "concern" || guide !== "listening") return;
+    const t = setTimeout(() => {
+      answer(fromReception);
+      setFromReception(null);
+    }, 600);
+    return () => clearTimeout(t);
+  }, [fromReception, begun, demo, turn.step, guide, answer]);
 
   const back = () => setHistory((h) => (h.length > 1 ? h.slice(0, -1) : h));
   const restart = useCallback(() => {
@@ -528,6 +547,11 @@ export default function ConsultationRoom({ room }: { room: RoomStyle }) {
     <div ref={topRef} className="space-y-4">
       <JourneyBar current={journey} />
       {demoMode && <DemoPanel active={demo} onPlay={playDemo} onReset={resetDemo} />}
+      {fromReception && (
+        <p className="rounded-xl bg-blue-50 px-4 py-2 text-blue-950">
+          From Reception: <q>{fromReception}</q> — this will be your first answer.
+        </p>
+      )}
       {failed3d && <p role="status" className="rounded-xl bg-amber-50 px-4 py-2 text-sm font-semibold text-amber-900">{failed3d}</p>}
       <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_360px]">
         <div className="space-y-4">
