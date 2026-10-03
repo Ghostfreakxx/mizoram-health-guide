@@ -12,11 +12,46 @@ options + **patient-prepared visit summary** (print / PDF / copy / share) →
 follow-up. A red flag at any point → **Urgent medical attention**
 (full-screen Emergency Mode) immediately.
 
+## A helpful conversation (`app/lib/consultation.ts`, `consultHelp.ts`, `education.ts`)
+
+The doctor's purpose is to help the patient explain the problem, understand
+the questions, notice urgency, and prepare a summary for a real doctor.
+Everything the patient types or says goes through `converse()`:
+
+1. **Safety first** — red-flag detection on every message, at every step.
+2. **"What does this mean?" / "Why are you asking?" / "Say that again"** —
+   plain-English re-wording from a small glossary; short reasons that never
+   reveal scoring. After one explanation, later questions keep a plain-word hint.
+3. **"I don't know", "I forgot", "I can't explain it"** — valid answers,
+   recorded as *Not sure / Not remembered / Could not describe*, never
+   invented. Missing course-of-illness answers can never lead to self-care.
+4. **An answer** to the current question (buttons, words, body map, a 0–10
+   pain scale, or a measured temperature in °C/°F).
+5. **A health question** ("What is TB?") — answered only from the reviewed
+   topic pages, word for word, shown as *general information, not an
+   assessment of you*; anything else gets "I don't have enough information to
+   answer that safely".
+
+Conversation flow: what brought you → (if vague) "tell me what is bothering
+you most" → (if the feeling is unclear) "Can you describe what it feels like?"
+→ where → when → the danger-sign check → who / age / sex → focused
+questions → better or worse → how bad → medicines, allergies, conditions →
+recap ("You told me about…") and the engine's result. A description is also
+checked *in context* ("like pressure" about the chest → "chest pressure"),
+and the patient is asked to confirm before routine questions continue.
+
+Memory: facts said anywhere (how long, who, age, the problem) are kept and not
+asked again; the doctor says once "You mentioned that the cough started…".
+Adapting, only from the patient's own words: short answers → short questions;
+"I'm scared / please help" → acknowledged once, optional history left out
+(and marked "Not asked" for the doctor).
+
 ## Doctor states (`consult-room/doctor/state.ts`)
 
 One state machine drives the screen, the voice and the 3D/2D doctor:
 IDLE · GREETING · LISTENING · PROCESSING · ASKING · EXPLAINING · REASSURING ·
-CONCERNED · EMERGENCY · HANDOFF · COMPLETE. Each state has a restrained
+CONCERNED · EMERGENCY · HANDOFF · COMPLETE, plus CLARIFYING (helpful
+expression, re-saying a question) and EDUCATING (calm, general information). Each state has a restrained
 expression (neutral, welcoming, listening, thinking, reassuring, concerned,
 urgent), a gaze policy, a posture and a gesture level (`PERFORMANCE`). The
 state never decides anything medical: the screen sets it from the engine's

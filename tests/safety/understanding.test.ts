@@ -60,7 +60,8 @@ describe("typed or spoken answers are understood — or not guessed", () => {
   });
 
   it("age and who are understood", () => {
-    const s = at([["concern", "fever"], ["check", "none"]]);
+    const s = at([["concern", "fever"], ["check", "none"], ["complaint", "fever"], ["duration", "today"]]);
+    expect(nextTurn(s).step).toBe("who");
     expect(interpretText(nextTurn(s), "it's for me")).toBe("self");
     const s2 = respond(s, "who", "self");
     expect(interpretText(nextTurn(s2), "34 years")).toBe("adult");

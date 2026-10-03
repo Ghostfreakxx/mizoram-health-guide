@@ -86,7 +86,7 @@ test("consultation room: a three-week cough gets follow-up questions, a chart an
   await page.getByRole("button", { name: "18 to 59 years" }).click();
   await page.getByRole("button", { name: "Female" }).click();
   await page.getByRole("button", { name: "None of these — continue" }).click();
-  await page.getByRole("button", { name: /Cough or breathing problem/ }).click();
+  // The problem (a cough) was understood from the words: not asked again.
   for (let i = 0; i < 40; i++) {
     if (await page.getByRole("heading", { name: "📋 Patient-prepared visit summary" }).count()) break;
     if (await page.getByText("Urgent medical attention").count()) break;
@@ -180,4 +180,46 @@ test("consultation room: an emergency is shown in the page, with the doctor besi
   await expect(page.getByRole("region", { name: /Emergency/ })).toBeVisible();
   await expect(page.getByRole("link", { name: /108/ }).first()).toBeVisible();
   await expect(page.getByRole("img", { name: /Urgent/ })).toBeVisible();
+});
+
+test("consultation room: the doctor helps when the patient can't explain, and safety acts on 'like pressure'", async ({ page }) => {
+  await page.goto("/ai-hospital/departments/general-medicine/room");
+  await page.getByLabel("Display").selectOption("text");
+  await page.getByRole("button", { name: "Begin consultation" }).click();
+  const box = page.getByRole("textbox", { name: "Your answer" });
+  await box.fill("I don't really know how to explain it");
+  await page.getByRole("button", { name: "Send" }).click();
+  await expect(page.getByRole("heading", { name: /That's okay\. Tell me what is bothering you most/ })).toBeVisible();
+  await page.getByRole("textbox", { name: "Or answer in your own words" }).fill("My chest feels strange");
+  await page.getByRole("button", { name: "Send" }).click();
+  await expect(page.getByRole("heading", { name: /Can you describe what it feels like\?/ })).toBeVisible();
+  await page.getByRole("textbox", { name: "Or answer in your own words" }).fill("Like pressure");
+  await page.getByRole("button", { name: "Send" }).click();
+  await expect(page.getByRole("heading", { name: /To be safe, I need to ask/ })).toBeVisible();
+  await page.getByRole("button", { name: "Yes", exact: true }).click();
+  await expect(page.getByRole("region", { name: /Emergency/ })).toBeVisible();
+});
+
+test("consultation room: explain, why, 'not sure', and verified health education", async ({ page }) => {
+  await page.goto("/ai-hospital/departments/general-medicine/room");
+  await page.getByLabel("Display").selectOption("text");
+  await page.getByRole("button", { name: "Begin consultation" }).click();
+  await page.getByRole("textbox", { name: "Your answer" }).fill("I have a cough");
+  await page.getByRole("button", { name: "Send" }).click();
+  await expect(page.getByRole("heading", { name: /When did this start\?/ })).toBeVisible();
+  await page.getByRole("button", { name: /Why do you ask\?/ }).click();
+  await expect(page.getByRole("status").filter({ hasText: "How long a problem has lasted" })).toBeVisible();
+  await page.getByRole("button", { name: /I'm not sure/ }).click();
+  await page.getByRole("button", { name: "None of these — continue" }).click();
+  const words = page.getByRole("textbox", { name: "Or answer in your own words" });
+  await words.fill("What is TB?");
+  await page.getByRole("button", { name: "Send" }).click();
+  const edu = page.getByRole("region", { name: "What is TB?" });
+  await expect(edu).toContainText("not an assessment of you");
+  await expect(edu).toContainText("spreads through the air");
+  await words.fill("Is it cancer?");
+  await page.getByRole("button", { name: "Send" }).click();
+  await expect(page.getByRole("status").filter({ hasText: "I don't have enough information to answer that safely" })).toBeVisible();
+  const chart = page.getByRole("complementary", { name: "Patient chart" });
+  await expect(chart).toContainText("Not sure");
 });

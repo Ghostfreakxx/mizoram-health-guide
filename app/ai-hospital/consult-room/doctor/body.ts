@@ -57,7 +57,8 @@ export function bodyAt(
   let gesture = 0;
   if (opts.speaking && m && perf.gesture > 0) {
     const p = opts.phrase ?? 0;
-    gesture = hash(p * 19 + 4 + seed) < 0.55 ? perf.gesture : perf.gesture * 0.25;
+    // Most phrases have still hands; a few get one small open-palm gesture.
+    gesture = p > 0 && hash(p * 19 + 4 + seed) < 0.4 ? perf.gesture : 0;
   }
 
   return {

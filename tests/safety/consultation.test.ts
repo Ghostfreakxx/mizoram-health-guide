@@ -96,7 +96,9 @@ describe("the safety engine stays authoritative", () => {
     expect(t.step).toBe("confirm:chest_pain");
     expect(nextTurn(respond(s, t.step, "yes")).input.kind).toBe("emergency");
     expect(nextTurn(respond(s, t.step, "unsure")).input.kind).toBe("emergency");
-    expect(nextTurn(respond(s, t.step, "no")).step).toBe("check");
+    const cleared = respond(s, t.step, "no");
+    expect(cleared.pendingFlags).toEqual([]);
+    expect(nextTurn(cleared).input.kind).not.toBe("emergency");
   });
 
   it("overdose in the person's words goes straight to Emergency Mode", () => {
@@ -107,8 +109,13 @@ describe("the safety engine stays authoritative", () => {
     let s = respond(start(), "concern", "headache");
     s = respond(s, "check", "breathing");
     expect(nextTurn(s).input.kind).toBe("emergency");
-    // "Not an emergency" goes back to the check, not past it.
+    // "Not an emergency" goes back to the check, not past it: it is asked again.
     s = respond(s, "emergency", "exit");
+    expect(s.checkDone).toBe(false);
+    while (!["check", "result", "emergency"].includes(nextTurn(s).step)) {
+      const t = nextTurn(s);
+      s = respond(s, t.step, t.input.kind === "single" || t.input.kind === "body" ? t.input.options[0].id : t.input.kind === "multi" ? [] : "x");
+    }
     expect(nextTurn(s).step).toBe("check");
   });
 
@@ -197,7 +204,10 @@ describe("department rooms share one engine", () => {
       expect(violatesLanguagePolicy(r.intro), r.slug).toBeNull();
       for (const c of r.focus) expect(getComplaint(c), `${r.slug}: ${c}`).toBeDefined();
       // The room's focus problems are offered first when the words are unclear
-      const s = respond(respond(respond(respond(respond(respond(startConsultation(r.greeting, r.intro, r.focus), "concern", "not well"), "check", "none"), "who", "self"), "age", "adult"), "sex", "female"), "special", []);
+      // "not well" is vague: the doctor asks for more first; "not sure" moves on.
+      const first = respond(startConsultation(r.greeting, r.intro, r.focus), "concern", "not well");
+      expect(nextTurn(first).step).toBe("concern-more");
+      const s = respond(respond(first, "concern-more", "?unsure"), "check", "none");
       const t = nextTurn(s);
       expect(t.step).toBe("complaint");
       if (t.input.kind === "single") expect(t.input.options[0].id).toBe(r.focus[0]);

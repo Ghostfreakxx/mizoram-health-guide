@@ -14,9 +14,11 @@ export type DoctorState =
   | "concerned" // an urgent (not emergency) result
   | "emergency" // the safety engine found a red flag
   | "handoff" // the summary for a real healthcare professional
+  | "clarifying" // re-saying a question simply, or saying why it is asked
+  | "educating" // general health information (not about this patient)
   | "complete"; // finished, waiting quietly
 
-export type Expression = "neutral" | "welcoming" | "listening" | "thinking" | "reassuring" | "concerned" | "urgent";
+export type Expression = "neutral" | "welcoming" | "listening" | "thinking" | "reassuring" | "concerned" | "urgent" | "helpful";
 export type GazePolicy = "patient" | "notice" | "steady" | "review" | "conversational";
 
 export type Performance = {
@@ -39,6 +41,8 @@ export const PERFORMANCE: Record<DoctorState, Performance> = {
   concerned: { expression: "concerned", gaze: "steady", gesture: 0.35, head: 0.5, lean: 0.55, nods: false },
   emergency: { expression: "urgent", gaze: "steady", gesture: 0.15, head: 0.25, lean: 0.7, nods: false },
   handoff: { expression: "reassuring", gaze: "review", gesture: 0.5, head: 0.8, lean: 0.3, nods: false },
+  clarifying: { expression: "helpful", gaze: "conversational", gesture: 0.4, head: 0.6, lean: 0.4, nods: false },
+  educating: { expression: "neutral", gaze: "conversational", gesture: 0.45, head: 0.7, lean: 0.25, nods: false },
   complete: { expression: "reassuring", gaze: "conversational", gesture: 0, head: 0.5, lean: 0.2, nods: false },
 };
 
@@ -53,8 +57,10 @@ export const STATE_LABEL: Record<DoctorState, string> = {
   concerned: "Doctor speaking",
   emergency: "Urgent",
   handoff: "Preparing your summary",
+  clarifying: "Explaining",
+  educating: "Health information",
   complete: "Consultation complete",
 };
 
 export const isSpeakingState = (s: DoctorState) =>
-  s === "greeting" || s === "asking" || s === "explaining" || s === "reassuring" || s === "concerned" || s === "handoff";
+  s === "greeting" || s === "asking" || s === "explaining" || s === "reassuring" || s === "concerned" || s === "handoff" || s === "clarifying" || s === "educating";

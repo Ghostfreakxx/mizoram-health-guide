@@ -31,6 +31,9 @@ type Props = {
   onRepeat: () => void;
   onStop: () => void;
   onSlower: () => void;
+  onExplain: () => void;
+  onBack: () => void;
+  canBack: boolean;
 };
 
 const btn =
@@ -77,6 +80,12 @@ export default function ConversationControls(p: Props) {
         </button>
         <button type="button" onClick={p.onStop} disabled={!p.speaking} className={`${btn} border-slate-300 bg-white text-slate-900`}>
           ■ Stop
+        </button>
+        <button type="button" onClick={p.onExplain} disabled={!p.canAnswer} className={`${btn} border-slate-300 bg-white text-slate-900`}>
+          ❓ Explain that
+        </button>
+        <button type="button" onClick={p.onBack} disabled={!p.canBack} className={`${btn} border-slate-300 bg-white text-slate-900`}>
+          ← Back
         </button>
       </div>
       {!p.talk.available && p.talk.reason && p.canAnswer && <p className="text-xs text-slate-600">{p.talk.reason}</p>}

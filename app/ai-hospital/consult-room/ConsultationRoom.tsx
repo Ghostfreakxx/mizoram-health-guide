@@ -2,7 +2,9 @@
 
 import dynamic from "next/dynamic";
 import { Component, type ReactNode, useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { type ConsultState, type Turn, BODY_AREAS, UNCLEAR_LINE, chartOf, nextTurn, respond, respondText, startConsultation, toAnswers } from "../../lib/consultation";
+import { type ConsultState, type Turn, BODY_AREAS, chartOf, converse, explainLine, nextTurn, respond, startConsultation, toAnswers, whyLine } from "../../lib/consultation";
+import type { EducationAnswer } from "../../lib/education";
+import { hasConsent, loadPassport } from "../../lib/storage";
 import { DEMO_SCENARIOS, demoAnswer } from "../../lib/demoScenarios";
 import type { Level } from "../../lib/safety/triage";
 import { questionsFor } from "../../lib/safety/triage";
@@ -54,7 +56,14 @@ export const PRIVACY_LINE = "Your consultation information stays on this device 
 
 const NORMAL_RATE = 0.92;
 const SLOW_RATE = 0.78;
-const THINK_MS = 550; // a short, natural pause while an answer is checked
+// A short, natural pause while an answer is checked: longer answers take a
+// little longer to "read" (0.6–1.4 s). Never used for an emergency.
+const thinkMs = (words: string) => Math.min(1400, 600 + words.length * 10);
+
+function splitSentences(text: string): string[] {
+  return (text.match(/[^.!?]+[.!?]+["”’)]*\s*|[^.!?]+$/g) ?? [text]).map((x) => x.trim()).filter(Boolean);
+}
+const sentencePause = (rate: number) => Math.round(260 / rate);
 const MAX_WAIT_FOR_3D_MS = 8000; // never hold the consultation for graphics
 
 function Toggle({ on, onClick, children }: { on: boolean; onClick: () => void; children: ReactNode }) {
@@ -70,8 +79,15 @@ function Toggle({ on, onClick, children }: { on: boolean; onClick: () => void; c
   );
 }
 
+const UNSURE_LABEL: Record<string, string> = { "?unsure": "I'm not sure", "?forgot": "I don't remember", "?describe": "I can't describe it" };
+
 function answerLabel(t: Turn, value: string | string[]): string {
   const v = Array.isArray(value) ? value : [value];
+  const one = v[0] ?? "";
+  if (UNSURE_LABEL[one]) return UNSURE_LABEL[one];
+  if (one.startsWith("pain:")) return `Pain ${one.slice(5)} out of 10`;
+  if (one.startsWith("temp:")) return one.slice(5);
+  if (one.startsWith("words:") && (t.input.kind === "single" || t.input.kind === "body")) return t.input.options.find((o) => o.id === one)?.label ?? one.slice(6);
   const inp = t.input;
   if (inp.kind === "text") return v[0]?.trim() || "(skipped)";
   if (v[0] === "skip") return "(skipped)";
@@ -143,6 +159,12 @@ export default function ConsultationRoom({ room }: { room: RoomStyle }) {
   const [demoMode, setDemoMode] = useState(false);
   const [demo, setDemo] = useState<string | null>(null);
   const [fromReception, setFromReception] = useState<string | null>(null);
+  const [education, setEducation] = useState<EducationAnswer | null>(null);
+  const [tempUnit, setTempUnit] = useState<"C" | "F">("C");
+  const [tempValue, setTempValue] = useState("");
+  // From the Health Passport — only when the patient has turned saving on.
+  const [saved, setSaved] = useState<{ medicines?: string; allergies?: string; conditions?: string }>({});
+  const lastSaid = useRef("");
   const speech = useRef<SpeechOutput | null>(null);
   const timers = useRef<ReturnType<typeof setTimeout>[]>([]); // demo timers
   const sayTimers = useRef<ReturnType<typeof setTimeout>[]>([]); // speech sequence timers
@@ -166,6 +188,10 @@ export default function ConsultationRoom({ room }: { room: RoomStyle }) {
     setReducedMotion(window.matchMedia("(prefers-reduced-motion: reduce)").matches);
     setDemoMode(new URLSearchParams(window.location.search).has("demo"));
     setFromReception(takePendingConcern());
+    if (hasConsent()) {
+      const p = loadPassport();
+      if (p) setSaved({ medicines: p.medicines.trim() || undefined, allergies: p.allergies.trim() || undefined, conditions: p.conditions.trim() || undefined });
+    }
     // Only a cheap setting check here; the browser is not asked anything until Talk is pressed.
     const v = voiceInputSetting();
     setTalk(v.ok ? { available: true } : { available: false, reason: v.reason });
@@ -232,24 +258,37 @@ export default function ConsultationRoom({ room }: { room: RoomStyle }) {
         const rate = rateRef.current;
         if (voiceRef.current && speech.current?.available) {
           setSpeaking(true);
-          // Some phones never report the end of speech: never wait forever.
-          let finished = false;
-          const finish = () => {
-            if (finished || seq.current !== run) return;
-            finished = true;
-            lips.current?.end();
-            step(i + 1);
+          // Sentence by sentence, with a short natural pause between them —
+          // easier to follow, and the doctor can be stopped between sentences.
+          const sentences = splitSentences(l.text);
+          const say = (j: number) => {
+            if (seq.current !== run) return;
+            if (j >= sentences.length) {
+              lips.current?.end();
+              step(i + 1);
+              return;
+            }
+            const text = sentences[j];
+            // Some phones never report the end of speech: never wait forever.
+            let finished = false;
+            const finish = () => {
+              if (finished || seq.current !== run) return;
+              finished = true;
+              lips.current?.end();
+              wait(() => say(j + 1), j + 1 < sentences.length ? sentencePause(rate) : 0);
+            };
+            wait(finish, Math.max(3000, (text.length * 110 * NORMAL_RATE) / rate));
+            speech.current!.speak(
+              text,
+              {
+                onStart: () => lips.current?.begin(text, performance.now() / 1000, rate / NORMAL_RATE),
+                onWord: (ci) => lips.current?.word(ci, performance.now() / 1000),
+                onEnd: finish,
+              },
+              rate,
+            );
           };
-          wait(finish, Math.max(4000, (l.text.length * 110 * NORMAL_RATE) / rate));
-          speech.current.speak(
-            l.text,
-            {
-              onStart: () => lips.current?.begin(l.text, performance.now() / 1000, rate / NORMAL_RATE),
-              onWord: (ci) => lips.current?.word(ci, performance.now() / 1000),
-              onEnd: finish,
-            },
-            rate,
-          );
+          say(0);
         } else {
           // Muted: the doctor "speaks" through subtitles; lips stay still.
           setSpeaking(false);
@@ -303,7 +342,7 @@ export default function ConsultationRoom({ room }: { room: RoomStyle }) {
       const s = { lines: [{ text: turn.say, state: resultState(turn.input.level) }, ...(turn.then ? [{ text: turn.then, state: "handoff" as const }] : [])], after: "complete" as const };
       turnSpeech.current = s;
       setDoctor("processing");
-      speak(s.lines, s.after, { delay: THINK_MS });
+      speak(s.lines, s.after, { delay: thinkMs(lastSaid.current) });
     } else if (turn.step === "concern" && history.length === 1) {
       // The doctor notices the patient (a glance up from the chart), then speaks.
       const s = { lines: [{ text: turn.say, state: "greeting" as const }], after: "listening" as const };
@@ -314,7 +353,7 @@ export default function ConsultationRoom({ room }: { room: RoomStyle }) {
       const s = { lines: [{ text: turn.say, state: "asking" as const }], after: "listening" as const };
       turnSpeech.current = s;
       setDoctor("processing");
-      speak(s.lines, s.after, { delay: THINK_MS });
+      speak(s.lines, s.after, { delay: thinkMs(lastSaid.current) });
     }
     /* eslint-enable react-hooks/set-state-in-effect */
   }, [started, turn, history.length, speak, setDoctor, clearTimers, reducedMotion]);
@@ -323,9 +362,11 @@ export default function ConsultationRoom({ room }: { room: RoomStyle }) {
     (next: ConsultState, said: string) => {
       stopMic.current?.();
       setLog((g) => [...g, { who: "patient", text: said }]);
+      lastSaid.current = said;
       setText("");
       setMulti([]);
       setMicNote("");
+      setEducation(null);
       setHistory((h) => [...h, next]);
     },
     [],
@@ -341,20 +382,58 @@ export default function ConsultationRoom({ room }: { room: RoomStyle }) {
     [state, turn, commit],
   );
 
-  // Typed or spoken words. Safety checks run first inside respondText.
+  // The doctor replies without moving the consultation on (an explanation,
+  // a reason, education, or "could you say that another way?").
+  const reply = (lines: Said[], noteText?: string) => {
+    setNote(noteText ?? "");
+    speak(lines, "listening");
+  };
+  // Keeps style/memory changes without adding a step to go "Back" to.
+  const replaceState = (next: ConsultState) => setHistory((h) => (next === h[h.length - 1] ? h : [...h.slice(0, -1), next]));
+
+  const explainNow = () => {
+    stopSpeaking();
+    replaceState({ ...state, style: { ...state.style, explained: state.style.explained + 1 } });
+    const line = explainLine(turn, state);
+    reply([{ text: line, state: "clarifying" }], line);
+  };
+  const whyNow = () => {
+    stopSpeaking();
+    const line = whyLine(turn);
+    reply([{ text: line, state: "clarifying" }], line);
+  };
+
+  // Typed or spoken words. Safety checks run first inside converse().
   const sendWords = (words: string) => {
     const w = words.trim();
     if (!w) return;
     stopSpeaking();
-    const r = respondText(state, turn, w);
-    if (r.understood || r.state !== state) {
-      commit(r.state, w);
+    const o = converse(state, turn, w);
+    if (o.kind === "answered") {
+      if (o.state !== state) commit(o.state, w);
       return;
     }
     setLog((g) => [...g, { who: "patient", text: w }]);
     setText("");
-    setNote(UNCLEAR_LINE);
-    speak([{ text: UNCLEAR_LINE, state: "asking" }], "listening");
+    if (o.kind === "repeat") return repeat();
+    if (o.kind === "explain") {
+      replaceState(o.state);
+      return reply([{ text: o.line, state: "clarifying" }], o.line);
+    }
+    if (o.kind === "why" || o.kind === "unknown-question") return reply([{ text: o.line, state: "clarifying" }], o.line);
+    if (o.kind === "education") {
+      setEducation(o.answer);
+      return reply(
+        [
+          { text: `Here is some general health information. It is not an assessment of you. ${o.answer.text[0]}`, state: "educating" },
+          { text: `Now, back to your consultation. ${turn.question ?? turn.say}`, state: "asking" },
+        ],
+        "",
+      );
+    }
+    // unclear: still keep anything worth remembering
+    replaceState(o.state);
+    reply([{ text: o.line, state: "clarifying" }], o.line);
   };
 
   // Words typed at Reception are sent as the first answer, once, after the greeting.
@@ -644,6 +723,9 @@ export default function ConsultationRoom({ room }: { room: RoomStyle }) {
       onRepeat={repeat}
       onStop={stopSpeaking}
       onSlower={toggleSlower}
+      onExplain={explainNow}
+      onBack={back}
+      canBack={started && history.length > 1 && !done}
     />
   ) : null;
 
@@ -731,6 +813,116 @@ export default function ConsultationRoom({ room }: { room: RoomStyle }) {
       {micNote && <p role="status" className="text-sm text-slate-700">{micNote}</p>}
     </form>
   );
+
+  // Ways to answer when the patient doesn't know, or doesn't understand.
+  const chip = "min-h-11 rounded-full border-2 border-slate-300 bg-white px-4 py-2 text-base font-semibold text-slate-800 hover:border-blue-500";
+  const helpRow =
+    started && !done && !emergency ? (
+      <div className="flex flex-wrap gap-2" role="group" aria-label="Help with this question">
+        {turn.step === "concern" ? (
+          <button type="button" className={chip} onClick={() => sendWords("I don't know how to explain it")}>
+            🤔 I can&apos;t explain it
+          </button>
+        ) : (
+          turn.unsure && (
+            <button type="button" className={chip} onClick={() => answer(turn.step === "describe" || turn.step === "concern-more" ? "?describe" : "?unsure")}>
+              🤷 I&apos;m not sure
+            </button>
+          )
+        )}
+        {(turn.step === "medicines" || turn.step === "duration") && (
+          <button type="button" className={chip} onClick={() => answer("?forgot")}>
+            💭 I don&apos;t remember
+          </button>
+        )}
+        {turn.step !== "concern" && (
+          <button type="button" className={chip} onClick={explainNow}>
+            ❓ What does this mean?
+          </button>
+        )}
+        {turn.step !== "concern" && turn.step !== "concern-more" && (
+          <button type="button" className={chip} onClick={whyNow}>
+            💬 Why do you ask?
+          </button>
+        )}
+      </div>
+    ) : null;
+
+  // Showing, not just telling: a 0–10 pain scale and a measured temperature.
+  // These are what the patient reports — nothing here examines anyone.
+  const extraEntry =
+    !started || done || emergency ? null : turn.entry === "pain" ? (
+      <fieldset className="space-y-2">
+        <legend className="text-base font-semibold text-slate-800">Or choose a number: 0 = no pain, 10 = worst pain you can imagine</legend>
+        <div className="grid grid-cols-6 gap-2 sm:grid-cols-11">
+          {Array.from({ length: 11 }, (_, n) => (
+            <button
+              key={n}
+              type="button"
+              onClick={() => answer(`pain:${n}`)}
+              aria-label={`Pain ${n} out of 10`}
+              className={`min-h-12 rounded-xl border-2 text-lg font-bold ${n >= 7 ? "border-red-300 bg-red-50 text-red-900" : n >= 4 ? "border-amber-300 bg-amber-50 text-amber-950" : "border-emerald-300 bg-emerald-50 text-emerald-950"}`}
+            >
+              {n}
+            </button>
+          ))}
+        </div>
+      </fieldset>
+    ) : turn.entry === "temperature" ? (
+      <form
+        className="flex flex-wrap items-end gap-2"
+        onSubmit={(e) => {
+          e.preventDefault();
+          const v = tempValue.trim();
+          if (v) answer(`temp:${v}${tempUnit}`);
+        }}
+      >
+        <label className="block text-base font-semibold text-slate-800">
+          Measured temperature
+          <input
+            inputMode="decimal"
+            value={tempValue}
+            onChange={(e) => setTempValue(e.target.value.replace(/[^0-9.,]/g, ""))}
+            placeholder={tempUnit === "C" ? "e.g. 38.5" : "e.g. 101.3"}
+            className="mt-1 block w-32 rounded-xl border-2 border-slate-300 px-3 py-2.5 text-lg"
+          />
+        </label>
+        <label className="block text-base font-semibold text-slate-800">
+          Unit
+          <select value={tempUnit} onChange={(e) => setTempUnit(e.target.value as "C" | "F")} className="mt-1 block min-h-12 rounded-xl border-2 border-slate-300 bg-white px-3">
+            <option value="C">°C</option>
+            <option value="F">°F</option>
+          </select>
+        </label>
+        <button type="submit" disabled={!tempValue.trim()} className="min-h-12 rounded-xl bg-blue-900 px-5 font-bold text-white disabled:opacity-40">
+          Use this
+        </button>
+      </form>
+    ) : (turn.step === "medicines" || turn.step === "allergies" || turn.step === "conditions") && saved[turn.step] ? (
+      <button type="button" className={chip} onClick={() => answer(saved[turn.step as "medicines"]!)}>
+        🗂️ Use what is saved in my Health Passport: {saved[turn.step as "medicines"]}
+      </button>
+    ) : null;
+
+  const educationCard = education ? (
+    <section aria-labelledby="edu-heading" className="space-y-2 rounded-2xl border-2 border-teal-700 bg-teal-50 p-4">
+      <p className="text-xs font-bold uppercase tracking-widest text-teal-900">Health information · general, not an assessment of you</p>
+      <h3 id="edu-heading" className="text-lg font-bold text-teal-950">{education.question}</h3>
+      {education.text.map((t) => (
+        <p key={t} className="text-slate-900">{t}</p>
+      ))}
+      <p className="text-sm text-slate-700">
+        From the reviewed page{" "}
+        <a href={education.topic.href} className="font-semibold text-teal-900 underline" target="_blank" rel="noreferrer">
+          {education.topic.title}
+        </a>{" "}
+        · Sources: {education.sources.join("; ")}
+      </p>
+      <button type="button" onClick={() => setEducation(null)} className="min-h-11 rounded-lg border-2 border-teal-700 bg-white px-4 font-semibold text-teal-900">
+        Back to my consultation
+      </button>
+    </section>
+  ) : null;
 
   let answerArea: ReactNode = null;
   if (!begun) {
@@ -866,8 +1058,11 @@ export default function ConsultationRoom({ room }: { room: RoomStyle }) {
                 </p>
               )}
               {started && turn.hint && <p className={`${textSize} text-slate-600`}>{turn.hint}</p>}
+              {educationCard}
               {consent}
               {answerArea}
+              {extraEntry}
+              {helpRow}
               {started && turn.step.startsWith("q:") && (
                 <p className="text-sm text-slate-600">
                   Question {questionsFor(toAnswers(state).context).filter((q) => q.id in state.answers).length + 1} about this problem. Each answer is checked for warning signs before the next question.
@@ -875,9 +1070,6 @@ export default function ConsultationRoom({ room }: { room: RoomStyle }) {
               )}
               {started && history.length > 1 && !done && (
                 <div className="flex flex-wrap gap-3 border-t border-slate-200 pt-4">
-                  <button type="button" onClick={back} className="min-h-11 rounded-xl border-2 border-slate-300 px-4 py-2.5 font-semibold text-slate-800">
-                    ← Back
-                  </button>
                   <button type="button" onClick={restart} className="min-h-11 rounded-xl border-2 border-slate-300 px-4 py-2.5 font-semibold text-slate-800">
                     ↺ Start again
                   </button>

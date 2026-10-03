@@ -9,9 +9,9 @@ import { type DoctorState, PERFORMANCE, STATE_LABEL, isSpeakingState } from "../
 const STATES = Object.keys(PERFORMANCE) as DoctorState[];
 
 describe("the doctor's state machine", () => {
-  it("has the eleven consultation states, each with a label and a performance", () => {
+  it("has the consultation states, each with a label and a performance", () => {
     expect(STATES.sort()).toEqual(
-      ["asking", "complete", "concerned", "emergency", "explaining", "greeting", "handoff", "idle", "listening", "processing", "reassuring"].sort(),
+      ["asking", "clarifying", "complete", "concerned", "educating", "emergency", "explaining", "greeting", "handoff", "idle", "listening", "processing", "reassuring"].sort(),
     );
     for (const s of STATES) expect(STATE_LABEL[s]).toBeTruthy();
   });
@@ -22,6 +22,12 @@ describe("the doctor's state machine", () => {
   });
   it("expressions stay restrained (no theatrical values)", () => {
     for (const f of Object.values(EXPRESSIONS)) for (const v of Object.values(f)) expect(v).toBeLessThanOrEqual(0.4);
+  });
+  it("listening is still: no gestures, eyes on the patient, small nods only", () => {
+    expect(PERFORMANCE.listening.gesture).toBe(0);
+    expect(PERFORMANCE.listening.gaze).toBe("patient");
+    expect(EXPRESSIONS[PERFORMANCE.listening.expression].mouthSmile).toBeLessThanOrEqual(0.12);
+    expect(PERFORMANCE.processing.gaze).toBe("review"); // thinking looks different: a glance at the chart
   });
   it("only the speaking states are speaking", () => {
     expect(isSpeakingState("listening")).toBe(false);
