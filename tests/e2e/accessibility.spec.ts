@@ -35,6 +35,11 @@ const PAGES = [
   "/ai-hospital/medicines",
   "/ai-hospital/lab-reports",
   "/ai-hospital/admin",
+  "/ai-hospital/vaccinations",
+  "/ai-hospital/screening",
+  "/ai-hospital/calm",
+  "/ai-hospital/first-aid",
+  "/ai-hospital/departments/general-medicine/room",
 ];
 
 for (const path of PAGES) {

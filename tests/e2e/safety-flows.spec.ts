@@ -53,3 +53,34 @@ test("live consultation is off unless configured", async ({ page }) => {
   await page.goto("/ai-hospital/consult");
   await expect(page.getByText("Not available yet.")).toBeVisible();
 });
+
+test("consultation room: an emergency in the patient's words switches to Emergency Mode", async ({ page }) => {
+  await page.goto("/ai-hospital/departments/general-medicine/room");
+  await page.getByLabel("Display").selectOption("text");
+  await page.getByRole("button", { name: "Begin consultation" }).click();
+  await page.getByRole("textbox", { name: /troubling you today/ }).fill("my father has crushing chest pain");
+  await page.getByRole("button", { name: "Send" }).click();
+  await expect(page.getByText("108").first()).toBeVisible();
+  await expect(page.getByRole("button", { name: "This is not an emergency — go back" })).toBeVisible();
+  // Routine questions are not shown.
+  await expect(page.getByText("Is this for you, or for someone else?")).toHaveCount(0);
+});
+
+test("consultation room: works with no 3D at all and never asks for camera or microphone", async ({ page, context }) => {
+  const asked: string[] = [];
+  await context.grantPermissions([]);
+  await page.exposeFunction("__perm", (n: string) => asked.push(n));
+  await page.addInitScript(() => {
+    const md = navigator.mediaDevices;
+    if (md) md.getUserMedia = async () => { (window as unknown as { __perm: (n: string) => void }).__perm("getUserMedia"); throw new Error("blocked"); };
+  });
+  await page.goto("/ai-hospital/departments/general-medicine/room");
+  await page.getByLabel("Display").selectOption("text");
+  await page.getByRole("button", { name: "Begin consultation" }).click();
+  await page.getByRole("textbox", { name: /troubling you today/ }).fill("cough for a week");
+  await page.getByRole("button", { name: "Send" }).click();
+  await page.getByRole("button", { name: "None of these — continue" }).click();
+  await expect(page.getByRole("heading", { name: "Is this for you, or for someone else?" })).toBeVisible();
+  await expect(page.getByText("cough for a week")).toBeVisible();
+  expect(asked).toEqual([]);
+});

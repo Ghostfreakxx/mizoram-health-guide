@@ -59,6 +59,11 @@ export const BANNED_PATTERNS: RegExp[] = [
   /\bprobability of\b/i,
   /\b\d+(\.\d+)?\s?(mg|mcg|ml|tablets?)\s?(per|a|every|twice|once|three times)\b/i,
   /\btake \d+/i,
+  // Naming a condition as the person's ("You have pneumonia"). Questions such
+  // as "Do you have…" or "Have you been told you have…" are allowed.
+  /(?<!\b(do|if|whether|told|that|think|may|might|could) )\byou (probably |likely |definitely |certainly )?have (pneumonia|cancer|diabetes|tb|tuberculosis|malaria|dengue|hiv|aids|covid|typhoid|hepatitis|asthma|a heart attack|a stroke|an infection|appendicitis|jaundice)\b/i,
+  /\bI (can )?diagnose\b/i,
+  /\byou (do not|don't|dont|no longer) need (a |to see a |any )?(real )?(doctor|hospital|medical care)\b/i,
 ];
 
 export function violatesLanguagePolicy(text: string): RegExp | null {

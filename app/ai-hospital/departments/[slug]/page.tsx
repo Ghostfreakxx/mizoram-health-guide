@@ -7,6 +7,7 @@ import { getService } from "../../../lib/services";
 import { healthTopics } from "../../../topics";
 import { departments, getDepartment } from "../../data/departments";
 import { BoundaryNote } from "../../components/ui";
+import { roomFor } from "../../consult-room/rooms";
 
 export const dynamicParams = false;
 
@@ -121,6 +122,12 @@ export default async function DepartmentPage({ params }: { params: Promise<{ slu
         </div>
 
         <aside className="space-y-5 lg:sticky lg:top-16 lg:self-start">
+          {roomFor(d.slug) && (
+            <Link href={`/ai-hospital/departments/${d.slug}/room`} className="block rounded-2xl bg-gradient-to-br from-blue-950 to-blue-700 p-6 text-white hover:from-blue-900">
+              <span className="block text-xl font-bold">🪑 Enter the consultation room</span>
+              <span className="mt-1 block text-blue-100">Sit down with the virtual guide and talk through the problem.</span>
+            </Link>
+          )}
           <Link href={`/ai-hospital/departments/${d.slug}/simulator`} className="block rounded-2xl border-2 border-amber-300 bg-amber-50 p-6 hover:border-amber-500">
             <span className="block text-xl font-bold text-blue-950">🧊 Take the 3D tour</span>
             <span className="mt-1 block text-slate-700">See what usually happens on a visit, step by step.</span>
