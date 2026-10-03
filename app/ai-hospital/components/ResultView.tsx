@@ -26,7 +26,7 @@ export default function ResultView({
   onEmergency,
 }: {
   answers: Answers;
-  meta: { relation?: string; sex?: string; specialAsked: boolean; concernText?: string; medicines?: string; allergies?: string };
+  meta: { relation?: string; sex?: string; specialAsked: boolean; concernText?: string; medicines?: string; allergies?: string; conditions?: string; location?: string; safety?: string[] };
   onRestart: () => void;
   onEmergency: (flags: RedFlagId[]) => void;
 }) {
@@ -86,7 +86,9 @@ export default function ResultView({
     negatives: result.negatives,
     unsure: result.unsure,
     measurements: temp,
-    conditions: ctx.special.includes("immunocompromised") ? "Weak immune system (as reported)" : "",
+    conditions: [meta.conditions, ctx.special.includes("immunocompromised") ? "Weak immune system (as reported)" : ""].filter(Boolean).join("; "),
+    location: meta.location,
+    safety: meta.safety,
     medicines: meta.medicines,
     allergies: meta.allergies,
     triage: {

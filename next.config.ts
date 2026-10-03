@@ -11,6 +11,11 @@ const nextConfig: NextConfig = {
           { key: "Content-Type", value: "application/javascript; charset=utf-8" },
         ],
       },
+      {
+        // The guide's 3D model is versioned (?v=…), so browsers may keep it for a long time.
+        source: "/models/:file*",
+        headers: [{ key: "Cache-Control", value: "public, max-age=2592000, immutable" }],
+      },
     ];
   },
 };

@@ -1,24 +1,22 @@
 "use client";
 
 import { useEffect, useRef } from "react";
-import type { Mood } from "../../lib/consultation";
-import { type Activity, poseAt } from "./doctorMotion";
+import { type GuideState, poseAt } from "./doctorMotion";
 import type { RoomStyle } from "./rooms";
+import type { LipSync } from "./voice";
 
-// Low-resource guide: a small SVG drawing driven by the same motion as the
-// 3D guide. No WebGL, no downloads, tiny CPU use.
+// Low-resource guide: a small SVG portrait driven by the same behaviour as
+// the 3D guide (blinks, nods, expressions, lip-sync). No WebGL, no downloads.
 
 export default function Doctor2D({
-  activity,
-  mood,
-  voiceLevel,
+  state,
+  lips,
   reducedMotion,
   paused,
   room,
 }: {
-  activity: Activity;
-  mood: Mood;
-  voiceLevel: React.RefObject<number>;
+  state: React.RefObject<GuideState>;
+  lips: React.RefObject<LipSync | null>;
   reducedMotion: boolean;
   paused: boolean;
   room: RoomStyle;
@@ -31,73 +29,79 @@ export default function Doctor2D({
   const browL = useRef<SVGPathElement>(null);
   const browR = useRef<SVGPathElement>(null);
   const body = useRef<SVGGElement>(null);
-  const state = useRef({ activity, mood, reducedMotion });
+  const hand = useRef<SVGGElement>(null);
+  const motion = useRef(reducedMotion);
   useEffect(() => {
-    state.current = { activity, mood, reducedMotion };
-  }, [activity, mood, reducedMotion]);
+    motion.current = reducedMotion;
+  }, [reducedMotion]);
 
   useEffect(() => {
     if (paused) return;
     let raf = 0;
     const t0 = performance.now();
     const tick = (now: number) => {
-      const s = state.current;
-      const p = poseAt((now - t0) / 1000, s.activity, s.mood, { reducedMotion: s.reducedMotion, voiceLevel: voiceLevel.current ?? 0 });
+      const p = poseAt((now - t0) / 1000, state.current ?? "waiting", { reducedMotion: motion.current });
+      const v = lips.current?.visemeAt(now / 1000);
       const deg = 180 / Math.PI;
       head.current?.setAttribute("transform", `translate(${p.headYaw * 60} ${p.headPitch * 40}) rotate(${p.headRoll * deg} 160 120)`);
       body.current?.setAttribute("transform", `translate(0 ${p.breath * 1.2})`);
+      hand.current?.setAttribute("transform", `translate(0 ${-p.gesture * 14})`);
       const lidH = 2 + p.blink * 16;
       lidL.current?.setAttribute("height", String(lidH));
       lidR.current?.setAttribute("height", String(lidH));
-      mouth.current?.setAttribute("ry", String(0.5 + p.mouth * 6));
-      smile.current?.setAttribute("d", `M146 166 Q160 ${166 + p.smile * 10} 174 166`);
-      const b = p.brow * 3;
-      browL.current?.setAttribute("d", `M126 ${100 - b} Q138 ${94 - b} 150 ${99 - b * 0.5}`);
-      browR.current?.setAttribute("d", `M170 ${99 - b * 0.5} Q182 ${94 - b} 194 ${100 - b}`);
+      mouth.current?.setAttribute("ry", String(0.5 + (v?.jawOpen ?? 0) * 16));
+      smile.current?.setAttribute("d", `M146 166 Q160 ${166 + p.smile * 10 - p.browDown * 4} 174 166`);
+      const b = (p.browInnerUp - p.browDown) * 4;
+      browL.current?.setAttribute("d", `M126 ${100 - b * 0.4} Q138 ${94 - b} 150 ${99 - b}`);
+      browR.current?.setAttribute("d", `M170 ${99 - b} Q182 ${94 - b} 194 ${100 - b * 0.4}`);
       raf = requestAnimationFrame(tick);
     };
     raf = requestAnimationFrame(tick);
     return () => cancelAnimationFrame(raf);
-  }, [paused, voiceLevel]);
+  }, [paused, state, lips]);
 
   return (
-    <svg viewBox="0 0 320 300" className="h-full w-full" aria-hidden>
+    <svg viewBox="0 0 320 300" className="h-full w-full" preserveAspectRatio="xMidYMid slice" aria-hidden>
       <rect width="320" height="300" fill={room.wall} />
-      <rect x="20" y="18" width="150" height="34" rx="4" fill={room.accent} />
-      <text x="95" y="40" textAnchor="middle" fontSize="12" fontWeight="700" fill="#fde68a">{room.title}</text>
-      <rect x="230" y="40" width="70" height="120" rx="4" fill="#f8fafc" stroke="#cbd5e1" />
+      <rect y="200" width="320" height="100" fill={room.dado} />
+      <rect x="18" y="16" width="160" height="34" rx="3" fill={room.accent} />
+      <text x="98" y="38" textAnchor="middle" fontSize="11" fontWeight="700" fill="#fde68a">{room.title}</text>
+      <rect x="236" y="36" width="66" height="130" rx="3" fill="#f8fafc" stroke="#cbd5e1" />
+      <rect x="62" y="150" width="54" height="36" rx="3" fill="#1f2937" />
       <g ref={body}>
-        {/* Coat and scrubs */}
-        <path d="M70 300 Q76 214 128 200 L192 200 Q244 214 250 300 Z" fill="#f7f8fa" stroke="#d6dbe1" />
-        <path d="M140 200 L160 236 L180 200 Z" fill="#1f5f6b" />
-        <path d="M128 202 L150 260 M192 202 L170 260" stroke="#d6dbe1" strokeWidth="3" fill="none" />
-        <path d="M134 204 Q160 250 186 204" stroke="#1f2937" strokeWidth="3" fill="none" />
-        <rect x="186" y="226" width="40" height="16" rx="2" fill="#ffffff" stroke="#cbd5e1" />
-        <text x="206" y="237" textAnchor="middle" fontSize="6" fontWeight="800" fill="#1e3a8a">VIRTUAL GUIDE</text>
-        <rect x="148" y="176" width="24" height="30" fill="#c58f6c" />
+        <path d="M70 300 Q76 214 128 200 L192 200 Q244 214 250 300 Z" fill="#f4f5f6" stroke="#d6dbe1" />
+        <path d="M140 200 L160 238 L180 200 Z" fill="#1f6470" />
+        <path d="M128 202 L152 262 M192 202 L168 262" stroke="#d6dbe1" strokeWidth="3" fill="none" />
+        <path d="M136 206 Q160 252 184 206" stroke="#111827" strokeWidth="3" fill="none" />
+        <rect x="148" y="176" width="24" height="30" fill="#c99a7b" />
         <g ref={head}>
-          <ellipse cx="160" cy="124" rx="46" ry="56" fill="#c58f6c" />
-          <path d="M112 118 Q112 62 160 62 Q208 62 208 118 Q196 86 160 84 Q124 86 112 118 Z" fill="#17110e" />
-          <ellipse cx="114" cy="128" rx="6" ry="11" fill="#b9845f" />
-          <ellipse cx="206" cy="128" rx="6" ry="11" fill="#b9845f" />
+          <ellipse cx="160" cy="124" rx="44" ry="54" fill="#c99a7b" />
+          <path d="M114 120 Q112 66 160 64 Q208 66 206 120 Q198 90 160 86 Q122 90 114 120 Z" fill="#2a1f19" />
+          <ellipse cx="160" cy="70" rx="30" ry="10" fill="#2a1f19" />
+          <ellipse cx="116" cy="128" rx="6" ry="11" fill="#b9845f" />
+          <ellipse cx="204" cy="128" rx="6" ry="11" fill="#b9845f" />
           {[138, 182].map((x) => (
             <g key={x}>
-              <ellipse cx={x} cy="114" rx="9" ry="6" fill="#f3efe9" />
-              <circle cx={x} cy="114" r="4.2" fill="#3a2417" />
-              <circle cx={x} cy="114" r="1.9" fill="#050505" />
+              <ellipse cx={x} cy="114" rx="9" ry="5.5" fill="#f1ede6" />
+              <circle cx={x} cy="114" r="4.2" fill="#4a2d1b" />
+              <circle cx={x} cy="114" r="1.9" fill="#060403" />
               <circle cx={x + 1.3} cy="112.6" r="0.9" fill="#fff" />
             </g>
           ))}
-          <rect ref={lidL} x="128" y="107" width="20" height="2" fill="#b37e5d" />
-          <rect ref={lidR} x="172" y="107" width="20" height="2" fill="#b37e5d" />
-          <path ref={browL} d="M126 100 Q138 94 150 99" stroke="#17110e" strokeWidth="3" fill="none" strokeLinecap="round" />
-          <path ref={browR} d="M170 99 Q182 94 194 100" stroke="#17110e" strokeWidth="3" fill="none" strokeLinecap="round" />
+          <rect ref={lidL} x="128" y="108" width="20" height="2" fill="#b9876a" />
+          <rect ref={lidR} x="172" y="108" width="20" height="2" fill="#b9876a" />
+          <path ref={browL} d="M126 100 Q138 94 150 99" stroke="#2b1e17" strokeWidth="3" fill="none" strokeLinecap="round" />
+          <path ref={browR} d="M170 99 Q182 94 194 100" stroke="#2b1e17" strokeWidth="3" fill="none" strokeLinecap="round" />
           <path d="M160 118 Q156 138 152 142 Q160 146 168 142" stroke="#a8724f" strokeWidth="2" fill="none" />
-          <ellipse ref={mouth} cx="160" cy="166" rx="9" ry="0.5" fill="#2a0f0f" />
-          <path ref={smile} d="M146 166 Q160 168 174 166" stroke="#7c3f38" strokeWidth="3" fill="none" strokeLinecap="round" />
+          <ellipse ref={mouth} cx="160" cy="166" rx="9" ry="0.5" fill="#3a1414" />
+          <path ref={smile} d="M146 166 Q160 168 174 166" stroke="#a55a55" strokeWidth="3.5" fill="none" strokeLinecap="round" />
         </g>
       </g>
-      <rect x="0" y="262" width="320" height="38" fill="#c9a27a" />
+      <rect x="0" y="262" width="320" height="38" fill="#d8c3a5" />
+      <g ref={hand}>
+        <ellipse cx="196" cy="262" rx="16" ry="8" fill="#c99a7b" />
+      </g>
+      <ellipse cx="124" cy="262" rx="16" ry="8" fill="#c99a7b" />
     </svg>
   );
 }

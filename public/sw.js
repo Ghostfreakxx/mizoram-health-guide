@@ -2,9 +2,9 @@
 //
 // Caches only public website files (pages and code). It never caches API
 // responses or anything a person types: health answers stay in page memory.
-const VERSION = "v3";
+const VERSION = "v4";
 const CACHE = `mhg-${VERSION}`;
-const CORE_PAGES = ["/offline", "/ai-hospital/emergency", "/ai-hospital/first-aid", "/helplines", "/ai-hospital", "/ai-hospital/triage", "/"];
+const CORE_PAGES = ["/offline", "/ai-hospital/emergency", "/ai-hospital/first-aid", "/ai-hospital/departments/general-medicine/room", "/helplines", "/ai-hospital", "/ai-hospital/triage", "/"];
 
 async function precache() {
   const cache = await caches.open(CACHE);
@@ -50,8 +50,9 @@ self.addEventListener("fetch", (event) => {
     caches.open(CACHE).then((c) => c.put(key, copy));
   };
 
-  // Versioned code and styles never change: cache first.
-  if (url.pathname.startsWith("/_next/static/")) {
+  // Versioned code, styles and the guide's 3D model never change: cache first.
+  // (Model URLs carry ?v=…, so a new model is a new cache entry.)
+  if (url.pathname.startsWith("/_next/static/") || url.pathname.startsWith("/models/")) {
     event.respondWith(
       caches.match(req).then(
         (hit) =>

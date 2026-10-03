@@ -12,10 +12,13 @@ export default function EmergencyMode({
   flags = [],
   onExit,
   exitLabel,
+  notice,
 }: {
   flags?: RedFlagId[];
   onExit: () => void;
   exitLabel?: string;
+  // Why Emergency Mode opened, e.g. from a consultation ("Your answers include warning signs…").
+  notice?: string;
 }) {
   const [selected, setSelected] = useState<RedFlagId[]>(flags);
   const [showNote, setShowNote] = useState(false);
@@ -53,12 +56,14 @@ export default function EmergencyMode({
     >
       <div className="bg-red-700 px-4 py-5 text-white">
         <div className="mx-auto max-w-2xl">
+          {notice && <p className="text-sm font-bold uppercase tracking-widest text-red-100">Urgent medical attention</p>}
           <h1 id="emergency-heading" ref={headingRef} tabIndex={-1} className="text-3xl font-black outline-none sm:text-4xl">
             {crisis ? tr("emergency.heading.crisis") : tr("emergency.heading")}
           </h1>
           {active.length > 0 && (
             <p className="mt-1 text-lg font-semibold text-red-50">{active.map((f) => flagTitle(f.id)).join(" · ")}</p>
           )}
+          {notice && <p className="mt-2 text-lg font-semibold text-white">{notice}</p>}
         </div>
       </div>
 

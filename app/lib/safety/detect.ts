@@ -28,7 +28,8 @@ const patterns: Pattern[] = [
     id: "chest_pain",
     negatable: true,
     match: [
-      /\bchest (pain|pains|pressure|tightness|is tight|feels tight|hurts|hurting|ache|aching|discomfort)\b/,
+      /\bchest (pain|pains|pressure|tightness|hurts|hurting|ache|aching|discomfort)\b/,
+      /\bchest (is|feels|feel|felt|was|getting|gets) (very |really |so |quite |a bit |a little |too )?(tight|heavy|painful|sore|squeezed|crushed)\b/,
       /\b(pain|pressure|tightness|ache) (in|on) (my |his |her |the )?chest\b/,
       /\bheart attack\b/,
     ],

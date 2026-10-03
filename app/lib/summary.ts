@@ -13,7 +13,9 @@ export type SummaryData = {
   started?: string;
   progression?: string;
   severity?: string;
+  location?: string;
   relevant?: string[];
+  safety?: string[]; // answers to danger-sign questions
   negatives?: string[];
   unsure?: string[];
   measurements?: { label: string; value: string }[];
@@ -48,10 +50,13 @@ export function summarySections(d: SummaryData): SummarySection[] {
     has(d.started) && `When it started: ${clean(d.started)}`,
     has(d.progression) && `How it has changed: ${clean(d.progression)}`,
     has(d.severity) && `How bad: ${clean(d.severity)}`,
+    has(d.location) && `Where: ${clean(d.location)}`,
   ]);
   add("Relevant symptoms reported", d.relevant ?? []);
   add("Measurements reported", (d.measurements ?? []).filter((m) => has(m.value)).map((m) => `${m.label}: ${m.value}`));
-  add("Asked about and reported as NOT present", d.negatives ?? []);
+  add("Important safety answers", d.safety ?? []);
+  const safety = new Set(d.safety ?? []);
+  add("Asked about and reported as NOT present", (d.negatives ?? []).filter((n) => !safety.has(n)));
   add("Patient was not sure about", d.unsure ?? []);
   add("Existing health conditions", [has(d.conditions) && clean(d.conditions)]);
   add("Current medicines", [has(d.medicines) && clean(d.medicines)]);

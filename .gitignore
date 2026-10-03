@@ -44,3 +44,6 @@ next-env.d.ts
 # Playwright
 /test-results/
 /playwright-report/
+
+# avatar build data cache
+scripts/avatar/.cache/

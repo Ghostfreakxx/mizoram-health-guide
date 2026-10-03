@@ -1,6 +1,28 @@
 # Virtual consultation room (prototype: General Medicine)
 
-`/ai-hospital/departments/general-medicine/room`
+`/ai-hospital/departments/general-medicine/room` · demo mode: add `?demo`
+
+## Patient journey
+
+Reception → Consultation (greeting) → danger-sign check → who / age / sex /
+pregnancy → main problem → body area (where useful) → **duration** → adaptive
+triage questions, one at a time → change and severity → medicines, allergies,
+long-term conditions → triage result (spoken) → handoff line → real-doctor
+options + **patient-prepared visit summary** (print / PDF / copy / share) →
+follow-up. A red flag at any point → **Urgent medical attention**
+(full-screen Emergency Mode) immediately.
+
+## Guide states (`doctorMotion.ts`)
+
+WAITING · GREETING · LISTENING · THINKING · ASKING · EXPLAINING · URGENT ·
+HANDOFF · COMPLETE. The screen (state chip, journey bar) and the guide's
+behaviour follow the same state.
+
+## Demo mode (`app/lib/demoScenarios.ts`)
+
+Scenarios A–H play only the *patient's* answers; every result comes from the
+real engine. `tests/safety/demo.test.ts` checks each expected outcome. Reset:
+"Reset demo", or "End demo scenario — reset" inside Emergency Mode.
 
 The patient sits across the desk from a virtual guide. The guide asks
 questions, keeps a note of the answers, and shows the safest next step. It is
@@ -34,8 +56,9 @@ The avatar only *presents* what the engine decided. It has no medical logic.
 - **three.js + React Three Fiber** (already used by the 3D tours). Works in
   every modern mobile browser with WebGL; no plug-ins.
 - The 3D code is loaded with `next/dynamic` only when the room opens.
-- The current guide and room are **built from code**: no model or texture
-  downloads.
+- The guide is a **real human model** built from MakeHuman CC0 data
+  (`scripts/avatar/`, ~370 KB high / ~230 KB balanced, meshopt-compressed,
+  one skeleton, 16 facial morph targets). The room is built from code.
 - Errors in 3D fall back to the 2D guide (error boundary). WebGL missing →
   2D guide automatically.
 
@@ -96,7 +119,10 @@ bones. The 2D and text tiers stay as they are.
 - Output: the phone's own text-to-speech (`speechSynthesis`) — nothing is sent
   anywhere. Mute, replay, pause and subtitles are always available. Lips only
   move while the voice is actually speaking.
-- Input: designed (`SpeechInput` in `voice.ts`) but **off**. Browser speech
+- Input: built (`listenOnDevice` in `voice.ts`) but **off by default**
+  (`NEXT_PUBLIC_VOICE_INPUT=on-device` to enable). It only uses on-device
+  recognition (`processLocally`); the availability check is never run on page
+  load because it crashed browser tabs in testing. Browser speech
   recognition in some browsers sends audio to an outside cloud service. It
   needs a Health Department decision (on-device or government-hosted
   recogniser) and an explicit microphone button with the browser's permission

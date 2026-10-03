@@ -1,16 +1,20 @@
-// Virtual consultation: a conversation on top of the deterministic triage
-// engine. This module decides only WHAT TO ASK NEXT and how the virtual guide
-// phrases it. It never decides urgency: every answer goes into the same
-// `Answers` object the Triage Desk uses, and `triage()` alone gives the result.
+// Virtual consultation: a guided conversation on top of the deterministic
+// triage engine. This module decides only WHAT TO ASK NEXT and how the
+// virtual guide phrases it. It never decides urgency: every answer goes into
+// the same `Answers` object the Triage Desk uses, and `triage()` alone gives
+// the result.
 //
 // Safety rules (enforced by tests):
-// - Red flags from free text, the danger-sign check, or any question stop the
-//   conversation at once and switch to Emergency Mode.
-// - A RED result also switches to Emergency Mode.
+// - Every answer is checked for red flags BEFORE the next question. Red flags
+//   in free text, the danger-sign check, any answer, or a RED result switch
+//   to Emergency Mode at once, and later answers cannot undo it.
 // - Every line the guide says passes the language policy (no diagnosis, no
 //   doses, never "you don't need a doctor").
-// - Panel information is only what the person supplied.
+// - The chart shows only what the person supplied, plus clearly separated
+//   routing information from the engine. Missing items say "Not provided".
 
+import { getDepartment } from "../ai-hospital/data/departments";
+import { LEVEL_TEXT } from "./safety/language";
 import { detectRedFlags } from "./safety/detect";
 import { receive } from "./safety/reception";
 import { type RedFlagId, getRedFlag, redFlags } from "./safety/redFlags";
@@ -21,6 +25,7 @@ import {
   type Answers,
   type Context,
   DURATIONS,
+  type Level,
   PROGRESSIONS,
   SEVERITIES,
   SPECIALS,
@@ -40,17 +45,27 @@ export type Option = { id: string; label: string; tone?: "danger" };
 
 export type Input =
   | { kind: "text"; placeholder: string; optional: boolean; maxLength: number }
-  | { kind: "single"; options: Option[] }
+  | { kind: "single"; options: Option[]; optional?: boolean }
   | { kind: "multi"; options: (Option & { hint?: string })[]; doneLabel: string; noneLabel: string }
-  | { kind: "result" }
+  | { kind: "body"; options: Option[] }
+  | { kind: "result"; level: Level }
   | { kind: "emergency"; flags: RedFlagId[] };
 
-export type Turn = { step: string; say: string; hint?: string; input: Input; mood: Mood };
+export type Turn = {
+  step: string;
+  say: string;
+  hint?: string;
+  input: Input;
+  mood: Mood;
+  // Said after `say` at the end of a consultation (the handoff line).
+  then?: string;
+};
 
 export type EmergencyState = { flags: RedFlagId[]; clear: { kind: "answer"; id: string } | { kind: "check" } | { kind: "text" } };
 
 export type ConsultState = {
   department: string; // display name, e.g. "General Medicine"
+  intro: string;
   concernText?: string;
   pendingFlags: RedFlagId[]; // mentioned in free text; need a yes/no
   dismissedFlags: RedFlagId[];
@@ -63,6 +78,8 @@ export type ConsultState = {
   specialDone: boolean;
   suggested: string[]; // complaint ids suggested from the person's words
   complaint?: string;
+  bodyArea?: string;
+  bodyDone: boolean;
   answers: Record<string, Answer>;
   prefilled: string[];
   choices: Record<string, string>;
@@ -73,28 +90,58 @@ export type ConsultState = {
   medicinesDone: boolean;
   allergies?: string;
   allergiesDone: boolean;
+  conditions?: string;
+  conditionsDone: boolean;
   emergency: EmergencyState | null;
 };
 
 export const MAX_TEXT = 300;
 
-export function startConsultation(department: string): ConsultState {
+export const EMERGENCY_LINE = "Your answers include warning signs that may require emergency medical care. Please get emergency help now.";
+export const HANDOFF_LINE =
+  "I've prepared a summary of the information you provided. You can show this to a healthcare professional so you don't have to explain everything again.";
+
+export function defaultIntro(department: string) {
+  return `Hello. Welcome to ${department}. I'm your AI Hospital virtual health guide. I'll ask you a few questions to help determine how urgently you may need care, and help prepare information for a healthcare professional. What brings you here today?`;
+}
+
+export function startConsultation(department: string, intro = defaultIntro(department)): ConsultState {
   return {
     department,
+    intro,
     pendingFlags: [],
     dismissedFlags: [],
     checkDone: false,
     special: [],
     specialDone: false,
     suggested: [],
+    bodyDone: false,
     answers: {},
     prefilled: [],
     choices: {},
     medicinesDone: false,
     allergiesDone: false,
+    conditionsDone: false,
     emergency: null,
   };
 }
+
+// Where the problem is. Structured input for the summary only — it never
+// changes urgency and is never presented as a diagnosis.
+export const BODY_AREAS: Option[] = [
+  { id: "head", label: "Head" },
+  { id: "face", label: "Face, eyes, ears or mouth" },
+  { id: "neck", label: "Neck or throat" },
+  { id: "chest", label: "Chest" },
+  { id: "upper-abdomen", label: "Upper tummy" },
+  { id: "lower-abdomen", label: "Lower tummy" },
+  { id: "back", label: "Back" },
+  { id: "arms", label: "Arms or hands" },
+  { id: "legs", label: "Legs or feet" },
+  { id: "pelvis", label: "Private parts" },
+  { id: "all-over", label: "All over, or many places" },
+];
+const ASKS_BODY = new Set(["stomach", "bones", "skin", "injury", "cancer", "other"]);
 
 const canBePregnant = (age?: AgeGroup, sex?: Sex) => (age === "child" || age === "adult") && sex !== "male";
 const asksSex = (age?: AgeGroup) => age === "child" || age === "adult" || age === "older";
@@ -121,15 +168,13 @@ export function toAnswers(s: ConsultState): Answers {
   };
 }
 
-const patient = (s: ConsultState) => (s.who === "other" ? "the patient" : "you");
 const YES_NO: Option[] = [
   { id: "yes", label: "Yes" },
   { id: "no", label: "No" },
   { id: "unsure", label: "Not sure" },
 ];
 
-export const EMERGENCY_LINE =
-  "Some of the information you provided may require urgent medical attention. Please seek emergency medical help now.";
+const isOther = (s: ConsultState) => s.who === "other";
 
 // The next thing the virtual guide says, and what kind of answer it needs.
 export function nextTurn(s: ConsultState): Turn {
@@ -139,9 +184,9 @@ export function nextTurn(s: ConsultState): Turn {
   if (s.concernText === undefined) {
     return {
       step: "concern",
-      say: `Hello. I'm the virtual guide for ${s.department}. Tell me what is troubling you today.`,
-      hint: "Type in your own words, for example: “fever and headache since yesterday”. I am not a doctor — I help you find the safest next step.",
-      input: { kind: "text", placeholder: "What is troubling you?", optional: false, maxLength: MAX_TEXT },
+      say: s.intro,
+      hint: "Type in your own words — for example, “I've been coughing for three weeks”. I am not a doctor; I help you find the safest next step.",
+      input: { kind: "text", placeholder: "What brings you here today?", optional: false, maxLength: MAX_TEXT },
       mood: "warm",
     };
   }
@@ -149,7 +194,7 @@ export function nextTurn(s: ConsultState): Turn {
   if (pending) {
     return {
       step: `confirm:${pending}`,
-      say: `You mentioned something that can be serious. To be safe, is this happening now: ${getRedFlag(pending).label.toLowerCase()}?`,
+      say: `You mentioned something that can be serious. To be safe — is this happening now: ${getRedFlag(pending).label.toLowerCase()}?`,
       input: { kind: "single", options: YES_NO },
       mood: "focused",
     };
@@ -180,7 +225,7 @@ export function nextTurn(s: ConsultState): Turn {
   if (!s.age) {
     return {
       step: "age",
-      say: s.who === "self" ? "How old are you?" : "How old is the patient?",
+      say: isOther(s) ? "How old is the patient?" : "How old are you?",
       input: { kind: "single", options: AGE_GROUPS.map((g) => ({ id: g.id, label: g.label })) },
       mood: "attentive",
     };
@@ -188,7 +233,7 @@ export function nextTurn(s: ConsultState): Turn {
   if (asksSex(s.age) && !s.sex) {
     return {
       step: "sex",
-      say: s.who === "self" ? "Are you female or male? This helps me ask the right questions." : "Is the patient female or male? This helps me ask the right questions.",
+      say: isOther(s) ? "Is the patient female or male? It helps me ask the right questions." : "Are you female or male? It helps me ask the right questions.",
       input: { kind: "single", options: [{ id: "female", label: "Female" }, { id: "male", label: "Male" }, { id: "unspecified", label: "Prefer not to say" }] },
       mood: "attentive",
     };
@@ -197,7 +242,7 @@ export function nextTurn(s: ConsultState): Turn {
     const options = SPECIALS.filter((x) => x.id === "immunocompromised" || canBePregnant(s.age, s.sex)).map((x) => ({ id: x.id, label: x.label, hint: x.hint || undefined }));
     return {
       step: "special",
-      say: `Do any of these apply to ${patient(s)}?`,
+      say: `Do any of these apply to ${isOther(s) ? "the patient" : "you"}?`,
       hint: "Tap all that apply.",
       input: { kind: "multi", options, doneLabel: "Continue", noneLabel: "None of these — continue" },
       mood: "attentive",
@@ -215,14 +260,24 @@ export function nextTurn(s: ConsultState): Turn {
       mood: "attentive",
     };
   }
+  if (ASKS_BODY.has(s.complaint) && !s.bodyDone) {
+    return {
+      step: "body",
+      say: "Where are you experiencing the problem?",
+      hint: "Tap the area on the body, or choose from the list. You can skip this.",
+      input: { kind: "body", options: BODY_AREAS },
+      mood: "attentive",
+    };
+  }
+  // Asked early, because later questions depend on how long it has been.
+  if (!s.duration) {
+    return { step: "duration", say: "When did this begin?", input: { kind: "single", options: DURATIONS.map((d) => ({ id: d.id, label: d.label })) }, mood: "attentive" };
+  }
   const ctx = contextOf(s);
   const q = questionsFor(ctx).find((x) => !(x.id in s.answers));
   if (q) return { step: `q:${q.id}`, say: q.text, hint: q.help, input: { kind: "single", options: YES_NO }, mood: "attentive" };
   const c = choicesFor(ctx).find((x) => !(x.id in s.choices));
   if (c) return { step: `c:${c.id}`, say: c.text, input: { kind: "single", options: c.options }, mood: "attentive" };
-  if (!s.duration) {
-    return { step: "duration", say: "When did this begin?", input: { kind: "single", options: DURATIONS.map((d) => ({ id: d.id, label: d.label })) }, mood: "attentive" };
-  }
   if (!s.progression) {
     return { step: "progression", say: "Has it become better, worse, or stayed the same?", input: { kind: "single", options: PROGRESSIONS.map((d) => ({ id: d.id, label: d.label })) }, mood: "attentive" };
   }
@@ -232,8 +287,8 @@ export function nextTurn(s: ConsultState): Turn {
   if (!s.medicinesDone) {
     return {
       step: "medicines",
-      say: `${s.who === "other" ? "Is the patient" : "Are you"} taking any medicines at the moment? You can skip this.`,
-      hint: "Write the names as they appear on the packet. This only goes into your summary for the doctor.",
+      say: `${isOther(s) ? "Is the patient" : "Are you"} taking any medicines at the moment? You can skip this.`,
+      hint: "Write the names as they appear on the packet. This only goes into the summary for the doctor.",
       input: { kind: "text", placeholder: "For example: Metformin, Amlodipine", optional: true, maxLength: MAX_TEXT },
       mood: "attentive",
     };
@@ -246,15 +301,25 @@ export function nextTurn(s: ConsultState): Turn {
       mood: "attentive",
     };
   }
+  if (!s.conditionsDone) {
+    return {
+      step: "conditions",
+      say: `${isOther(s) ? "Does the patient" : "Do you"} have any long-term health conditions, such as diabetes or high blood pressure? You can skip this.`,
+      input: { kind: "text", placeholder: "For example: diabetes, asthma", optional: true, maxLength: MAX_TEXT },
+      mood: "attentive",
+    };
+  }
   // Every question answered. The triage engine decides; RED always means Emergency Mode.
   const result = triage(toAnswers(s));
   if (result.level === "RED") {
     return { step: "emergency", say: EMERGENCY_LINE, input: { kind: "emergency", flags: result.emergency }, mood: "serious" };
   }
+  const text = LEVEL_TEXT[result.level];
   return {
     step: "result",
-    say: "Thank you. Based on the information you provided, here is the safest next step.",
-    input: { kind: "result" },
+    say: result.now && text.nowMessage ? text.nowMessage : text.message,
+    then: HANDOFF_LINE,
+    input: { kind: "result", level: result.level },
     mood: result.level === "ORANGE" ? "serious" : "focused",
   };
 }
@@ -270,7 +335,8 @@ function withTextFlags(s: ConsultState, text: string): ConsultState {
   return pending.length ? { ...s, pendingFlags: [...s.pendingFlags, ...pending] } : s;
 }
 
-// Applies the person's answer to the current step. Unknown values are ignored.
+// Applies the person's answer to the current step. Unknown values are ignored
+// (the same state object is returned).
 export function respond(s: ConsultState, step: string, value: string | string[]): ConsultState {
   const v = Array.isArray(value) ? value : [value];
   const one = v[0] ?? "";
@@ -287,12 +353,14 @@ export function respond(s: ConsultState, step: string, value: string | string[])
     if (e.clear.kind === "check") return { ...s, checkDone: false, emergency: null };
     return { ...s, dismissedFlags: [...s.dismissedFlags, ...e.flags], emergency: null };
   }
+  // While in an emergency, nothing else can change the outcome.
+  if (s.emergency) return s;
 
   if (step === "concern") {
     const text = clip(one);
     if (!text) return s;
     const r = receive(text);
-    let next: ConsultState = {
+    const next: ConsultState = {
       ...s,
       concernText: text,
       relation: r.relation,
@@ -302,8 +370,7 @@ export function respond(s: ConsultState, step: string, value: string | string[])
       answers: { ...r.prefill, ...s.answers },
       prefilled: Object.keys(r.prefill),
     };
-    next = withTextFlags(next, text);
-    return next;
+    return withTextFlags(next, text);
   }
 
   if (step.startsWith("confirm:")) {
@@ -349,6 +416,11 @@ export function respond(s: ConsultState, step: string, value: string | string[])
     return { ...s, complaint: one, special, answers, prefilled: keep ? s.prefilled : [] };
   }
 
+  if (step === "body") {
+    if (one === "skip") return { ...s, bodyDone: true, bodyArea: undefined };
+    return BODY_AREAS.some((b) => b.id === one) ? { ...s, bodyDone: true, bodyArea: one } : s;
+  }
+
   if (step.startsWith("q:")) {
     const id = step.slice(2);
     const q = questionsFor(contextOf(s)).find((x) => x.id === id);
@@ -369,45 +441,102 @@ export function respond(s: ConsultState, step: string, value: string | string[])
   if (step === "progression") return PROGRESSIONS.some((d) => d.id === one) ? { ...s, progression: one as Answers["progression"] } : s;
   if (step === "severity") return SEVERITIES.some((d) => d.id === one) ? { ...s, severity: one as Answers["severity"] } : s;
 
-  if (step === "medicines" || step === "allergies") {
-    const text = clip(one);
-    const next = step === "medicines" ? { ...s, medicines: text || undefined, medicinesDone: true } : { ...s, allergies: text || undefined, allergiesDone: true };
+  if (step === "medicines" || step === "allergies" || step === "conditions") {
+    const text = clip(one) || undefined;
+    const next =
+      step === "medicines"
+        ? { ...s, medicines: text, medicinesDone: true }
+        : step === "allergies"
+          ? { ...s, allergies: text, allergiesDone: true }
+          : { ...s, conditions: text, conditionsDone: true };
     return text ? withTextFlags(next, text) : next;
   }
 
   return s;
 }
 
-export type PanelItem = { label: string; value: string };
+// ---------------- The live patient chart ----------------
 
-// What the person has told the guide so far — nothing guessed, no diagnosis.
-export function panelItems(s: ConsultState): PanelItem[] {
-  const items: PanelItem[] = [];
-  const add = (label: string, value?: string) => {
-    if (value && value.trim()) items.push({ label, value: value.trim() });
-  };
-  add("Main concern", s.concernText);
-  if (s.complaint) add("Closest problem (your choice)", getComplaint(s.complaint)?.label);
-  if (s.who) add("For", s.who === "self" ? "Myself" : `Someone else${s.relation ? ` (${s.relation})` : ""}`);
-  add("Age group", AGE_GROUPS.find((g) => g.id === s.age)?.label);
-  if (s.special.length && s.specialDone) add("Also applies", s.special.map((x) => SPECIALS.find((y) => y.id === x)?.label).join(", "));
-  add("Started", DURATIONS.find((d) => d.id === s.duration)?.label);
-  add("Change", PROGRESSIONS.find((d) => d.id === s.progression)?.label);
-  add("How bad", SEVERITIES.find((d) => d.id === s.severity)?.label);
-  if (s.complaint) {
-    const qs = questionsFor(contextOf(s));
-    const said = (a: Answer) => qs.filter((q) => s.answers[q.id] === a && !s.prefilled.includes(q.id));
-    add("Important symptoms you reported", said("yes").map((q) => q.positive).join("; "));
-    add("You said these are not present", said("no").map((q) => q.negative).join("; "));
-    add("You were not sure about", said("unsure").map((q) => q.positive).join("; "));
-    for (const c of choicesFor(contextOf(s))) {
-      add(c.summaryLabel, c.options.find((o) => o.id === s.choices[c.id])?.label);
-    }
+export const NOT_PROVIDED = "Not provided";
+
+export type ChartRow = { label: string; value: string; provided: boolean };
+export type Chart = {
+  reported: ChartRow[]; // REPORTED BY PATIENT
+  safety: ChartRow[]; // answers to safety (danger-sign) questions
+  routing: ChartRow[] | null; // SYSTEM ROUTING INFORMATION (only once known)
+};
+
+const label = <T extends { id: string; label: string }>(list: readonly T[], id?: string) => list.find((x) => x.id === id)?.label;
+
+export function chartOf(s: ConsultState): Chart {
+  const row = (l: string, v?: string): ChartRow => (v && v.trim() ? { label: l, value: v.trim(), provided: true } : { label: l, value: NOT_PROVIDED, provided: false });
+  const ctx = contextOf(s);
+  const qs = s.complaint ? questionsFor(ctx) : [];
+  const said = (a: Answer, emergencyOnly: boolean) =>
+    qs.filter((q) => s.answers[q.id] === a && !s.prefilled.includes(q.id) && ("emergency" in q.yes) === emergencyOnly);
+
+  const reported: ChartRow[] = [
+    row("Main concern", s.concernText),
+    row("Closest problem (chosen)", s.complaint ? getComplaint(s.complaint)?.label : undefined),
+    row("For", s.who ? (s.who === "self" ? "Self" : `Someone else${s.relation ? ` (${s.relation})` : ""}`) : undefined),
+    row("Age group", label(AGE_GROUPS, s.age)),
+  ];
+  if (s.specialDone && canBePregnant(s.age, s.sex)) {
+    reported.push(
+      row(
+        "Pregnancy status",
+        s.special.includes("pregnant") ? "Pregnant" : s.special.includes("postpartum") ? "Gave birth in the last 6 weeks" : "Not pregnant (as reported)",
+      ),
+    );
   }
-  add("Current medicines", s.medicines);
-  add("Known allergies", s.allergies);
-  return items;
+  if (s.complaint && ASKS_BODY.has(s.complaint)) reported.push(row("Where", label(BODY_AREAS, s.bodyArea)));
+  reported.push(
+    row("Duration", label(DURATIONS, s.duration)),
+    row("Change", label(PROGRESSIONS, s.progression)),
+    row("How bad", label(SEVERITIES, s.severity)),
+    row("Symptoms reported", said("yes", false).map((q) => q.positive).join("; ")),
+    row("Relevant negatives", said("no", false).map((q) => q.negative).join("; ")),
+  );
+  const unsure = qs.filter((q) => s.answers[q.id] === "unsure" && !s.prefilled.includes(q.id));
+  if (unsure.length) reported.push(row("Not sure about", unsure.map((q) => q.positive).join("; ")));
+  for (const c of s.complaint ? choicesFor(ctx) : []) {
+    const v = label(c.options, s.choices[c.id]);
+    if (v) reported.push(row(c.summaryLabel, v));
+  }
+  reported.push(
+    row("Current medicines", s.medicines),
+    row("Known allergies", s.allergies),
+    row("Existing conditions", [s.conditions, s.special.includes("immunocompromised") ? "Weak immune system" : ""].filter(Boolean).join("; ")),
+  );
+
+  const safety: ChartRow[] = [row("Danger signs at the start", s.checkDone ? "None reported" : undefined)];
+  for (const q of said("no", true)) safety.push(row(q.negative, "No"));
+  for (const q of said("unsure", true)) safety.push(row(q.positive, "Not sure"));
+
+  let routing: ChartRow[] | null = null;
+  const t = nextTurn(s);
+  if (t.input.kind === "result" || t.input.kind === "emergency") {
+    const r = triage(toAnswers(s));
+    const level = t.input.kind === "emergency" ? "RED" : r.level;
+    routing = [
+      row("Navigation urgency", LEVEL_TEXT[level].label),
+      row(
+        "Suggested service",
+        level === "RED"
+          ? "Emergency care (108 / 112)"
+          : r.departments.map((d) => getDepartment(d)?.plainName ?? d).join(", "),
+      ),
+    ];
+  }
+  return { reported, safety, routing };
 }
 
-// Every fixed line the guide can say, for the language-policy test.
-export const FIXED_LINES = [EMERGENCY_LINE, "Thank you. Based on the information you provided, here is the safest next step."];
+// Flat list of everything the person has supplied (no routing information).
+export type PanelItem = { label: string; value: string };
+export function panelItems(s: ConsultState): PanelItem[] {
+  const c = chartOf(s);
+  return [...c.reported, ...c.safety].filter((r) => r.provided).map(({ label: l, value }) => ({ label: l, value }));
+}
+
+// Fixed lines the guide can say, for the language-policy test.
+export const FIXED_LINES = [EMERGENCY_LINE, HANDOFF_LINE, ...Object.values(LEVEL_TEXT).flatMap((t) => [t.message, t.nowMessage ?? ""])];

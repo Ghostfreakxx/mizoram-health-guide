@@ -54,21 +54,57 @@ test("live consultation is off unless configured", async ({ page }) => {
   await expect(page.getByText("Not available yet.")).toBeVisible();
 });
 
-test("consultation room: an emergency in the patient's words switches to Emergency Mode", async ({ page }) => {
+test("consultation room: 'chest feels very tight… struggling to breathe' interrupts at once", async ({ page }) => {
   await page.goto("/ai-hospital/departments/general-medicine/room");
   await page.getByLabel("Display").selectOption("text");
   await page.getByRole("button", { name: "Begin consultation" }).click();
-  await page.getByRole("textbox", { name: /troubling you today/ }).fill("my father has crushing chest pain");
+  await page.getByRole("textbox", { name: "Your answer" }).fill("My chest feels very tight and I'm struggling to breathe.");
   await page.getByRole("button", { name: "Send" }).click();
-  await expect(page.getByText("108").first()).toBeVisible();
+  await expect(page.getByText("Urgent medical attention")).toBeVisible();
+  await expect(page.getByText("Your answers include warning signs")).toBeVisible();
+  await expect(page.getByRole("link", { name: /108/ }).first()).toBeVisible();
   await expect(page.getByRole("button", { name: "This is not an emergency — go back" })).toBeVisible();
   // Routine questions are not shown.
   await expect(page.getByText("Is this for you, or for someone else?")).toHaveCount(0);
 });
 
-test("consultation room: works with no 3D at all and never asks for camera or microphone", async ({ page, context }) => {
+test("consultation room: a three-week cough gets follow-up questions, a chart and a visit summary", async ({ page }) => {
+  await page.goto("/ai-hospital/departments/general-medicine/room");
+  await page.getByLabel("Display").selectOption("text");
+  await page.getByRole("button", { name: "Begin consultation" }).click();
+  await page.getByRole("textbox", { name: "Your answer" }).fill("I've been coughing for about three weeks");
+  await page.getByRole("button", { name: "Send" }).click();
+  await page.getByRole("button", { name: "None of these — continue" }).click();
+  await expect(page.getByRole("heading", { name: "Is this for you, or for someone else?" })).toBeVisible();
+  const chart = page.getByRole("complementary", { name: "Patient chart" });
+  await expect(chart).toContainText("I've been coughing for about three weeks");
+  await expect(chart).toContainText("More than 2 weeks");
+  await expect(chart).toContainText("Not provided");
+  // Answer the rest: myself, adult, female, nothing special, cough, then "No" / first option / skip.
+  await page.getByRole("button", { name: "Myself" }).click();
+  await page.getByRole("button", { name: "18 to 59 years" }).click();
+  await page.getByRole("button", { name: "Female" }).click();
+  await page.getByRole("button", { name: "None of these — continue" }).click();
+  await page.getByRole("button", { name: /Cough or breathing problem/ }).click();
+  for (let i = 0; i < 40; i++) {
+    if (await page.getByText("Patient-prepared visit summary").count()) break;
+    if (await page.getByText("Urgent medical attention").count()) break;
+    const no = page.getByRole("button", { name: "No", exact: true });
+    const skip = page.getByRole("button", { name: "Skip", exact: true });
+    if (await no.count()) await no.click();
+    else if (await skip.count()) await skip.click();
+    else if (await page.getByRole("button", { name: "About the same" }).count()) await page.getByRole("button", { name: "About the same" }).click();
+    else if (await page.getByRole("button", { name: /^Mild/ }).count()) await page.getByRole("button", { name: /^Mild/ }).click();
+    else await page.locator("main button.min-h-14").first().click();
+  }
+  await expect(page.getByText("Patient-prepared visit summary")).toBeVisible();
+  await expect(page.getByText("Next: a real healthcare professional")).toBeVisible();
+  await expect(chart).toContainText("System routing information");
+  await expect(chart).toContainText("Navigation urgency");
+});
+
+test("consultation room: never asks for camera or microphone, and works with no 3D", async ({ page }) => {
   const asked: string[] = [];
-  await context.grantPermissions([]);
   await page.exposeFunction("__perm", (n: string) => asked.push(n));
   await page.addInitScript(() => {
     const md = navigator.mediaDevices;
@@ -77,10 +113,19 @@ test("consultation room: works with no 3D at all and never asks for camera or mi
   await page.goto("/ai-hospital/departments/general-medicine/room");
   await page.getByLabel("Display").selectOption("text");
   await page.getByRole("button", { name: "Begin consultation" }).click();
-  await page.getByRole("textbox", { name: /troubling you today/ }).fill("cough for a week");
+  await page.getByRole("textbox", { name: "Your answer" }).fill("headache");
   await page.getByRole("button", { name: "Send" }).click();
-  await page.getByRole("button", { name: "None of these — continue" }).click();
-  await expect(page.getByRole("heading", { name: "Is this for you, or for someone else?" })).toBeVisible();
-  await expect(page.getByText("cough for a week")).toBeVisible();
+  await expect(page.getByText("Your consultation information stays on this device")).toBeVisible();
   expect(asked).toEqual([]);
+});
+
+test("demo mode plays a scenario through the real engine and resets", async ({ page }) => {
+  await page.emulateMedia({ reducedMotion: "reduce" }); // no smooth scrolling while presenting
+  await page.goto("/ai-hospital/departments/general-medicine/room?demo");
+  await page.getByLabel("Display").selectOption("text");
+  await page.getByRole("button", { name: /D\. Possible heart emergency/ }).click();
+  await expect(page.getByText("Urgent medical attention")).toBeVisible({ timeout: 20000 });
+  await page.getByRole("button", { name: "End demo scenario — reset" }).click();
+  await expect(page.getByText("Urgent medical attention")).toHaveCount(0);
+  await expect(page.getByRole("button", { name: /B\. Persistent cough/ })).toBeVisible();
 });

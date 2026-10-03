@@ -1,0 +1,389 @@
+"use client";
+
+import { useMemo } from "react";
+import * as THREE from "three";
+import type { Tier } from "./capability";
+import type { Prop, RoomStyle } from "./rooms";
+
+// A consulting room in a modern Indian clinic, seen from the patient's chair.
+// Shared furniture for every department; each department adds a small "prop
+// pack" (rooms.ts). Everything is built from code: no downloads.
+//
+// Layout (metres): the guide sits at z = -0.95 behind the desk; the patient's
+// eyes (camera) are ~1.2 m in front of her. Back wall at z = -2.1.
+
+type V3 = [number, number, number];
+
+function canvasTexture(draw: (g: CanvasRenderingContext2D, w: number, h: number) => void, w: number, h: number) {
+  const c = document.createElement("canvas");
+  c.width = w;
+  c.height = h;
+  draw(c.getContext("2d")!, w, h);
+  const t = new THREE.CanvasTexture(c);
+  t.colorSpace = THREE.SRGBColorSpace;
+  t.anisotropy = 4;
+  return t;
+}
+
+function Box({ size, position, color, rotation, rough = 0.8, metal = 0, emissive }: { size: V3; position: V3; color: string; rotation?: V3; rough?: number; metal?: number; emissive?: string }) {
+  return (
+    <mesh position={position} rotation={rotation} castShadow receiveShadow>
+      <boxGeometry args={size} />
+      <meshStandardMaterial color={color} roughness={rough} metalness={metal} emissive={emissive ?? "#000"} emissiveIntensity={emissive ? 0.5 : 0} />
+    </mesh>
+  );
+}
+
+function Cyl({ r, h, position, color, rotation, rough = 0.6, metal = 0, seg = 20 }: { r: number | [number, number]; h: number; position: V3; color: string; rotation?: V3; rough?: number; metal?: number; seg?: number }) {
+  const [rt, rb] = Array.isArray(r) ? r : [r, r];
+  return (
+    <mesh position={position} rotation={rotation} castShadow>
+      <cylinderGeometry args={[rt, rb, h, seg]} />
+      <meshStandardMaterial color={color} roughness={rough} metalness={metal} />
+    </mesh>
+  );
+}
+
+function Picture({ texture, size, position, rotation, frame = "#e5e7eb" }: { texture: THREE.Texture; size: [number, number]; position: V3; rotation?: V3; frame?: string }) {
+  return (
+    <group position={position} rotation={rotation}>
+      <Box size={[size[0] + 0.03, size[1] + 0.03, 0.015]} position={[0, 0, 0]} color={frame} />
+      <mesh position={[0, 0, 0.009]}>
+        <planeGeometry args={size} />
+        <meshStandardMaterial map={texture} roughness={0.9} />
+      </mesh>
+    </group>
+  );
+}
+
+// ---------------- Wall textures ----------------
+
+function useSign(room: RoomStyle) {
+  return useMemo(
+    () =>
+      canvasTexture((g, w, h) => {
+        g.fillStyle = room.accent;
+        g.fillRect(0, 0, w, h);
+        g.fillStyle = "#ffffff";
+        g.textAlign = "left";
+        g.textBaseline = "middle";
+        g.font = "700 30px system-ui, sans-serif";
+        g.fillText("MIZORAM AI HOSPITAL · PROTOTYPE", 34, 50);
+        g.font = "800 64px system-ui, sans-serif";
+        g.fillStyle = "#fde68a";
+        g.fillText(room.title, 34, 130);
+      }, 1024, 190),
+    [room],
+  );
+}
+
+function useHandwashPoster() {
+  return useMemo(
+    () =>
+      canvasTexture((g, w, h) => {
+        g.fillStyle = "#f8fafc";
+        g.fillRect(0, 0, w, h);
+        g.fillStyle = "#0f766e";
+        g.fillRect(0, 0, w, 70);
+        g.fillStyle = "#fff";
+        g.font = "800 34px system-ui, sans-serif";
+        g.textAlign = "center";
+        g.fillText("Clean hands save lives", w / 2, 46);
+        const steps = ["Wet", "Soap", "Palms", "Backs", "Fingers", "Thumbs", "Rinse", "Dry"];
+        steps.forEach((s, i) => {
+          const x = 70 + (i % 4) * 125;
+          const y = 140 + Math.floor(i / 4) * 170;
+          g.fillStyle = "#ccfbf1";
+          g.beginPath();
+          g.arc(x, y, 46, 0, Math.PI * 2);
+          g.fill();
+          g.fillStyle = "#0f766e";
+          g.font = "700 30px system-ui";
+          g.fillText(String(i + 1), x, y + 10);
+          g.fillStyle = "#334155";
+          g.font = "600 24px system-ui";
+          g.fillText(s, x, y + 82);
+        });
+      }, 560, 480),
+    [],
+  );
+}
+
+function useBodyChart() {
+  return useMemo(
+    () =>
+      canvasTexture((g, w, h) => {
+        g.fillStyle = "#fffdf7";
+        g.fillRect(0, 0, w, h);
+        g.fillStyle = "#1e3a8a";
+        g.font = "800 30px system-ui";
+        g.textAlign = "center";
+        g.fillText("THE HUMAN BODY", w / 2, 44);
+        // silhouette
+        g.fillStyle = "#e7d3c3";
+        g.beginPath();
+        g.ellipse(w / 2, 110, 34, 42, 0, 0, Math.PI * 2);
+        g.fill();
+        g.beginPath();
+        g.moveTo(w / 2 - 80, 170);
+        g.quadraticCurveTo(w / 2, 150, w / 2 + 80, 170);
+        g.lineTo(w / 2 + 64, 400);
+        g.lineTo(w / 2 + 40, 600);
+        g.lineTo(w / 2 - 40, 600);
+        g.lineTo(w / 2 - 64, 400);
+        g.closePath();
+        g.fill();
+        // organs (simple, labelled)
+        const organ = (x: number, y: number, rx: number, ry: number, c: string) => {
+          g.fillStyle = c;
+          g.beginPath();
+          g.ellipse(x, y, rx, ry, 0, 0, Math.PI * 2);
+          g.fill();
+        };
+        organ(w / 2 - 34, 245, 26, 52, "#f4a7a7");
+        organ(w / 2 + 34, 245, 26, 52, "#f4a7a7");
+        organ(w / 2 + 6, 262, 18, 20, "#c2410c");
+        organ(w / 2 - 20, 330, 34, 22, "#a16207");
+        organ(w / 2 + 22, 340, 22, 18, "#d6a36a");
+        g.strokeStyle = "#475569";
+        g.fillStyle = "#334155";
+        g.font = "600 20px system-ui";
+        g.textAlign = "left";
+        const label = (x1: number, y1: number, text: string) => {
+          g.beginPath();
+          g.moveTo(x1, y1);
+          g.lineTo(w / 2 + 110, y1);
+          g.stroke();
+          g.fillText(text, w / 2 + 116, y1 + 7);
+        };
+        label(w / 2 + 50, 220, "Lungs");
+        label(w / 2 + 16, 262, "Heart");
+        label(w / 2 + 6, 326, "Liver");
+        label(w / 2 + 36, 350, "Stomach");
+      }, 480, 640),
+    [],
+  );
+}
+
+function useClock() {
+  return useMemo(
+    () =>
+      canvasTexture((g, w) => {
+        const r = w / 2;
+        g.fillStyle = "#ffffff";
+        g.beginPath();
+        g.arc(r, r, r - 4, 0, Math.PI * 2);
+        g.fill();
+        g.strokeStyle = "#1f2937";
+        g.lineWidth = 8;
+        g.stroke();
+        for (let i = 0; i < 12; i++) {
+          const a = (i / 12) * Math.PI * 2;
+          g.beginPath();
+          g.moveTo(r + Math.sin(a) * (r - 22), r - Math.cos(a) * (r - 22));
+          g.lineTo(r + Math.sin(a) * (r - 40), r - Math.cos(a) * (r - 40));
+          g.lineWidth = 6;
+          g.stroke();
+        }
+        g.lineWidth = 9;
+        g.beginPath();
+        g.moveTo(r, r);
+        g.lineTo(r + 50, r - 30);
+        g.stroke();
+        g.lineWidth = 5;
+        g.beginPath();
+        g.moveTo(r, r);
+        g.lineTo(r - 20, r - 90);
+        g.stroke();
+      }, 256, 256),
+    [],
+  );
+}
+
+function useScreen() {
+  return useMemo(
+    () =>
+      canvasTexture((g, w, h) => {
+        g.fillStyle = "#eef2f7";
+        g.fillRect(0, 0, w, h);
+        g.fillStyle = "#1e3a8a";
+        g.fillRect(0, 0, w, 34);
+        g.fillStyle = "#fff";
+        g.font = "700 18px system-ui";
+        g.fillText("OPD · Patient queue", 12, 23);
+        g.fillStyle = "#cbd5e1";
+        for (let i = 0; i < 6; i++) g.fillRect(12, 50 + i * 28, w - 24, 16);
+      }, 400, 240),
+    [],
+  );
+}
+
+// ---------------- Department props ----------------
+
+function PropItem({ prop }: { prop: Prop }) {
+  const chart = useBodyChart();
+  switch (prop) {
+    case "bp-monitor":
+      return (
+        <group position={[0.5, 0.785, -0.66]} rotation={[0, -0.5, 0]}>
+          <Box size={[0.16, 0.07, 0.13]} position={[0, 0.035, 0]} color="#f1f5f9" rough={0.4} />
+          <mesh position={[0, 0.072, 0.012]} rotation={[-Math.PI / 2 + 0.3, 0, 0]}>
+            <planeGeometry args={[0.1, 0.055]} />
+            <meshStandardMaterial color="#0b3b36" emissive="#0f766e" emissiveIntensity={0.35} roughness={0.2} />
+          </mesh>
+          <mesh position={[0.17, 0.02, 0.02]} rotation={[Math.PI / 2, 0, 0.3]}>
+            <torusGeometry args={[0.055, 0.016, 10, 24]} />
+            <meshStandardMaterial color="#1e3a8a" roughness={0.85} />
+          </mesh>
+        </group>
+      );
+    case "stethoscope":
+      return (
+        <group position={[0.32, 0.79, -0.42]} rotation={[0, 0.4, 0]}>
+          <mesh rotation={[Math.PI / 2, 0, 0]}>
+            <torusGeometry args={[0.07, 0.005, 8, 32, Math.PI * 1.6]} />
+            <meshStandardMaterial color="#111827" roughness={0.4} />
+          </mesh>
+          <Cyl r={0.022} h={0.012} position={[0.09, 0.003, 0.03]} color="#d1d5db" metal={0.9} rough={0.2} />
+        </group>
+      );
+    case "sanitizer":
+      return (
+        <group position={[-0.62, 0.785, -0.42]}>
+          <Cyl r={0.032} h={0.13} position={[0, 0.065, 0]} color="#bae6fd" rough={0.15} />
+          <Cyl r={0.012} h={0.04} position={[0, 0.15, 0]} color="#f8fafc" />
+          <Box size={[0.05, 0.01, 0.014]} position={[0.02, 0.17, 0]} color="#f8fafc" />
+        </group>
+      );
+    case "anatomy-chart":
+      return <Picture texture={chart} size={[0.45, 0.6]} position={[0.95, 1.55, -2.08]} />;
+    case "couch":
+      return (
+        <group position={[1.75, 0, -1.35]}>
+          <Box size={[0.68, 0.08, 1.85]} position={[0, 0.66, 0]} color="#5b6b7a" rough={0.5} />
+          <Box size={[0.6, 0.012, 1.7]} position={[0, 0.706, 0.05]} color="#f8fafc" />
+          <Box size={[0.68, 0.18, 0.5]} position={[0, 0.78, -0.68]} rotation={[0.35, 0, 0]} color="#5b6b7a" rough={0.5} />
+          {[-0.28, 0.28].map((x) => [-0.82, 0.82].map((z) => <Cyl key={`${x}${z}`} r={0.025} h={0.62} position={[x, 0.31, z]} color="#9ca3af" metal={0.7} rough={0.3} />))}
+          <Box size={[0.4, 0.18, 0.3]} position={[-0.55, 0.09, 0.4]} color="#9ca3af" metal={0.5} rough={0.4} />
+        </group>
+      );
+    case "curtain":
+      return (
+        <group position={[1.15, 0, -1.2]}>
+          <Cyl r={0.01} h={1.8} position={[0, 2.35, 0]} rotation={[Math.PI / 2, 0, 0]} color="#cbd5e1" metal={0.6} />
+          {Array.from({ length: 7 }, (_, i) => (
+            <mesh key={i} position={[Math.sin(i * 1.4) * 0.03, 1.4, -0.85 + i * 0.09]} rotation={[0, 0, 0]}>
+              <boxGeometry args={[0.02, 1.9, 0.1]} />
+              <meshStandardMaterial color="#a5d8e6" roughness={0.95} />
+            </mesh>
+          ))}
+        </group>
+      );
+    default:
+      return null;
+  }
+}
+
+export default function Room3D({ room, tier }: { room: RoomStyle; tier: Exclude<Tier, "lite"> }) {
+  const sign = useSign(room);
+  const poster = useHandwashPoster();
+  const clock = useClock();
+  const screen = useScreen();
+  const full = tier === "full";
+
+  return (
+    <group>
+      {/* Floor (light vinyl), walls with a painted dado, ceiling */}
+      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0, -0.6]} receiveShadow>
+        <planeGeometry args={[6, 6]} />
+        <meshStandardMaterial color={room.floor} roughness={0.55} />
+      </mesh>
+      <mesh position={[0, 1.5, -2.1]} receiveShadow>
+        <planeGeometry args={[6, 3]} />
+        <meshStandardMaterial color={room.wall} roughness={0.95} />
+      </mesh>
+      <Box size={[6, 1.0, 0.01]} position={[0, 0.5, -2.095]} color={room.dado} rough={0.9} />
+      <Box size={[6, 0.03, 0.02]} position={[0, 1.0, -2.09]} color="#ffffff" />
+      {([-1, 1] as const).map((s) => (
+        <group key={s}>
+          <mesh position={[s * 2.3, 1.5, -0.6]} rotation={[0, -s * Math.PI / 2, 0]} receiveShadow>
+            <planeGeometry args={[6, 3]} />
+            <meshStandardMaterial color={room.wall} roughness={0.95} />
+          </mesh>
+          <Box size={[0.01, 1.0, 6]} position={[s * 2.295, 0.5, -0.6]} color={room.dado} rough={0.9} />
+        </group>
+      ))}
+      <mesh position={[0, 2.8, -0.6]} rotation={[Math.PI / 2, 0, 0]}>
+        <planeGeometry args={[6, 6]} />
+        <meshStandardMaterial color="#f8fafc" />
+      </mesh>
+      <Box size={[1.2, 0.03, 0.6]} position={[0, 2.78, -0.7]} color="#ffffff" emissive="#ffffff" />
+
+      {/* Signage and wall items */}
+      <mesh position={[-0.75, 2.12, -2.09]}>
+        <planeGeometry args={[1.25, 0.23]} />
+        <meshBasicMaterial map={sign} toneMapped={false} />
+      </mesh>
+      <Picture texture={poster} size={[0.42, 0.36]} position={[-1.15, 1.45, -2.08]} />
+      <mesh position={[0.25, 2.2, -2.085]}>
+        <circleGeometry args={[0.13, 32]} />
+        <meshStandardMaterial map={clock} roughness={0.6} />
+      </mesh>
+
+      {/* Window with blinds, left wall */}
+      <mesh position={[-2.29, 1.6, -1.2]} rotation={[0, Math.PI / 2, 0]}>
+        <planeGeometry args={[1.2, 1.0]} />
+        <meshStandardMaterial color="#e0f2fe" emissive="#e0f2fe" emissiveIntensity={0.7} />
+      </mesh>
+      {Array.from({ length: full ? 14 : 7 }, (_, i) => (
+        <Box key={i} size={[0.012, 0.05, 1.2]} position={[-2.27, 1.13 + i * (0.95 / (full ? 14 : 7)), -1.2]} rotation={[0.5, 0, 0]} color="#f8fafc" rough={0.5} />
+      ))}
+
+      {/* Medicine cabinet with glass doors, back right */}
+      <group position={[1.45, 0, -1.9]}>
+        <Box size={[0.9, 1.8, 0.38]} position={[0, 0.9, 0]} color="#f1f5f9" rough={0.5} />
+        {[0.95, 1.3, 1.62].map((y) => <Box key={y} size={[0.84, 0.02, 0.32]} position={[0, y, 0.02]} color="#cbd5e1" />)}
+        {full &&
+          ([
+            [-0.28, 1.0, "#e0f2fe"], [-0.12, 1.0, "#fef3c7"], [0.1, 1.0, "#dcfce7"], [0.28, 1.0, "#fee2e2"],
+            [-0.22, 1.36, "#e2e8f0"], [0.02, 1.36, "#dbeafe"], [0.24, 1.36, "#fef9c3"],
+          ] as [number, number, string][]).map(([x, y, c]) => <Box key={`${x}${y}`} size={[0.12, 0.14, 0.16]} position={[x, y + 0.08, 0.02]} color={c} />)}
+        <mesh position={[0, 1.3, 0.195]}>
+          <planeGeometry args={[0.86, 0.95]} />
+          <meshPhysicalMaterial color="#e0f2fe" transparent opacity={0.18} roughness={0.05} />
+        </mesh>
+        <Box size={[0.88, 0.8, 0.02]} position={[0, 0.42, 0.195]} color="#e2e8f0" rough={0.5} />
+      </group>
+
+      {/* Desk: laminate top, steel legs, modesty panel */}
+      <Box size={[1.5, 0.04, 0.78]} position={[0, 0.76, -0.56]} color="#d8c3a5" rough={0.55} />
+      <Box size={[1.46, 0.62, 0.02]} position={[0, 0.43, -0.18]} color="#b9a184" rough={0.7} />
+      {[-0.7, 0.7].map((x) => <Box key={x} size={[0.04, 0.74, 0.7]} position={[x, 0.37, -0.56]} color="#94a3b8" metal={0.5} rough={0.4} />)}
+
+      {/* Doctor's chair (behind her) */}
+      <group position={[0, 0, -1.2]}>
+        <Box size={[0.5, 0.62, 0.07]} position={[0, 1.02, -0.06]} color="#1f2937" rough={0.7} />
+        <Box size={[0.5, 0.07, 0.48]} position={[0, 0.48, 0.18]} color="#1f2937" rough={0.7} />
+        <Cyl r={0.025} h={0.4} position={[0, 0.25, 0.18]} color="#4b5563" metal={0.7} rough={0.3} />
+      </group>
+
+      {/* Desk items: monitor turned towards her (we see its back), keyboard, notepad, pen */}
+      <group position={[-0.62, 0.78, -1.0]} rotation={[0, Math.PI - 0.7, 0]} scale={0.72}>
+        <Box size={[0.2, 0.012, 0.14]} position={[0, 0.006, 0]} color="#1f2937" metal={0.3} rough={0.4} />
+        <Box size={[0.04, 0.24, 0.03]} position={[0, 0.13, -0.03]} color="#1f2937" metal={0.3} rough={0.4} />
+        <Box size={[0.54, 0.33, 0.035]} position={[0, 0.36, -0.01]} color="#2b313a" rough={0.5} />
+        <mesh position={[0, 0.36, 0.0085]}>
+          <planeGeometry args={[0.5, 0.29]} />
+          <meshBasicMaterial map={screen} toneMapped={false} />
+        </mesh>
+      </group>
+      <Box size={[0.38, 0.015, 0.13]} position={[-0.32, 0.787, -0.78]} rotation={[0, 0.35, 0]} color="#e5e7eb" rough={0.5} />
+      <Box size={[0.17, 0.006, 0.24]} position={[0.12, 0.783, -0.4]} rotation={[0, -0.12, 0]} color="#ffffff" rough={0.9} />
+      <Cyl r={0.0045} h={0.14} position={[0.24, 0.787, -0.4]} rotation={[Math.PI / 2, 0, 0.35]} color="#1e3a8a" />
+
+      {room.props.map((p) => (
+        <PropItem key={p} prop={p} />
+      ))}
+    </group>
+  );
+}

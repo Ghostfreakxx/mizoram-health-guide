@@ -1,12 +1,14 @@
 import { describe, expect, it } from "vitest";
 import { chooseTier } from "../../app/ai-hospital/consult-room/capability";
-import { blinkAt, poseAt } from "../../app/ai-hospital/consult-room/doctorMotion";
+import { blinkAt, poseAt, visemeFor } from "../../app/ai-hospital/consult-room/doctorMotion";
+import { LipSync } from "../../app/ai-hospital/consult-room/voice";
 import {
   type ConsultState,
   EMERGENCY_LINE,
   FIXED_LINES,
   type Turn,
   nextTurn,
+  chartOf,
   panelItems,
   respond,
   startConsultation,
@@ -42,6 +44,7 @@ const calm = (complaint: string) => (t: Turn, ...rest: [ConsultState?]): string 
   if (t.step === "complaint") return complaint;
   if (t.step.startsWith("confirm:")) return "no";
   if (t.step === "duration") return "1-3-days";
+  if (t.step === "body") return "skip";
   if (t.step === "progression") return "better";
   if (t.step === "severity") return "mild";
   if (t.input.kind === "text") return "";
@@ -71,9 +74,11 @@ describe("the virtual guide never diagnoses or prescribes", () => {
     for (const l of [...FIXED_LINES, nextTurn(start()).say]) expect(violatesLanguagePolicy(l)).toBeNull();
   });
 
-  it("greets as a guide for the department, and says it is not a doctor", () => {
+  it("introduces itself as a virtual guide, never as a doctor", () => {
     const t = nextTurn(start());
-    expect(t.say).toBe("Hello. I'm the virtual guide for General Medicine. Tell me what is troubling you today.");
+    expect(t.say).toBe(
+      "Hello. Welcome to General Medicine. I'm your AI Hospital virtual health guide. I'll ask you a few questions to help determine how urgently you may need care, and help prepare information for a healthcare professional. What brings you here today?",
+    );
     expect(t.hint).toMatch(/I am not a doctor/);
   });
 });
@@ -164,21 +169,24 @@ describe("the information panel shows only what the person said", () => {
     expect(text).toMatch(/Salbutamol inhaler/);
     expect(text).toMatch(/penicillin/);
     expect(text).not.toMatch(/\b(RED|ORANGE|YELLOW|GREEN|urgent|emergency|diagnos)/i);
+    // Routing information is kept separate, and only appears once the engine has decided.
+    const c = chartOf(s);
+    expect(c.routing).not.toBeNull();
+    expect(c.routing!.map((r) => r.label)).toEqual(["Navigation urgency", "Suggested service"]);
   });
 });
 
 describe("the guide's movement", () => {
-  it("is calm and serious in an emergency (no smiling)", () => {
-    for (const a of ["idle", "listening", "thinking", "speaking"] as const) {
-      expect(poseAt(3.3, a, "serious").smile).toBe(0);
-    }
+  it("is calm and serious when urgent (no smiling)", () => {
+    for (let t = 0; t < 10; t += 0.9) expect(poseAt(t, "urgent").smile).toBe(0);
   });
-  it("reduced motion keeps the head still", () => {
+  it("reduced motion keeps the head and hands still", () => {
     for (let t = 0; t < 20; t += 0.7) {
-      const p = poseAt(t, "speaking", "warm", { reducedMotion: true });
-      expect(p.headYaw).toBeCloseTo(0, 10);
-      expect(p.headPitch).toBeCloseTo(0, 10);
-      expect(p.gesture).toBeCloseTo(0, 10);
+      for (const st of ["listening", "explaining", "thinking"] as const) {
+        const p = poseAt(t, st, { reducedMotion: true });
+        expect(p.headYaw).toBeCloseTo(0, 10);
+        expect(p.gesture).toBeCloseTo(0, 10);
+      }
     }
   });
   it("blinks naturally: sometimes, briefly", () => {
@@ -188,10 +196,25 @@ describe("the guide's movement", () => {
     expect(closed).toBeLessThan(0.08);
     for (const b of samples) expect(b).toBeGreaterThanOrEqual(0);
   });
-  it("lips move only when the voice is on", () => {
-    expect(poseAt(2, "speaking", "warm", { voiceLevel: 0 }).mouth).toBe(0);
-    const moving = Array.from({ length: 50 }, (_, i) => poseAt(i / 10, "speaking", "warm", { voiceLevel: 0.85 }).mouth);
-    expect(Math.max(...moving)).toBeGreaterThan(0.2);
+  it("mostly still while listening; hands move only when explaining", () => {
+    for (let t = 0; t < 30; t += 0.5) {
+      expect(poseAt(t, "listening").gesture).toBe(0);
+      expect(Math.abs(poseAt(t, "listening").headYaw)).toBeLessThan(0.05);
+    }
+    expect(Math.max(...Array.from({ length: 60 }, (_, i) => poseAt(i / 2, "explaining").gesture))).toBeGreaterThan(0.3);
+  });
+});
+
+describe("lip-sync", () => {
+  it("closes the lips for m/b/p and opens for vowels; rests when not speaking", () => {
+    expect(visemeFor("m").mouthPress).toBeGreaterThan(0.4);
+    expect(visemeFor("a").jawOpen).toBeGreaterThan(0.2);
+    const l = new LipSync();
+    expect(l.visemeAt(1).jawOpen).toBe(0);
+    l.begin("Hello there", 0);
+    expect(Math.max(...Array.from({ length: 20 }, (_, i) => l.visemeAt(i / 40).jawOpen))).toBeGreaterThan(0.05);
+    l.end();
+    expect(l.visemeAt(0.2).jawOpen).toBe(0);
   });
 });
 
