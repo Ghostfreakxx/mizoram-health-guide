@@ -90,7 +90,7 @@ type SRInstance = {
   start: () => void;
   stop: () => void;
   abort: () => void;
-  onresult: ((e: { results: ArrayLike<ArrayLike<{ transcript: string }> & { isFinal: boolean }> }) => void) | null;
+  onresult: ((e: { results: ArrayLike<ArrayLike<{ transcript: string; confidence?: number }> & { isFinal: boolean }> }) => void) | null;
   onerror: ((e: { error: string }) => void) | null;
   onend: (() => void) | null;
   onspeechend?: (() => void) | null;
@@ -118,7 +118,17 @@ export function voiceInputSetting(): VoiceInputStatus {
 
 const LANG = "en-IN";
 
-export type ListenHandlers = { onText: (text: string, final: boolean) => void; onEnd: () => void; onError: (message: string) => void };
+export type ListenHandlers = { onText: (text: string, final: boolean, confidence?: number) => void; onEnd: () => void; onError: (message: string) => void };
+
+// Below this, the doctor shows "I heard: … Is that correct?" before the words
+// can be used. (Browsers report 0 when they give no confidence at all; those
+// words still go to the answer box for the patient to check before Send.)
+export const CONFIDENCE_FLOOR = 0.75;
+export function needsSpeechConfirmation(text: string, confidence?: number): boolean {
+  if (!text.trim()) return false;
+  if (confidence === undefined || confidence === 0) return false;
+  return confidence < CONFIDENCE_FLOOR;
+}
 
 // Starts listening. Returns a stop function. Audio handling depends on the
 // mode (see top of file). Never called without the patient pressing Talk.
@@ -147,11 +157,15 @@ export async function listen(h: ListenHandlers): Promise<() => void> {
   rec.onresult = (e) => {
     let text = "";
     let final = false;
+    let confidence: number | undefined;
     for (let i = 0; i < e.results.length; i++) {
-      text += e.results[i][0].transcript;
+      const alt = e.results[i][0];
+      text += alt.transcript;
       final = e.results[i].isFinal;
+      // the least certain part decides
+      if (e.results[i].isFinal && typeof alt.confidence === "number") confidence = confidence === undefined ? alt.confidence : Math.min(confidence, alt.confidence);
     }
-    h.onText(text.trim(), final);
+    h.onText(text.trim(), final, confidence);
   };
   rec.onerror = (e) =>
     h.onError(

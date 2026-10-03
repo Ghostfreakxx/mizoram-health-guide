@@ -16,6 +16,7 @@
 import { getDepartment } from "../ai-hospital/data/departments";
 import { DESCRIBE_OPTIONS, type Uncertain, feelingWord, isVagueConcern, metaIntent, plainMeanings, plainTerms, soundsDistressed, uncertainty } from "./consultHelp";
 import { type EducationAnswer, findEducation, isGeneralQuestion, isQuestion } from "./education";
+import { askedTerm } from "./knowledge/glossary";
 import { LEVEL_TEXT } from "./safety/language";
 import { detectRedFlags } from "./safety/detect";
 import { receive } from "./safety/reception";
@@ -116,6 +117,39 @@ export type ConsultState = {
   style: { explained: number; short: number; distressed: boolean };
   turns: number;
   mentioned: string[]; // memory lines already said ("duration")
+  // Where, structured: region and side are separate, and side is only stored
+  // once the patient has confirmed it.
+  bodySide?: Side;
+  sideHint?: "left" | "right"; // "on the right" — not yet confirmed
+  whereFirst: boolean; // "it hurts here": ask where before anything else
+  helpDescribe: boolean; // "Help me describe it" mode
+  simplePain?: Answer; // "Let's make it easier. Are you having pain?"
+  pattern?: "constant" | "comes-and-goes";
+  modifiers?: string; // what makes it better or worse, in their words
+  modifiersDone: boolean;
+  unclear: { step: string; count: number }; // consecutive misunderstandings
+  corrections: string[]; // what the patient corrected (for the summary)
+};
+
+export type Side = "left" | "right" | "both" | "middle";
+export const SIDES: Option[] = [
+  { id: "left", label: "Left" },
+  { id: "right", label: "Right" },
+  { id: "both", label: "Both sides" },
+  { id: "middle", label: "Middle" },
+];
+// Regions where the side matters.
+const LATERAL = new Set(["head", "chest", "upper-abdomen", "lower-abdomen", "back", "arms", "legs"]);
+// One clear problem group for a body region (others are offered as a list).
+const REGION_COMPLAINT: Record<string, string> = {
+  head: "headache",
+  neck: "ent",
+  chest: "heart",
+  "upper-abdomen": "stomach",
+  "lower-abdomen": "stomach",
+  back: "bones",
+  arms: "bones",
+  legs: "bones",
 };
 
 export const MAX_TEXT = 300;
@@ -157,6 +191,11 @@ export function startConsultation(department: string, intro = defaultIntro(depar
     style: { explained: 0, short: 0, distressed: false },
     turns: 0,
     mentioned: [],
+    whereFirst: false,
+    helpDescribe: false,
+    modifiersDone: false,
+    unclear: { step: "", count: 0 },
+    corrections: [],
   };
 }
 
@@ -214,7 +253,7 @@ const isOther = (s: ConsultState) => s.who === "other";
 const PAINFUL = new Set(["stomach", "headache", "bones", "injury", "heart", "mouth", "ent", "eye", "urine"]);
 const DESCRIBES = new Set(["heart", "stomach", "headache", "other"]);
 const REGION: Record<string, string> = { heart: "chest", stomach: "stomach", headache: "head" };
-const VAGUE_FEELING = /\b(strange|weird|funny|odd|not right|uncomfortable|off|different|heavy feeling|something wrong)\b/i;
+const VAGUE_FEELING = /\b(strange|weird|funny|odd|not right|uncomfortable|off|different|heavy feeling|something wrong|doing something|something (is )?(happening|going on)|acting up)\b/i;
 const QUALITY = /\b(pain|pains|painful|hurt\w*|ache\w*|pressure|tight\w*|burn\w*|heavy|sharp|dull|stabbing|squeez\w*|crushing|cramp\w*)\b/i;
 
 export const DURATION_WORDS: Record<string, string> = {
@@ -263,6 +302,108 @@ function compose(s: ConsultState, t: Turn, opts: { ack?: boolean; simple?: strin
 
 const you = (s: ConsultState, a: string, b: string) => (isOther(s) ? b : a);
 
+const SIDE_WORD: Record<string, string> = { left: "left", right: "right", both: "both sides", middle: "middle" };
+
+// Where in the body. With "on the right" (not yet a body part), the options
+// are right-side areas; the side is stored only once the patient picks one.
+function bodyTurn(s: ConsultState): Turn {
+  const side = s.sideHint;
+  if (side) {
+    const S = side === "right" ? "Right" : "Left";
+    return compose(s, {
+      step: "body",
+      say: `When you say “on the ${side}”, which part of your body do you mean?`,
+      input: {
+        kind: "body",
+        options: [
+          { id: `chest|${side}`, label: `${S} side of chest` },
+          { id: `upper-abdomen|${side}`, label: `${S} upper stomach` },
+          { id: `lower-abdomen|${side}`, label: `${S} lower stomach` },
+          { id: `back|${side}`, label: `${S} side of back` },
+          { id: `arms|${side}`, label: `${S} arm` },
+          { id: `legs|${side}`, label: `${S} leg` },
+          { id: `head|${side}`, label: `${S} side of head` },
+          { id: "other-place", label: "Somewhere else" },
+        ],
+      },
+      mood: "attentive",
+      unsure: true,
+    });
+  }
+  const say = s.helpDescribe
+    ? "That's okay. I'll help you describe it. First, where in your body do you notice the problem?"
+    : s.whereFirst
+      ? "I'm not completely sure what you mean yet. Where do you feel it? You can show me on the picture."
+      : PAINFUL.has(s.complaint ?? "")
+        ? "Where exactly does it hurt?"
+        : "Where on the body is the problem?";
+  return compose(s, {
+    step: "body",
+    say,
+    hint: "Tap the area on the body (front or back), or say it in words.",
+    input: { kind: "body", options: BODY_AREAS },
+    mood: "attentive",
+    unsure: true,
+  }, { ack: !s.helpDescribe && !s.whereFirst });
+}
+
+function sideTurn(s: ConsultState): Turn {
+  const area = label(BODY_AREAS, s.bodyArea)?.toLowerCase() ?? "there";
+  return compose(s, {
+    step: "side",
+    say: s.bodyArea === "upper-abdomen" || s.bodyArea === "lower-abdomen" ? "Thank you. Which area — the left, the right, the middle, or both sides?" : `Thank you. Which side of the ${area.replace(/ or .*/, "")}?`,
+    input: { kind: "single", options: SIDES },
+    mood: "attentive",
+    unsure: true,
+  });
+}
+
+// What it feels like — options that fit the part of the body.
+const FEELINGS: Record<string, Option[]> = {
+  chest: [
+    { id: "words:pressure", label: "Pressure" },
+    { id: "words:sharp pain", label: "Sharp pain" },
+    { id: "words:burning", label: "Burning" },
+    { id: "words:tightness", label: "Tightness" },
+    { id: "words:other", label: "Other / describe it" },
+  ],
+  head: [
+    { id: "words:pain", label: "Pain" },
+    { id: "words:dizziness", label: "Dizziness" },
+    { id: "words:weakness", label: "Weakness" },
+    { id: "words:vision trouble", label: "Vision trouble" },
+    { id: "words:other", label: "Something else" },
+  ],
+  stomach: [
+    { id: "words:pain", label: "Pain or cramps" },
+    { id: "words:burning", label: "Burning" },
+    { id: "words:feeling sick", label: "Feeling sick" },
+    { id: "words:bloated", label: "Bloated or full" },
+    { id: "words:other", label: "Something else" },
+  ],
+  default: DESCRIBE_OPTIONS.filter((o) => o.id !== "unsure").map((o) => ({ id: `words:${o.id}`, label: o.label })),
+};
+const regionOf = (s: ConsultState) =>
+  s.bodyArea === "chest" || s.complaint === "heart" ? "chest" : s.bodyArea === "head" || s.complaint === "headache" ? "head" : s.bodyArea?.endsWith("abdomen") || s.complaint === "stomach" ? "stomach" : "default";
+
+function describeTurn(s: ConsultState): Turn {
+  const region = regionOf(s);
+  const say =
+    region === "head" && !s.helpDescribe && !s.bodyDone
+      ? "Can you tell me a little more? Is it mainly pain, dizziness, weakness, vision trouble, or something else?"
+      : s.helpDescribe || s.whereFirst
+        ? "Thank you. What does it feel like?"
+        : "Can you describe what it feels like?";
+  return compose(s, {
+    step: "describe",
+    say,
+    hint: "In your own words, or tap the closest one.",
+    input: { kind: "single", options: FEELINGS[region] },
+    mood: "attentive",
+    unsure: true,
+  });
+}
+
 // The next thing the virtual guide says, and what kind of answer it needs.
 // One useful question at a time, in everyday words; anything the patient has
 // already said is not asked again.
@@ -280,29 +421,6 @@ export function nextTurn(s: ConsultState): Turn {
       mood: "warm",
     };
   }
-  if (!s.concernMore && !s.complaint && isVagueConcern(s.concernText, s.suggested)) {
-    const cantExplain = /\b(explain|describe|say)\b/i.test(s.concernText);
-    return compose(s, {
-      step: "concern-more",
-      say: cantExplain
-        ? "That's okay. Tell me what is bothering you most — for example pain, fever, breathing, cough, stomach problems, or something else."
-        : "I'm sorry you're feeling unwell. Tell me what is bothering you most right now — for example pain, fever, breathing, cough, stomach problems, or something else.",
-      hint: "Use your own words, or tap the closest one.",
-      input: {
-        kind: "single",
-        options: [
-          { id: "words:pain", label: "Pain" },
-          { id: "words:fever", label: "Fever" },
-          { id: "words:breathing problem", label: "Breathing" },
-          { id: "words:cough", label: "Cough" },
-          { id: "words:stomach problem", label: "Stomach problems" },
-          { id: "?describe", label: "Something else / I'm not sure" },
-        ],
-      },
-      mood: "warm",
-      unsure: true,
-    });
-  }
   const pending = s.pendingFlags[0];
   if (pending) {
     return compose(s, {
@@ -312,6 +430,37 @@ export function nextTurn(s: ConsultState): Turn {
       mood: "focused",
       unsure: true,
     }, { simple: getRedFlag(pending).label });
+  }
+  // "I can't explain it", "It hurts here": first, where in the body.
+  const needsWhere = (s.helpDescribe || s.whereFirst) && !s.bodyDone;
+  if (needsWhere || (s.sideHint && !s.bodyDone)) return bodyTurn(s);
+  if (s.bodyArea && LATERAL.has(s.bodyArea) && !s.bodySide && !s.unknown.side) return sideTurn(s);
+  if (!s.concernMore && !s.complaint && !s.helpDescribe && !s.whereFirst && isVagueConcern(s.concernText, s.suggested)) {
+    const cantExplain = /\b(explain|describe|say)\b/i.test(s.concernText);
+    const unclearWords = VAGUE_FEELING.test(s.concernText);
+    return compose(s, {
+      step: "concern-more",
+      say: cantExplain
+        ? "That's okay. Tell me what is bothering you most — for example pain, fever, breathing, cough, stomach problems, or something else."
+        : unclearWords
+          ? "I'm not completely sure what you mean yet. Can you tell me a little more — is it pain, fever, breathing, dizziness, stomach problems, or something else?"
+          : "I'm sorry you're feeling unwell. Tell me what is bothering you most right now — for example pain, fever, breathing, cough, stomach problems, or something else.",
+      hint: "Use your own words, tap the closest one, or tap “Help me describe it”.",
+      input: {
+        kind: "single",
+        options: [
+          { id: "words:pain", label: "Pain" },
+          { id: "words:fever", label: "Fever" },
+          { id: "words:breathing problem", label: "Breathing" },
+          { id: "words:cough", label: "Cough" },
+          { id: "words:dizzy", label: "Dizziness" },
+          { id: "words:stomach problem", label: "Stomach problems" },
+          { id: "help", label: "Help me describe it" },
+        ],
+      },
+      mood: "warm",
+      unsure: true,
+    });
   }
   if (!s.complaint) {
     const suggested = s.suggested.map(getComplaint).filter((c): c is NonNullable<typeof c> => !!c);
@@ -328,32 +477,46 @@ export function nextTurn(s: ConsultState): Turn {
       unsure: true,
     }, { ack: true });
   }
-  if (DESCRIBES.has(s.complaint) && !s.describeDone && VAGUE_FEELING.test(s.concernText) && !QUALITY.test(s.concernText)) {
+  const vagueFeeling = VAGUE_FEELING.test(s.concernText) && !QUALITY.test(s.concernText);
+  if (!s.describeDone && (s.helpDescribe || s.whereFirst || (DESCRIBES.has(s.complaint) && vagueFeeling))) return describeTurn(s);
+  if (s.unknown.describe && !s.simplePain && !s.unknown.simplePain) {
     return compose(s, {
-      step: "describe",
-      say: "Can you describe what it feels like?",
-      hint: "In your own words, or tap the closest one.",
-      input: { kind: "single", options: DESCRIBE_OPTIONS.map((o) => ({ id: o.id === "unsure" ? "?describe" : `words:${o.id}`, label: o.label })) },
+      step: "simple-pain",
+      say: "That's okay. Let's make it easier. Are you having pain?",
+      input: { kind: "single", options: YES_NO },
       mood: "attentive",
       unsure: true,
-    }, { ack: true });
+    });
   }
-  if (ASKS_BODY.has(s.complaint) && !s.bodyDone) {
-    return compose(s, {
-      step: "body",
-      say: PAINFUL.has(s.complaint) ? "Where exactly does it hurt?" : "Where on the body is the problem?",
-      hint: "Tap the area on the body, or say it in words. You can skip this.",
-      input: { kind: "body", options: BODY_AREAS },
-      mood: "attentive",
-      unsure: true,
-    }, { ack: true });
-  }
+  if (ASKS_BODY.has(s.complaint) && !s.bodyDone) return bodyTurn(s);
+  if (s.bodyArea && LATERAL.has(s.bodyArea) && !s.bodySide && !s.unknown.side) return sideTurn(s);
   // Asked early, because later questions depend on how long it has been.
   if (!s.duration && !s.unknown.duration) {
     return compose(s, {
       step: "duration",
-      say: PAINFUL.has(s.complaint) && QUALITY.test(s.concernText) ? "When did the pain start?" : "When did this start?",
+      say: PAINFUL.has(s.complaint) && (QUALITY.test(s.concernText) || QUALITY.test(s.description ?? "") || s.simplePain === "yes") ? "When did the pain start?" : "When did this start?",
       input: { kind: "single", options: DURATIONS.map((d) => ({ id: d.id, label: d.label })) },
+      mood: "attentive",
+      unsure: true,
+    }, { ack: true });
+  }
+  // Help-me-describe-it: two more questions a doctor usually asks about a
+  // symptom. They go into the summary only; they never change urgency.
+  if (s.helpDescribe && !s.pattern && !s.unknown.pattern) {
+    return compose(s, {
+      step: "pattern",
+      say: "Is it there all the time, or does it come and go?",
+      input: { kind: "single", options: [{ id: "constant", label: "All the time" }, { id: "comes-and-goes", label: "It comes and goes" }] },
+      mood: "attentive",
+      unsure: true,
+    }, { ack: true });
+  }
+  if (s.helpDescribe && !s.modifiersDone) {
+    return compose(s, {
+      step: "modifiers",
+      say: "Does anything make it better or worse — for example resting, moving, eating, or lying down?",
+      hint: "In your own words. You can say “nothing” or “not sure”.",
+      input: { kind: "text", placeholder: "For example: worse when I walk, better when I rest", optional: true, maxLength: MAX_TEXT },
       mood: "attentive",
       unsure: true,
     }, { ack: true });
@@ -609,6 +772,7 @@ function respondCore(s: ConsultState, step: string, value: string | string[]): C
   if (s.emergency) return s;
 
   if (step === "concern-more") {
+    if (one === "help" || unsure === "Could not describe") return { ...s, concernMore: true, helpDescribe: true };
     if (unsure) return { ...s, concernMore: true };
     const more = clip(one.startsWith("words:") ? one.slice(6) : one);
     if (!more) return s;
@@ -628,21 +792,47 @@ function respondCore(s: ConsultState, step: string, value: string | string[]): C
 
   if (step === "describe") {
     if (unsure) return { ...s, describeDone: true, unknown: { ...s.unknown, describe: unsure } };
+    if (one === "words:other") return s; // the patient will type it
     const opt = DESCRIBE_OPTIONS.find((o) => `words:${o.id}` === one);
-    const words = clip(opt ? opt.label : one);
+    const words = clip(opt ? opt.label : one.startsWith("words:") ? one.slice(6) : one);
     if (!words) return s;
     const next = { ...s, describeDone: true, description: words };
     // Safety first: the words alone, then the words in context ("pressure" in
     // the chest). A match in context is confirmed with the patient.
     const direct = withTextFlags(next, words);
     if (direct.emergency) return direct;
-    const region = s.complaint ? REGION[s.complaint] : undefined;
+    const region = regionOf(s) === "default" ? (s.complaint ? REGION[s.complaint] : undefined) : regionOf(s);
     if (!region) return direct;
+    const ctxFlags: RedFlagId[] = [];
     const feeling = opt ? opt.words : feelingWord(words);
-    if (!feeling) return direct;
-    const d = detectRedFlags(`${region} ${feeling}`);
-    const ctxFlags = [...d.confirmed, ...d.needsConfirmation].filter((f) => !s.dismissedFlags.includes(f) && !direct.pendingFlags.includes(f));
-    return ctxFlags.length ? { ...direct, pendingFlags: [...direct.pendingFlags, ...ctxFlags] } : direct;
+    if (feeling) {
+      const d = detectRedFlags(`${region} ${feeling}`);
+      ctxFlags.push(...d.confirmed, ...d.needsConfirmation);
+    }
+    // Weakness or trouble seeing, about the head: check for stroke signs.
+    if (region === "head" && /\b(weak\w*|vision|sight|see|seeing|blurr\w*|numb\w*|speech|slurr\w*)\b/i.test(words)) ctxFlags.push("stroke");
+    const fresh = [...new Set(ctxFlags)].filter((f) => !s.dismissedFlags.includes(f) && !direct.pendingFlags.includes(f));
+    return fresh.length ? { ...direct, pendingFlags: [...direct.pendingFlags, ...fresh] } : direct;
+  }
+
+  if (step === "help-describe") return { ...s }; // already switched on by startHelpDescribe
+  if (step === "simple-pain") {
+    if (unsure) return { ...s, unknown: { ...s.unknown, simplePain: unsure } };
+    return one === "yes" || one === "no" ? { ...s, simplePain: one } : s;
+  }
+  if (step === "side") {
+    if (unsure) return { ...s, unknown: { ...s.unknown, side: unsure } };
+    return SIDES.some((x) => x.id === one) ? { ...s, bodySide: one as Side, sideHint: undefined } : s;
+  }
+  if (step === "pattern") {
+    if (unsure) return { ...s, unknown: { ...s.unknown, pattern: unsure } };
+    return one === "constant" || one === "comes-and-goes" ? { ...s, pattern: one } : s;
+  }
+  if (step === "modifiers") {
+    if (unsure) return { ...s, modifiersDone: true, unknown: { ...s.unknown, modifiers: unsure } };
+    const words = clip(one);
+    const none = /^(no|nothing|none|nope|not really|nothing i'?ve noticed)\.?$/i.test(words);
+    return { ...s, modifiersDone: true, modifiers: words ? (none ? "Nothing noticed" : words) : undefined };
   }
 
   if (step === "concern") {
@@ -662,6 +852,18 @@ function respondCore(s: ConsultState, step: string, value: string | string[]): C
       answers: { ...r.prefill, ...s.answers },
       prefilled: Object.keys(r.prefill),
     };
+    // "It hurts here", "on the right": where comes first (never guessed).
+    // "I can't explain it": the patient gets help to describe it.
+    const t = text.toLowerCase().replace(/[’‘]/g, "'");
+    const noPart = !bodyFromWords(t) && !next.suggested.length;
+    const side = sideFromWords(t);
+    if (noPart && (/\b(here|over here|this (spot|area|place|part|side)|right there)\b/.test(t) || side === "left" || side === "right")) {
+      next.whereFirst = true;
+      if (side === "left" || side === "right") next.sideHint = side;
+    }
+    if (!next.suggested.length && /\b(can'?t|cannot|unable to) (explain|describe|say)\b|\bdon'?t know what'?s wrong\b/.test(t) && !/\bdon'?t (really )?know how to\b/.test(t)) {
+      next.helpDescribe = true;
+    }
     const kept = r.duration ? { ...next, remembered: [...next.remembered, "duration"] } : next;
     const distressed = soundsDistressed(text)
       ? { ...kept, style: { ...kept.style, distressed: true }, notes: ["I can hear this is hard. I'll keep my questions short."] }
@@ -716,13 +918,23 @@ function respondCore(s: ConsultState, step: string, value: string | string[]): C
   }
 
   if (step === "body") {
-    if (unsure) return { ...s, bodyDone: true, bodyArea: undefined, unknown: { ...s.unknown, body: unsure } };
-    if (one === "skip") return { ...s, bodyDone: true, bodyArea: undefined };
-    if (one.startsWith("words:")) {
-      const words = clip(one.slice(6));
-      return words ? { ...s, bodyDone: true, bodyWords: words } : s;
-    }
-    return BODY_AREAS.some((b) => b.id === one) ? { ...s, bodyDone: true, bodyArea: one } : s;
+    if (unsure) return { ...s, bodyDone: true, bodyArea: undefined, sideHint: undefined, unknown: { ...s.unknown, body: unsure } };
+    if (one === "skip") return { ...s, bodyDone: true, bodyArea: undefined, sideHint: undefined };
+    // "on the right" without a body part: ask which part (never guessed).
+    if (one.startsWith("side:")) return { ...s, sideHint: one.slice(5) === "left" ? "left" : "right" };
+    if (one === "other-place") return { ...s, sideHint: undefined };
+    const [region, side] = one.split("|");
+    if (!BODY_AREAS.some((b) => b.id === region)) return s;
+    const placed: ConsultState = {
+      ...s,
+      bodyDone: true,
+      bodyArea: region,
+      bodySide: SIDES.some((x) => x.id === side) ? (side as Side) : s.bodySide,
+      sideHint: undefined,
+    };
+    // The region can tell us the problem group; nothing is inferred beyond that.
+    if (!placed.complaint && REGION_COMPLAINT[region] && !placed.suggested.length) return withComplaint({ ...placed, suggested: [REGION_COMPLAINT[region]] });
+    return placed;
   }
 
   if (step.startsWith("q:")) {
@@ -910,7 +1122,19 @@ export function interpretText(turn: Turn, text: string): string | string[] | nul
   }
   if (step === "body") {
     const area = bodyFromWords(t);
-    if (area) return area;
+    const side = sideFromWords(t);
+    if (area) return side && side !== "middle" && side !== "both" && LATERAL.has(area) ? `${area}|${side}` : area;
+    if (side === "left" || side === "right") return `side:${side}`;
+  }
+  if (step === "side") {
+    const side = sideFromWords(t);
+    if (side) return side;
+  }
+  if (step === "simple-pain") return yesNo(t);
+  if (step === "pattern") {
+    if (/\b(all the time|constant\w*|always|non ?stop|doesn'?t stop|continuous\w*)\b/.test(t)) return "constant";
+    if (/\b(comes and goes|on and off|off and on|sometimes|now and then|comes? back|goes away)\b/.test(t)) return "comes-and-goes";
+    return null;
   }
   if (step === "duration") {
     if (/\b(today|this morning|tonight|few hours|hours)\b/.test(t)) return "today";
@@ -937,8 +1161,7 @@ export function interpretText(turn: Turn, text: string): string | string[] | nul
       return label && (t === label || t.includes(label) || label.split(" ").filter((w) => w.length > 3).some((w) => t.includes(w)));
     });
     if (hits.length === 1) return hits[0].id;
-    // Where, in the patient's own words ("here on the right side") — kept as said.
-    if (inp.kind === "body" && /\b(left|right|side|top|bottom|middle|centre|center|here|near|below|above|under)\b/.test(t)) return `words:${text.trim()}`;
+    // Anything else about "where" is clarified with the body map — never guessed.
     return null;
   }
   return null;
@@ -956,15 +1179,35 @@ const BODY_WORDS: [RegExp, string][] = [
   [/\b(leg|legs|foot|feet|knee|knees|ankle|hip|thigh|toe|toes)\b/, "legs"],
   [/\b(all over|everywhere|whole body|many places)\b/, "all-over"],
 ];
+function sideFromWords(t: string): Side | null {
+  const said = (w: string) => new RegExp(`\\b${w}\\b`).test(t);
+  if (said("both") || said("both sides")) return "both";
+  if (said("middle") || said("centre") || said("center")) return "middle";
+  if (said("left") && !said("right")) return "left";
+  if (said("right") && !said("left") && !/\bthat'?s right\b|\bright now\b|\ball right\b/.test(t)) return "right";
+  return null;
+}
+
 function bodyFromWords(t: string): string | null {
+  // "lower right side of my stomach" — upper/lower said anywhere near a tummy word
+  if (/\b(stomach|tummy|belly|abdomen)\b/.test(t)) {
+    if (/\b(lower|bottom|below)\b/.test(t)) return "lower-abdomen";
+    if (/\b(upper|top|above)\b/.test(t)) return "upper-abdomen";
+  }
   const hits = BODY_WORDS.filter(([re]) => re.test(t)).map(([, id]) => id);
   return hits.length === 1 ? hits[0] : null;
 }
 
+// "Help me describe it": the doctor walks through where → what it feels like
+// → when → all the time or comes and goes → how strong → what changes it.
+export function startHelpDescribe(s: ConsultState): ConsultState {
+  if (s.emergency) return s;
+  if (s.concernText === undefined) return respond(s, "concern", "I can't explain it");
+  return respond({ ...s, helpDescribe: true, concernMore: true }, "help-describe", "start");
+}
+
 // ---------------- Helping the patient: explain, why, education ----------------
 
-export const UNKNOWN_LINE =
-  "I don't have enough information to answer that safely. A doctor, nurse or health worker can answer it properly — I can include it in your summary. Shall we carry on?";
 export const AGE_HELP_LINE = "That's okay — an approximate age is fine. For example, is it a baby, a child, an adult, or someone over 60?";
 
 // Re-says the current question in everyday words.
@@ -1031,35 +1274,120 @@ export function whyLine(turn: Turn): string {
   return lines[step] ?? "It helps prepare a useful summary for a healthcare professional.";
 }
 
+// Three different kinds of difficulty — none of them is a reason to send the
+// patient to a helpline. Only clinical reasons do that (see lib/escalation.ts).
+export type Difficulty = "language" | "missing" | "knowledge";
+
 export type Outcome =
   | { kind: "answered"; state: ConsultState } // the consultation moved on (or an emergency opened)
   | { kind: "explain"; state: ConsultState; line: string }
   | { kind: "why"; line: string }
   | { kind: "repeat" }
+  | { kind: "term"; line: string } // "What does allergy mean?"
   | { kind: "education"; answer: EducationAnswer }
-  | { kind: "unknown-question"; line: string }
-  | { kind: "unclear"; state: ConsultState; line: string };
+  | { kind: "corrected"; state: ConsultState; line: string } // "I said left, not right"
+  | { kind: "professional"; line: string } // the patient asks for a real doctor
+  | { kind: "unclear"; state: ConsultState; line: string; difficulty: Difficulty };
+
+export const KNOWLEDGE_LINE = "I don't have verified information about that in my health guide yet, and I don't want to guess about medical information.";
+// Kept for older callers; the same honest knowledge limitation.
+export const UNKNOWN_LINE = `${KNOWLEDGE_LINE} Let's carry on with your consultation.`;
+export const PROFESSIONAL_LINE =
+  "Of course. Speaking with a real doctor or health worker is always your choice. I can prepare a summary of what you've told me so far to take with you. You can see the ways to reach one now, or we can carry on so the summary is more complete.";
+
+const MISSING_LINE: Record<string, string> = {
+  body: "I need to know where the problem is before I can guide you further. Can you show me on the picture, or tell me the part of the body?",
+  side: "I need to know which side it is on. Please tap left, right, middle or both — or “I'm not sure”.",
+  describe: "I need a little more about how it feels before I can guide you further. Tap the closest one, or tell me in your own words.",
+  "concern-more": "I need to know a little more about what is bothering you. You can tap one of the choices, or “Help me describe it”.",
+};
+
+// The clarification ladder: say it another way → simplify → make it easier.
+function clarify(s: ConsultState, turn: Turn, extra = ""): { state: ConsultState; line: string; difficulty: Difficulty } {
+  const count = s.unclear.step === turn.step ? s.unclear.count + 1 : 1;
+  const state = { ...s, unclear: { step: turn.step, count } };
+  const missing = MISSING_LINE[turn.step];
+  if (missing && count < 3 && turn.step !== "concern-more") return { state, line: `${extra}${missing}`, difficulty: "missing" };
+  if (count === 1) {
+    return { state, line: `${extra}I didn't quite understand that. Could you say it another way, or choose one of the answers below?`, difficulty: missing ? "missing" : "language" };
+  }
+  if (count === 2) {
+    return { state: { ...state, style: { ...state.style, explained: state.style.explained + 1 } }, line: `${extra}I'm not completely sure I understood. Let me ask that another way. ${explainLine(turn, s)}`, difficulty: "language" };
+  }
+  const easier =
+    turn.step === "concern" || turn.step === "concern-more"
+      ? "Let's make it easier. Tap “Help me describe it”, and I'll ask about it one small step at a time."
+      : turn.unsure
+        ? "Let's make it easier. Just tap the answer that is closest — or tap “I'm not sure”, and we'll carry on."
+        : "Let's make it easier. Just tap the answer that is closest.";
+  return { state, line: `${extra}${easier}`, difficulty: "language" };
+}
+
+const CORRECTION = /\b(actually|i said|i meant|i mean|not (the )?(left|right)|correction|change (it|that)|i made a mistake|that'?s wrong|sorry,? (it'?s|i meant))\b/i;
+
+// "Actually, I said left, not right." — the patient's correction replaces
+// what was stored, and the doctor says what she changed.
+function correction(s: ConsultState, text: string): { state: ConsultState; line: string } | null {
+  const t = text.toLowerCase().replace(/[’‘]/g, "'");
+  if (!CORRECTION.test(t)) return null;
+  // Sides: "not right" removes right; the remaining side is the correction.
+  const negated = new Set([...t.matchAll(/\bnot (?:the )?(left|right)\b/g)].map((m) => m[1]));
+  const sides = (["left", "right", "middle", "both"] as const).filter((x) => new RegExp(`\\b${x}\\b`).test(t) && !negated.has(x));
+  if ((s.bodySide || s.sideHint || s.bodyArea) && sides.length === 1) {
+    const side = sides[0];
+    const next = s.bodyArea ? { ...s, bodySide: side, sideHint: undefined } : { ...s, sideHint: side === "left" || side === "right" ? side : undefined };
+    return { state: { ...next, corrections: [...s.corrections, `Side changed to ${SIDE_WORD[side]}`] }, line: `Okay. I've changed that to the ${SIDE_WORD[side]}${side === "both" || side === "middle" ? "" : " side"}.` };
+  }
+  const area = bodyFromWords(t);
+  if (area && s.bodyDone) {
+    return {
+      state: { ...s, bodyArea: area, bodySide: undefined, corrections: [...s.corrections, `Place changed to ${label(BODY_AREAS, area)}`] },
+      line: `Okay. I've changed that to: ${label(BODY_AREAS, area)?.toLowerCase()}.`,
+    };
+  }
+  const d = receive(text).duration ?? (/\b(today|this morning)\b/.test(t) ? "today" : /\byesterday\b/.test(t) ? "1-3-days" : undefined);
+  if (d && (s.duration || s.unknown.duration)) {
+    const unknown = { ...s.unknown };
+    delete unknown.duration;
+    return { state: { ...s, duration: d, unknown, corrections: [...s.corrections, "Start time changed"] }, line: `Okay. I've changed that: it started ${DURATION_WORDS[d]}.` };
+  }
+  return null;
+}
+
+const WANTS_PROFESSIONAL = /\b(real|human|actual|proper) (doctor|person|nurse)\b|\b(talk|speak) to (a |an )?(doctor|nurse|human|person|someone real)\b|\bsee a doctor (now|today)\b/i;
 
 const shortAnswer = (s: ConsultState, words: string): ConsultState => {
   const short = words.split(/\s+/).filter(Boolean).length <= 3 ? s.style.short + 1 : 0;
   return short === s.style.short ? s : { ...s, style: { ...s.style, short } };
 };
+const understood = (s: ConsultState): ConsultState => (s.unclear.count ? { ...s, unclear: { step: "", count: 0 } } : s);
 
 // Everything the patient types or says goes through here. Order matters:
 //  1. safety (red flags) — always first, can open an emergency at any step
-//  2. "what does that mean?" / "why are you asking?" / "say that again"
-//  3. "I don't know", "I forgot", "I can't explain" — valid answers
+//  2. corrections, "I want a real doctor", "what does that word mean?",
+//     "what does this mean?" / "why are you asking?" / "say that again"
+//  3. "I don't know", "I forgot", "I can't explain it" — valid answers
 //  4. an answer to the current question
-//  5. a general health question → verified education, or an honest
-//     "I don't have enough information to answer that safely"
-//  6. otherwise: ask again, gently
+//  5. a general health question → verified knowledge, or an honest
+//     "I don't have verified information about that yet"
+//  6. otherwise: the clarification ladder. Never a helpline.
 export function converse(s: ConsultState, turn: Turn, text: string): Outcome {
   if (s.emergency) return { kind: "answered", state: s };
   const words = clip(text);
-  if (!words) return { kind: "unclear", state: s, line: UNCLEAR_LINE };
+  if (!words) return { kind: "unclear", ...clarify(s, turn) };
 
   const flagged = withTextFlags(s, words);
   if (flagged !== s) return { kind: "answered", state: absorb(flagged, words) };
+
+  const fix = correction(s, words);
+  if (fix) return { kind: "corrected", state: fix.state, line: fix.line };
+  if (WANTS_PROFESSIONAL.test(words)) return { kind: "professional", line: PROFESSIONAL_LINE };
+
+  const term = askedTerm(words);
+  // A fuller verified answer wins over the one-line glossary meaning.
+  const fuller = term && isGeneralQuestion(words) ? findEducation(words) : null;
+  if (fuller) return { kind: "education", answer: fuller };
+  if (term) return { kind: "term", line: `“${term.term.charAt(0).toUpperCase()}${term.term.slice(1)}” means ${term.meaning}.` };
 
   let meta = metaIntent(words);
   // "I don't know how to explain it" at the start is an answer, not a request.
@@ -1074,7 +1402,7 @@ export function converse(s: ConsultState, turn: Turn, text: string): Outcome {
   if (turn.step === "concern") {
     if (general) {
       const e = findEducation(words);
-      return e ? { kind: "education", answer: e } : { kind: "unknown-question", line: UNKNOWN_LINE };
+      return e ? { kind: "education", answer: e } : { kind: "unclear", state: s, line: `${KNOWLEDGE_LINE} What brought you here today?`, difficulty: "knowledge" };
     }
     return { kind: "answered", state: respond(shortAnswer(s, words), "concern", words) };
   }
@@ -1092,23 +1420,24 @@ export function converse(s: ConsultState, turn: Turn, text: string): Outcome {
   if (u && turn.unsure) {
     const value = u === "Not remembered" ? "?forgot" : u === "Could not describe" ? "?describe" : "?unsure";
     const next = respond(s, turn.step, value);
-    if (next !== s) return { kind: "answered", state: next };
+    if (next !== s) return { kind: "answered", state: understood(next) };
   }
   if (u && turn.step === "age") return { kind: "explain", state: s, line: AGE_HELP_LINE };
 
   const value = interpretText(turn, words);
   if (value !== null) {
-    const next = respond(shortAnswer(s, words), turn.step, value);
-    if (next !== shortAnswer(s, words)) return { kind: "answered", state: absorb(next, words) };
+    const base = shortAnswer(s, words);
+    const next = respond(base, turn.step, value);
+    if (next !== base) return { kind: "answered", state: understood(absorb(next, words)) };
   }
 
-  // A question that is not an answer (and not in the verified list).
-  if (general || isQuestion(words)) return { kind: "unknown-question", line: UNKNOWN_LINE };
+  // A question that is not an answer, and not in the verified knowledge.
+  if (general || isQuestion(words)) {
+    return { kind: "unclear", state: s, line: `${KNOWLEDGE_LINE} Let's carry on. ${turn.question ?? turn.say}`, difficulty: "knowledge" };
+  }
 
   // Not understood — but facts mentioned on the way are still remembered.
-  const kept = absorb(s, words);
-  const help = s.style.explained > 0 || u ? ` ${explainLine(turn, s)}` : "";
-  return { kind: "unclear", state: kept, line: `${UNCLEAR_LINE}${help}` };
+  return { kind: "unclear", ...clarify(absorb(s, words), turn) };
 }
 
 export type TextResult = { state: ConsultState; understood: boolean };
@@ -1166,7 +1495,15 @@ export function chartOf(s: ConsultState): Chart {
     );
   }
   if (s.description || s.unknown.describe) reported.push(row("How it feels", s.description && `${s.description} (patient's words)`, "describe"));
-  if (s.complaint && ASKS_BODY.has(s.complaint)) reported.push(row("Where", label(BODY_AREAS, s.bodyArea) ?? (s.bodyWords && `${s.bodyWords} (patient's words)`), "body"));
+  if ((s.complaint && ASKS_BODY.has(s.complaint)) || s.bodyArea || s.whereFirst || s.helpDescribe) {
+    const where = label(BODY_AREAS, s.bodyArea);
+    const side = s.bodySide ? ` — ${SIDE_WORD[s.bodySide]}${s.bodySide === "left" || s.bodySide === "right" ? " side" : ""}` : "";
+    reported.push(row("Where", where ? `${where}${side}` : s.bodyWords && `${s.bodyWords} (patient's words)`, "body"));
+  }
+  if (s.simplePain || s.unknown.simplePain) reported.push(row("Pain", s.simplePain === "yes" ? "Yes" : s.simplePain === "no" ? "No" : undefined, "simplePain"));
+  if (s.pattern || s.unknown.pattern) reported.push(row("Pattern", s.pattern === "constant" ? "All the time" : s.pattern ? "Comes and goes" : undefined, "pattern"));
+  if (s.modifiersDone) reported.push(row("Better or worse with", s.modifiers, "modifiers"));
+  if (s.corrections.length) reported.push(row("Corrected by patient", s.corrections.join("; ")));
   reported.push(
     row("Duration", label(DURATIONS, s.duration) && `${label(DURATIONS, s.duration)}${s.remembered.includes("duration") ? " (from what you said)" : ""}`, "duration"),
     row("Change", label(PROGRESSIONS, s.progression), "progression"),

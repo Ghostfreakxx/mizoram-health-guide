@@ -3,54 +3,19 @@
 // means when they are unsure, confused, or asking something else.
 //
 // Nothing here decides urgency. Explanations only re-say a question in
-// everyday words (a small glossary of common terms); reasons never reveal
+// everyday words (the glossary in knowledge/glossary.ts); reasons never reveal
 // scoring. Only what the patient actually says is used: no guessing about
 // education, intelligence, diagnosis or feelings beyond their own words.
 
 // ---------------- Plain-English glossary ----------------
 
-// Everyday meaning of words that appear in the questions.
-const GLOSSARY: [RegExp, string][] = [
-  [/\b(short of breath|breathless\w*|difficulty breathing|hard to breathe|breathing difficulty)\b/i, "it feels difficult to breathe, or you feel you are not getting enough air"],
-  [/\b(breathing (very )?fast|fast breathing|breathing faster)\b/i, "taking many quick breaths, more than usual, even when resting"],
-  [/\bchest (pull|pulls) in\b/i, "the skin between or below the ribs sinks in with each breath"],
-  [/\b(wheez\w*)\b/i, "a whistling sound when breathing out"],
-  [/\b(tight|tightness)\b/i, "a squeezing or pressing feeling"],
-  [/\bpressure\b/i, "a heavy, pressing or squeezing feeling"],
-  [/\b(fits|seizures?|convulsions?)\b/i, "sudden shaking of the body that cannot be controlled, or suddenly going stiff and not responding"],
-  [/\bfever\b/i, "the body feels hotter than normal, sometimes with shivering"],
-  [/\b(shivering|chills)\b/i, "feeling cold and shaking, even when it is not cold"],
-  [/\bvomit\w*\b/i, "throwing up — food or liquid coming back out of the mouth"],
-  [/\bdiarrh\w*\b/i, "loose, watery stools (toilet) many times a day"],
-  [/\bstools?\b/i, "what comes out when you go to the toilet"],
-  [/\burine\b/i, "pee (passing water)"],
-  [/\bdizzy\b|\bdizziness\b/i, "feeling light-headed, faint, or as if the room is spinning"],
-  [/\bconfus\w*\b/i, "not thinking clearly, not knowing where they are, or not making sense"],
-  [/\bfloppy\b/i, "the body is weak and loose, like a rag doll"],
-  [/\bstiff neck\b/i, "the neck hurts and is hard to bend forward"],
-  [/\brash that does not fade\b/i, "spots on the skin that stay red when you press on them"],
-  [/\b(irregular|pounding) heartbeat\b|\bheartbeat\b/i, "the heart feels like it is racing, thumping, or skipping beats"],
-  [/\bswollen|swelling\b/i, "puffed up, bigger than normal"],
-  [/\bnight sweats?\b/i, "waking up wet with sweat at night"],
-  [/\b(weight loss|losing weight)\b/i, "getting thinner without trying to"],
-  [/\bcontractions?\b/i, "the belly tightening again and again with pain, as happens in labour"],
-  [/\bdischarge\b/i, "fluid coming out of the body, for example from the vagina or a wound"],
-  [/\bwater (has )?broken\b|\bwater broken\b/i, "a gush or steady leak of fluid from the vagina during pregnancy"],
-  [/\bblood pressure\b/i, "the pressure of blood in the body, measured with a cuff on the arm"],
-  [/\bjhum\b/i, "shifting-cultivation fields"],
-  [/\bnumb\w*\b/i, "loss of feeling, like pins and needles"],
-  [/\bweak(ness)?\b/i, "less strength than normal"],
-  [/\bimmun\w*\b/i, "the body's defence against infection is weaker than usual, for example because of HIV, cancer treatment or steroid medicines"],
-  [/\b(dehydrat\w*|very dry mouth)\b/i, "the body has lost too much water"],
-  [/\b(yellow eyes|yellow skin)\b/i, "the white of the eyes or the skin looks yellow"],
-  [/\bphlegm|sputum\b/i, "the thick mucus you cough up"],
-];
+import { GLOSSARY } from "./knowledge/glossary";
 
 export function plainTerms(text: string): { term: string; meaning: string }[] {
   const out: { term: string; meaning: string }[] = [];
-  for (const [re, meaning] of GLOSSARY) {
-    const m = text.match(re);
-    if (m && !out.some((o) => o.meaning === meaning)) out.push({ term: m[0].toLowerCase(), meaning });
+  for (const g of GLOSSARY) {
+    const m = text.match(g.match);
+    if (m && !out.some((o) => o.meaning === g.meaning)) out.push({ term: m[0].toLowerCase(), meaning: g.meaning });
     if (out.length >= 3) break;
   }
   return out;
@@ -74,7 +39,7 @@ export function feelingWord(text: string): string | null {
 
 export type Meta = "explain" | "why" | "repeat";
 
-const EXPLAIN = /\b(i don'?t understand|i do not understand|don'?t get it|what do you mean|what does (that|this|it) mean|meaning\??$|explain( that| please| it)?$|not clear|confus(ed|ing)|what is that\??$|huh\??$|pardon\??$|say (it|that) (more )?simpl\w*)\b/;
+const EXPLAIN = /\b(i don'?t understand|i do not understand|don'?t get it|what do you mean|what does (that|this|it)( word| term)? mean|what do (those|these) words mean|meaning\??$|explain( that| please| it)?$|not clear|confus(ed|ing)|what is that\??$|huh\??$|pardon\??$|say (it|that) (more )?simpl\w*)\b/;
 const WHY = /\b(why (are|do) you (ask|need|want)\w*|why (does|is) (that|this|it) (matter|important)|why that question|why do you need to know|what is this for)\b/;
 const REPEAT = /^(repeat|say (it|that) again|again please|come again|sorry\??|what\??)$/;
 

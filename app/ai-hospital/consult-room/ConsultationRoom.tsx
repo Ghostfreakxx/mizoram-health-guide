@@ -2,7 +2,8 @@
 
 import dynamic from "next/dynamic";
 import { Component, type ReactNode, useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { type ConsultState, type Turn, BODY_AREAS, chartOf, converse, explainLine, nextTurn, respond, startConsultation, toAnswers, whyLine } from "../../lib/consultation";
+import { type ConsultState, type Turn, BODY_AREAS, chartOf, converse, explainLine, nextTurn, respond, startConsultation, startHelpDescribe, toAnswers, whyLine } from "../../lib/consultation";
+import { termsIn } from "../../lib/knowledge/glossary";
 import type { EducationAnswer } from "../../lib/education";
 import { hasConsent, loadPassport } from "../../lib/storage";
 import { DEMO_SCENARIOS, demoAnswer } from "../../lib/demoScenarios";
@@ -24,7 +25,7 @@ import JourneyBar, { type JourneyStep } from "./JourneyBar";
 import PatientChart from "./PatientChart";
 import type { ChartLine } from "./Room3D";
 import type { RoomStyle } from "./rooms";
-import { type SpeechOutput, VOICE_CONSENT_TEXT, browserSpeech, listen, voiceInputSetting } from "./voice";
+import { type SpeechOutput, VOICE_CONSENT_TEXT, browserSpeech, listen, needsSpeechConfirmation, voiceInputSetting } from "./voice";
 
 // The 3D room is only downloaded once a consultation room is opened (or
 // warmed up by preload.ts when the person points at a link to it).
@@ -78,6 +79,9 @@ function Toggle({ on, onClick, children }: { on: boolean; onClick: () => void; c
     </button>
   );
 }
+
+// Steps where the patient is still describing the problem.
+const SYMPTOM_STEPS = new Set(["concern", "concern-more", "complaint", "describe", "body", "side", "simple-pain"]);
 
 const UNSURE_LABEL: Record<string, string> = { "?unsure": "I'm not sure", "?forgot": "I don't remember", "?describe": "I can't describe it" };
 
@@ -160,6 +164,8 @@ export default function ConsultationRoom({ room }: { room: RoomStyle }) {
   const [demo, setDemo] = useState<string | null>(null);
   const [fromReception, setFromReception] = useState<string | null>(null);
   const [education, setEducation] = useState<EducationAnswer | null>(null);
+  const [wantsProfessional, setWantsProfessional] = useState(false);
+  const [heard, setHeard] = useState<string | null>(null); // uncertain speech awaiting confirmation
   const [tempUnit, setTempUnit] = useState<"C" | "F">("C");
   const [tempValue, setTempValue] = useState("");
   // From the Health Passport — only when the patient has turned saving on.
@@ -384,9 +390,12 @@ export default function ConsultationRoom({ room }: { room: RoomStyle }) {
 
   // The doctor replies without moving the consultation on (an explanation,
   // a reason, education, or "could you say that another way?").
+  // Listening → a short thinking pause → clarifying: calm and attentive,
+  // never "concerned" just because something was hard to understand.
   const reply = (lines: Said[], noteText?: string) => {
     setNote(noteText ?? "");
-    speak(lines, "listening");
+    setDoctor("processing");
+    speak(lines, "listening", { delay: reducedMotion ? 250 : 650 });
   };
   // Keeps style/memory changes without adding a step to go "Back" to.
   const replaceState = (next: ConsultState) => setHistory((h) => (next === h[h.length - 1] ? h : [...h.slice(0, -1), next]));
@@ -396,6 +405,16 @@ export default function ConsultationRoom({ room }: { room: RoomStyle }) {
     replaceState({ ...state, style: { ...state.style, explained: state.style.explained + 1 } });
     const line = explainLine(turn, state);
     reply([{ text: line, state: "clarifying" }], line);
+  };
+  const meaningNow = (term: string, meaning: string) => {
+    stopSpeaking();
+    const line = `“${term.charAt(0).toUpperCase()}${term.slice(1)}” means ${meaning}.`;
+    reply([{ text: line, state: "clarifying" }], line);
+  };
+  const helpMeDescribe = () => {
+    stopSpeaking();
+    const next = startHelpDescribe(state);
+    if (next !== state) commit(next, "Help me describe it");
   };
   const whyNow = () => {
     stopSpeaking();
@@ -420,7 +439,15 @@ export default function ConsultationRoom({ room }: { room: RoomStyle }) {
       replaceState(o.state);
       return reply([{ text: o.line, state: "clarifying" }], o.line);
     }
-    if (o.kind === "why" || o.kind === "unknown-question") return reply([{ text: o.line, state: "clarifying" }], o.line);
+    if (o.kind === "why" || o.kind === "term") return reply([{ text: o.line, state: "clarifying" }], o.line);
+    if (o.kind === "corrected") {
+      replaceState(o.state);
+      return reply([{ text: o.line, state: "clarifying" }, { text: nextTurn(o.state).question ?? nextTurn(o.state).say, state: "asking" }], o.line);
+    }
+    if (o.kind === "professional") {
+      setWantsProfessional(true);
+      return reply([{ text: o.line, state: "reassuring" }], o.line);
+    }
     if (o.kind === "education") {
       setEducation(o.answer);
       return reply(
@@ -537,12 +564,22 @@ export default function ConsultationRoom({ room }: { room: RoomStyle }) {
     setDoctor("listening");
     setMicNote("");
     setListening(true);
+    let heardText = "";
+    let heardConfidence: number | undefined;
     stopMic.current = await listen({
-      onText: (t) => setText(t),
+      onText: (t, final, confidence) => {
+        setText(t);
+        heardText = t;
+        if (final) heardConfidence = confidence;
+      },
       onEnd: () => {
         setListening(false);
         stopMic.current = null;
-        setMicNote("Check the words, then press Send. You can correct them first.");
+        // Uncertain recognition is never used silently: the patient confirms it.
+        if (needsSpeechConfirmation(heardText, heardConfidence)) {
+          setHeard(heardText);
+          setMicNote("");
+        } else setMicNote(heardText ? "Check the words, then press Send. You can correct them first." : "");
       },
       onError: (m) => {
         setListening(false);
@@ -819,11 +856,12 @@ export default function ConsultationRoom({ room }: { room: RoomStyle }) {
   const helpRow =
     started && !done && !emergency ? (
       <div className="flex flex-wrap gap-2" role="group" aria-label="Help with this question">
-        {turn.step === "concern" ? (
-          <button type="button" className={chip} onClick={() => sendWords("I don't know how to explain it")}>
-            🤔 I can&apos;t explain it
+        {SYMPTOM_STEPS.has(turn.step) && !state.helpDescribe && (
+          <button type="button" className={`${chip} border-blue-900 text-blue-950`} onClick={helpMeDescribe}>
+            🧭 Help me describe it
           </button>
-        ) : (
+        )}
+        {turn.step === "concern" ? null : (
           turn.unsure && (
             <button type="button" className={chip} onClick={() => answer(turn.step === "describe" || turn.step === "concern-more" ? "?describe" : "?unsure")}>
               🤷 I&apos;m not sure
@@ -845,8 +883,46 @@ export default function ConsultationRoom({ room }: { room: RoomStyle }) {
             💬 Why do you ask?
           </button>
         )}
+        {/* Hard words in the question get their own "what does … mean?" */}
+        {termsIn(turn.question ?? turn.say, { hardOnly: true, max: 2 }).map((g) => (
+          <button key={g.id} type="button" className={chip} onClick={() => meaningNow(g.term, g.meaning)}>
+            📖 What does “{g.term}” mean?
+          </button>
+        ))}
       </div>
     ) : null;
+
+  // "I heard: … Is that correct?" — uncertain speech is confirmed first.
+  const heardPanel = heard ? (
+    <div role="group" aria-labelledby="heard-title" className="space-y-3 rounded-2xl border-2 border-amber-500 bg-amber-50 p-4">
+      <p id="heard-title" className="font-semibold text-amber-950">I heard:</p>
+      <p className="text-lg text-slate-900">“{heard}”</p>
+      <p className="font-semibold text-amber-950">Is that correct?</p>
+      <div className="flex flex-wrap gap-2">
+        <button type="button" className="min-h-12 rounded-xl bg-blue-900 px-5 font-bold text-white" onClick={() => { const h = heard; setHeard(null); sendWords(h); }}>
+          Yes
+        </button>
+        <button type="button" className={chip} onClick={() => { setHeard(null); setText(""); void startListening(); }}>
+          🎙️ Try again
+        </button>
+        <button type="button" className={chip} onClick={() => { setHeard(null); answerBox.current?.focus(); }}>
+          ✏️ Edit
+        </button>
+      </div>
+    </div>
+  ) : null;
+
+  // The patient asked for a real professional: always respected.
+  const professionalCard = wantsProfessional ? (
+    <div className="space-y-2 rounded-2xl border-2 border-blue-900 bg-blue-50 p-4">
+      <p className="font-bold text-blue-950">Talking with a real doctor or health worker</p>
+      <p className="text-slate-800">You can see the ways to reach one now. Your visit summary so far is in the chart, and it will be ready to take with you.</p>
+      <div className="flex flex-wrap gap-2">
+        <a href="/ai-hospital/doctor" className="inline-flex min-h-12 items-center rounded-xl bg-blue-900 px-5 font-bold text-white">See ways to talk to a real doctor</a>
+        <button type="button" className={chip} onClick={() => setWantsProfessional(false)}>Carry on with the questions</button>
+      </div>
+    </div>
+  ) : null;
 
   // Showing, not just telling: a 0–10 pain scale and a measured temperature.
   // These are what the patient reports — nothing here examines anyone.
@@ -943,7 +1019,7 @@ export default function ConsultationRoom({ room }: { room: RoomStyle }) {
       <div className="space-y-4">
         <div className={`grid gap-3 ${inp.options.length <= 3 ? "sm:grid-cols-3" : "sm:grid-cols-2"}`}>
           {inp.options.map((o) => (
-            <BigChoice key={o.id} tone={o.tone === "danger" ? "danger" : "default"} onClick={() => answer(o.id)}>
+            <BigChoice key={o.id} tone={o.tone === "danger" ? "danger" : "default"} onClick={() => (o.id === "words:other" ? answerBox.current?.focus() : answer(o.id))}>
               {o.label}
             </BigChoice>
           ))}
@@ -971,7 +1047,7 @@ export default function ConsultationRoom({ room }: { room: RoomStyle }) {
   } else if (inp.kind === "body") {
     answerArea = (
       <div className="space-y-4">
-        <BodyMap options={BODY_AREAS} onPick={(id) => answer(id)} />
+        <BodyMap options={inp.options} onPick={(id) => answer(id)} />
         {wordsForm}
       </div>
     );
@@ -986,7 +1062,10 @@ export default function ConsultationRoom({ room }: { room: RoomStyle }) {
     medicines: state.medicines,
     allergies: state.allergies,
     conditions: state.conditions,
-    location: BODY_AREAS.find((b) => b.id === state.bodyArea)?.label,
+    location: (() => {
+      const where = chart.reported.find((r) => r.label === "Where");
+      return where?.provided ? where.value : BODY_AREAS.find((b) => b.id === state.bodyArea)?.label;
+    })(),
     safety: safetyAnswers,
   };
 
@@ -1058,6 +1137,8 @@ export default function ConsultationRoom({ room }: { room: RoomStyle }) {
                 </p>
               )}
               {started && turn.hint && <p className={`${textSize} text-slate-600`}>{turn.hint}</p>}
+              {heardPanel}
+              {professionalCard}
               {educationCard}
               {consent}
               {answerArea}

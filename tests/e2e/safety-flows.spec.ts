@@ -167,7 +167,7 @@ test("consultation room: own-words answers are understood, or the doctor asks ag
   const words = page.getByRole("textbox", { name: "Or answer in your own words" });
   await words.fill("banana");
   await page.getByRole("button", { name: "Send" }).click();
-  await expect(page.getByRole("status").filter({ hasText: "Sorry, I didn't quite catch that." })).toBeVisible();
+  await expect(page.getByRole("status").filter({ hasText: "I didn't quite understand that." })).toBeVisible();
   for (const name of ["Talk", "Type instead", "Repeat", "Stop"]) await expect(page.getByRole("button", { name: new RegExp(name) }).first()).toBeVisible();
 });
 
@@ -219,7 +219,45 @@ test("consultation room: explain, why, 'not sure', and verified health education
   await expect(edu).toContainText("spreads through the air");
   await words.fill("Is it cancer?");
   await page.getByRole("button", { name: "Send" }).click();
-  await expect(page.getByRole("status").filter({ hasText: "I don't have enough information to answer that safely" })).toBeVisible();
+  await expect(page.getByRole("status").filter({ hasText: "I don't have verified information about that in my health guide yet" })).toBeVisible();
   const chart = page.getByRole("complementary", { name: "Patient chart" });
   await expect(chart).toContainText("Not sure");
+});
+
+test("consultation room: 'I can't explain what's wrong' → the doctor helps describe it with the body map", async ({ page }) => {
+  await page.goto("/ai-hospital/departments/general-medicine/room");
+  await page.getByLabel("Display").selectOption("text");
+  await page.getByRole("button", { name: "Begin consultation" }).click();
+  await page.getByRole("textbox", { name: "Your answer" }).fill("I can't explain what's wrong");
+  await page.getByRole("button", { name: "Send" }).click();
+  await expect(page.getByRole("heading", { name: /I'll help you describe it\. First, where in your body/ })).toBeVisible();
+  await page.getByRole("group", { name: "Body areas" }).getByRole("button", { name: "Lower tummy" }).click();
+  await expect(page.getByRole("heading", { name: /Which area — the left, the right, the middle, or both sides\?/ })).toBeVisible();
+  await page.getByRole("button", { name: "Right", exact: true }).click();
+  await expect(page.getByRole("heading", { name: /What does it feel like\?/ })).toBeVisible();
+  await expect(page.getByRole("complementary", { name: "Patient chart" })).toContainText("Lower tummy — right side");
+  // No helpline, no emergency: the doctor is still helping.
+  await expect(page.getByText("Urgent medical attention")).toHaveCount(0);
+});
+
+test("consultation room: unknown topics and corrections keep the consultation going", async ({ page }) => {
+  await page.goto("/ai-hospital/departments/general-medicine/room");
+  await page.getByLabel("Display").selectOption("text");
+  await page.getByRole("button", { name: "Begin consultation" }).click();
+  await page.getByRole("textbox", { name: "Your answer" }).fill("My stomach hurts");
+  await page.getByRole("button", { name: "Send" }).click();
+  const words = page.getByRole("textbox", { name: "Or answer in your own words" });
+  await words.fill("here on the right");
+  await page.getByRole("button", { name: "Send" }).click();
+  await expect(page.getByRole("heading", { name: /When you say “on the right”, which part of your body do you mean\?/ })).toBeVisible();
+  await page.getByRole("button", { name: "Right lower stomach" }).click();
+  await words.fill("Actually, I said left, not right.");
+  await page.getByRole("button", { name: "Send" }).click();
+  await expect(page.getByRole("status").filter({ hasText: "Okay. I've changed that to the left side." })).toBeVisible();
+  await expect(page.getByRole("complementary", { name: "Patient chart" })).toContainText("Lower tummy — left side");
+  await words.fill("What does my spleen do?");
+  await page.getByRole("button", { name: "Send" }).click();
+  await expect(page.getByRole("status").filter({ hasText: "I don't have verified information about that in my health guide yet" })).toBeVisible();
+  await expect(page.getByText("Urgent medical attention")).toHaveCount(0);
+  await expect(page.getByRole("heading", { name: /When did the pain start\?/ })).toBeVisible();
 });

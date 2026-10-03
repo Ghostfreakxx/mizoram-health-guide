@@ -2,9 +2,10 @@
 //
 // Every answer is taken word for word from the site's reviewed topic pages
 // (app/content/*), which list their sources. Nothing here is generated, and
-// a test checks that each answer still appears in that content. Questions
-// outside this list get an honest "I don't have enough information to
-// answer that safely" — never a made-up answer.
+// a test checks that each answer still appears in that content. These
+// curated entries handle common questions precisely; anything else is looked
+// up in the verified Health Knowledge layer (lib/knowledge). If neither has
+// it, the doctor says so honestly — never a made-up answer.
 //
 // Education is always shown separately from the personal consultation: it
 // is general information, not an assessment of the patient.
@@ -15,6 +16,7 @@ import { hiv } from "../content/hiv";
 import { malaria } from "../content/malaria";
 import { tb } from "../content/tb";
 import type { TopicContent } from "../content/types";
+import { retrieve } from "./knowledge";
 
 export type EducationAnswer = {
   id: string;
@@ -87,7 +89,10 @@ export function isGeneralQuestion(text: string): boolean {
 export function findEducation(text: string): EducationAnswer | null {
   const t = text.toLowerCase();
   const e = ENTRIES.find((x) => x.match.every((m) => m.test(t)));
-  if (!e) return null;
+  if (!e) {
+    const k = retrieve(text);
+    return k ? { id: k.id, question: k.question, text: k.text, topic: k.topic, sources: k.sources } : null;
+  }
   const parts = e.text(e.topic).filter(Boolean);
   if (!parts.length) return null;
   return {

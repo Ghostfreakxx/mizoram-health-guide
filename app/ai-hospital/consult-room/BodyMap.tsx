@@ -2,10 +2,14 @@
 
 import type { Option } from "../../lib/consultation";
 
-// "Where are you experiencing the problem?" — tap the body or use the list.
-// Structured input for the summary only; never a diagnosis.
+// "Can you show me where?" — tap the body (front or back) or use the list.
+// Region and side are stored separately; the side is asked next, never
+// guessed from where on the picture the patient tapped (left/right is easy
+// to mirror). Structured input for the summary only; never a diagnosis.
 
-const REGIONS: { id: string; d: string }[] = [
+type Region = { id: string; d: string };
+
+const FRONT: Region[] = [
   { id: "head", d: "M74 18 Q100 -2 126 18 L126 38 L74 38 Z" },
   { id: "face", d: "M74 38 L126 38 Q126 70 100 74 Q74 70 74 38 Z" },
   { id: "neck", d: "M88 74 L112 74 L114 90 L86 90 Z" },
@@ -17,13 +21,22 @@ const REGIONS: { id: string; d: string }[] = [
   { id: "legs", d: "M76 250 L98 250 L96 390 L76 390 Z M102 250 L124 250 L124 390 L104 390 Z" },
 ];
 
-export default function BodyMap({ options, onPick }: { options: Option[]; onPick: (id: string) => void }) {
+const BACK: Region[] = [
+  { id: "head", d: "M74 18 Q100 -2 126 18 L126 70 Q100 78 74 70 Z" },
+  { id: "neck", d: "M88 74 L112 74 L114 90 L86 90 Z" },
+  { id: "back", d: "M58 92 Q100 82 142 92 L138 224 L62 224 Z" },
+  { id: "pelvis", d: "M62 224 L138 224 L124 250 L76 250 Z" },
+  { id: "arms", d: "M58 92 L40 110 L26 230 L40 236 L58 150 Z M142 92 L160 110 L174 230 L160 236 L142 150 Z" },
+  { id: "legs", d: "M76 250 L98 250 L96 390 L76 390 Z M102 250 L124 250 L124 390 L104 390 Z" },
+];
+
+function Figure({ title, regions, options, onPick }: { title: string; regions: Region[]; options: Option[]; onPick: (id: string) => void }) {
   return (
-    <div className="grid gap-4 sm:grid-cols-[180px_1fr] sm:items-start">
-      <svg viewBox="0 0 200 400" className="mx-auto h-72 w-auto" aria-hidden>
-        {REGIONS.map((r) => (
+    <figure className="text-center">
+      <svg viewBox="0 0 200 400" className="mx-auto h-56 w-auto sm:h-64" aria-hidden>
+        {regions.map((r) => (
           <path
-            key={r.id}
+            key={`${title}-${r.id}`}
             d={r.d}
             onClick={() => onPick(r.id)}
             className="cursor-pointer fill-slate-200 stroke-white transition-colors hover:fill-blue-300"
@@ -33,15 +46,33 @@ export default function BodyMap({ options, onPick }: { options: Option[]; onPick
           </path>
         ))}
       </svg>
-      <div className="grid gap-2 sm:grid-cols-2">
+      <figcaption className="text-sm font-semibold text-slate-600">{title}</figcaption>
+    </figure>
+  );
+}
+
+export default function BodyMap({ options, onPick }: { options: Option[]; onPick: (id: string) => void }) {
+  // Right-side (or left-side) areas after "on the right": a short list only.
+  const sided = options.some((o) => o.id.includes("|"));
+  return (
+    <div className={sided ? "" : "grid gap-4 md:grid-cols-[minmax(0,320px)_1fr] md:items-start"}>
+      {!sided && (
+        <div className="grid grid-cols-2 gap-2" aria-hidden>
+          <Figure title="Front" regions={FRONT} options={options} onPick={onPick} />
+          <Figure title="Back" regions={BACK} options={options} onPick={onPick} />
+        </div>
+      )}
+      <div className="grid gap-2 sm:grid-cols-2" role="group" aria-label="Body areas">
         {options.map((o) => (
           <button key={o.id} type="button" onClick={() => onPick(o.id)} className="min-h-12 rounded-xl border-2 border-slate-300 bg-white px-4 py-2 text-left font-semibold text-slate-900 hover:border-blue-500 hover:bg-blue-50">
             {o.label}
           </button>
         ))}
-        <button type="button" onClick={() => onPick("skip")} className="min-h-12 rounded-xl border-2 border-dashed border-slate-300 px-4 py-2 text-left font-semibold text-slate-700">
-          Skip this question
-        </button>
+        {!sided && (
+          <button type="button" onClick={() => onPick("skip")} className="min-h-12 rounded-xl border-2 border-dashed border-slate-300 px-4 py-2 text-left font-semibold text-slate-700">
+            Skip this question
+          </button>
+        )}
       </div>
     </div>
   );

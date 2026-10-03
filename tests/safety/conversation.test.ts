@@ -4,6 +4,7 @@ import { describe, expect, it } from "vitest";
 import {
   type ConsultState,
   type Outcome,
+  KNOWLEDGE_LINE,
   UNKNOWN_LINE,
   chartOf,
   converse,
@@ -44,13 +45,19 @@ describe("it feels like a conversation", () => {
     );
   });
 
-  it("'My stomach hurts' → 'Where exactly does it hurt?' → 'here on the right' is kept → 'When did the pain start?'", () => {
+  it("'My stomach hurts' → 'Where exactly does it hurt?' → 'here on the right' is clarified, never guessed", () => {
     const { s, doctor } = talk(["I don't feel well", "My stomach hurts"]);
     expect(doctor.at(-1)).toMatch(/Where exactly does it hurt\?$/);
     const r = talk(["here on the right"], s);
-    expect(r.s.bodyWords).toBe("here on the right");
-    expect(nextTurn(r.s).question).toBe("When did the pain start?");
-    expect(chartOf(r.s).reported.find((x) => x.label === "Where")!.value).toMatch(/here on the right/);
+    expect(r.s.bodyArea).toBeUndefined();
+    expect(r.s.sideHint).toBe("right");
+    const t = nextTurn(r.s);
+    expect(t.say).toMatch(/When you say “on the right”, which part of your body do you mean\?/);
+    if (t.input.kind === "body") expect(t.input.options.map((o) => o.label)).toEqual(expect.arrayContaining(["Right side of chest", "Right upper stomach", "Right lower stomach", "Right side of back", "Right arm", "Right leg"]));
+    const placed = respond(r.s, "body", "lower-abdomen|right");
+    expect(placed.bodyArea).toBe("lower-abdomen");
+    expect(placed.bodySide).toBe("right");
+    expect(nextTurn(placed).question).toBe("When did the pain start?");
   });
 
   it("the exact test: 'I don't really know how to explain it' → help → 'chest feels strange' → describe → 'Like pressure' → safety", () => {
@@ -240,8 +247,11 @@ describe("health education — verified, separate, honest", () => {
     const s = talk(["I have a cough"]).s;
     for (const q of ["Is it cancer?", "What is lupus?", "Can I drink alcohol with my tablets?"]) {
       const o = converse(s, nextTurn(s), q);
-      expect(o.kind, q).toBe("unknown-question");
-      if (o.kind === "unknown-question") expect(o.line).toBe(UNKNOWN_LINE);
+      expect(o.kind, q).toBe("unclear");
+      if (o.kind === "unclear") {
+        expect(o.difficulty).toBe("knowledge");
+        expect(o.line.startsWith(KNOWLEDGE_LINE)).toBe(true);
+      }
     }
   });
 

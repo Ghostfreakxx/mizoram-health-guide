@@ -46,12 +46,91 @@ Adapting, only from the patient's own words: short answers → short questions;
 "I'm scared / please help" → acknowledged once, optional history left out
 (and marked "Not asked" for the doctor).
 
+## When communication is hard: help first, never escalate for confusion
+
+"I cannot understand you yet" and "you need a real doctor" are different
+conclusions. Conversational difficulty never leads to a helpline.
+
+**Three failure states** (`converse()` → `kind: "unclear"` with `difficulty`):
+
+| Difficulty | Example | What the doctor does |
+|---|---|---|
+| language | "banana" | 1st: "I didn't quite understand that. Could you say it another way…" → 2nd: "I'm not completely sure I understood. Let me ask that another way." + a simpler wording → 3rd+: "Let's make it easier. Just tap the answer that is closest — or “I'm not sure”." |
+| missing | "somewhere around there" (where?) | "I need to know where the problem is before I can guide you further…" + body map |
+| knowledge | "What does my spleen do?" | "I don't have verified information about that in my health guide yet, and I don't want to guess about medical information. Let's carry on." + the current question |
+
+**Clarification:** "I feel weird" → "I'm not completely sure what you mean
+yet…" with quick answers and *Help me describe it*. "It hurts here" → "Where do
+you feel it?" with the body map. "My head is doing something" → "Is it mainly
+pain, dizziness, weakness, vision trouble, or something else?" → "I don't know"
+→ "That's okay. Let's make it easier. Are you having pain?" (Yes / No / Not sure).
+
+**Corrections:** "Actually, I said left, not right" → "Okay. I've changed that to
+the left side." (also places and start times). Corrections are listed in the
+summary.
+
+**Clinical escalation rules** (`lib/escalation.ts`): a verified red flag
+(Emergency Mode, 108/112); an ORANGE triage result (urgent); a YELLOW result
+(sourced routing criteria: duration, worsening, age, pregnancy…); or the patient
+asking for a real professional ("I want to talk to a real doctor" → the ways to
+reach one, with the summary so far). `NOT_REASONS` lists what never escalates.
+
+## Body map (`BodyMap.tsx`)
+
+Front and back figures plus a labelled list. **Region and side are stored
+separately** (`bodyArea`, `bodySide`). For chest, tummy, back, arms, legs and
+head the doctor then asks the side (Left / Right / Both / Middle / Not sure);
+the side is never guessed from where the picture was tapped. "Here on the
+right" sets only a hint and asks "When you say “on the right”, which part of
+your body do you mean?" with right-side areas; nothing is stored until the
+patient picks one. An explicit "lower right side of my stomach" is taken as said.
+No disease is ever inferred from a location.
+
+## Help me describe it
+
+Available from every symptom question (and when the patient says "I can't
+explain it"): where (body map) → which side → what it feels like (options that
+fit the region, e.g. chest: pressure, sharp pain, burning, tightness) → when →
+all the time or comes and goes → what makes it better or worse → then the normal
+questions (how strong uses the 0–10 scale). Pattern and triggers are standard
+symptom-history questions recorded for the doctor only; they never change
+urgency. Chest descriptions, and weakness or trouble seeing about the head, are
+checked by the safety engine at once (chest pain / stroke-sign confirmation).
+
+## Speech confirmation
+
+Recognised words always go into the answer box first and are only used after
+**Send**. When the browser reports low confidence (< 0.75), the doctor shows
+"I heard: “…” — Is that correct? [Yes] [Try again] [Edit]" and nothing enters
+the consultation until the patient confirms. (`needsSpeechConfirmation` in
+`voice.ts`.) **Limitation:** the microphone path cannot be exercised in the
+headless test browser; the confirmation rule is unit-tested, the live
+recogniser is not.
+
+## Verified Health Knowledge (`lib/knowledge/`)
+
+General questions are answered only from content already published on this
+site after review: the topic pages, the Medicine Information guide and the Lab
+Report Explainer — split into passages that keep their sources, organised by
+category (symptoms, human body, infectious diseases, heart, lungs, digestion,
+diabetes, blood pressure, cancer, HIV, TB, malaria, dengue, pregnancy, child
+health, mental wellbeing, substance use, vaccination, nutrition, medicine safety,
+tests and reports). Retrieval needs the topic to be named and a real word
+overlap; weak matches are refused. Categories with no reviewed content yet
+(e.g. human body, symptoms, digestive health, nutrition) honestly return the
+knowledge limitation. To add knowledge, add reviewed content with sources.
+
+The plain-English glossary (`lib/knowledge/glossary.ts`, ~60 terms) offers
+"What does … mean?" buttons for hard words in the current question. **Every
+entry is `reviewed: false` and awaits clinician review.**
+
 ## Doctor states (`consult-room/doctor/state.ts`)
 
 One state machine drives the screen, the voice and the 3D/2D doctor:
 IDLE · GREETING · LISTENING · PROCESSING · ASKING · EXPLAINING · REASSURING ·
-CONCERNED · EMERGENCY · HANDOFF · COMPLETE, plus CLARIFYING (helpful
-expression, re-saying a question) and EDUCATING (calm, general information). Each state has a restrained
+CONCERNED · EMERGENCY · HANDOFF · COMPLETE, plus CLARIFYING (helpful,
+attentive expression — never concerned — after a short thinking pause) and
+EDUCATING (calm, general information). Each state has a restrained
 expression (neutral, welcoming, listening, thinking, reassuring, concerned,
 urgent), a gaze policy, a posture and a gesture level (`PERFORMANCE`). The
 state never decides anything medical: the screen sets it from the engine's
