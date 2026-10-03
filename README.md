@@ -64,6 +64,22 @@ It never diagnoses or prescribes.
   or exact times) and hides any count below 5. Nothing is collected or sent
   until the Health Department decides where counts go.
 
+### Virtual consultation rooms (flagship)
+
+- `/ai-hospital/departments/<slug>/room` — General Medicine, Cardiology,
+  Respiratory, Paediatrics, Mental Health, Obstetrics & Gynaecology. One
+  shared system: virtual guide, conversation engine (`app/lib/consultation.ts`),
+  live patient chart, visit summary, real-doctor handoff.
+- The guide is a human 3D model built from MakeHuman CC0 data
+  (`scripts/avatar/`, ~370 KB / ~230 KB), with eye contact, blinks,
+  breathing, nods, gestures and lip-sync; 3D → 2D → text fallback.
+- Reception (`/ai-hospital/reception`) is the front door and routes into the
+  right room; the patient's words travel in memory only.
+- Demo mode: add `?demo` to a room address. See
+  `docs/government/DEMO_SCRIPT.md` and `docs/VIRTUAL_CONSULTATION.md`.
+- Spoken answers (on-device only) are off by default:
+  `NEXT_PUBLIC_VOICE_INPUT=on-device`.
+
 ## Safety tests (release requirement)
 
 ```bash
