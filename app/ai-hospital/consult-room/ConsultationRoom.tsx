@@ -365,10 +365,10 @@ export default function ConsultationRoom({ room }: { room: RoomStyle }) {
         </div>
         {!begun && (
           <div className="absolute inset-x-0 bottom-0 flex justify-center bg-gradient-to-t from-slate-900/60 to-transparent p-3 pt-10">
-            <div className="w-full max-w-md rounded-2xl bg-white/95 p-4 text-center shadow-xl">
-              <p className="text-lg font-bold text-blue-950">{room.greeting} consultation room</p>
-              <p className="mt-1 text-sm text-slate-700">A virtual health guide helps you find the safest next step. It is not a doctor and cannot diagnose.</p>
-              <button type="button" onClick={() => setBegun(true)} className="mt-3 w-full rounded-xl bg-blue-900 px-5 py-3 text-lg font-bold text-white hover:bg-blue-800">
+            <div className="w-full max-w-md rounded-2xl bg-white/95 p-3 text-center shadow-xl sm:p-4">
+              <p className="text-base font-bold text-blue-950 sm:text-lg">{room.greeting} consultation room</p>
+              <p className="mt-1 hidden text-sm text-slate-700 sm:block">A virtual health guide helps you find the safest next step. It is not a doctor and cannot diagnose.</p>
+              <button type="button" onClick={() => setBegun(true)} className="mt-2 w-full rounded-xl bg-blue-900 px-5 py-2.5 text-lg font-bold text-white hover:bg-blue-800 sm:mt-3 sm:py-3">
                 Begin consultation
               </button>
             </div>

@@ -28,6 +28,7 @@ const groups = [
       { href: "/ai-hospital/screening", title: "Free health check-ups" },
       { href: "/ai-hospital/calm", title: "Calm corner" },
       { href: "/ai-hospital/first-aid", title: "First aid" },
+      { href: "/ai-hospital/sources", title: "Sources and verification" },
     ],
   },
   { title: "Health Topics", links: healthTopics },

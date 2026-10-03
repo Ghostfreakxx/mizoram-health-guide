@@ -1,3 +1,4 @@
+import Link from "next/link";
 import ReadAloud from "../../components/ReadAloud";
 import { sourcesFor } from "../../lib/sources";
 
@@ -62,7 +63,8 @@ export function SourceNote({ ids, className = "" }: { ids: string[]; className?:
   return (
     <p className={`text-sm text-slate-600 ${className}`}>
       Source: {[...new Set(list.map((s) => s.organisation))].join("; ")}
-      {pending && " (awaiting verification against the official source)"}
+      {pending && " (awaiting verification against the official source)"} ·{" "}
+      <Link href="/ai-hospital/sources" className="underline">All sources</Link>
     </p>
   );
 }

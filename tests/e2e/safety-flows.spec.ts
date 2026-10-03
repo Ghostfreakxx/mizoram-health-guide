@@ -118,6 +118,8 @@ test("consultation room: never asks for camera or microphone, and works with no 
   await page.getByRole("textbox", { name: "Your answer" }).fill("headache");
   await page.getByRole("button", { name: "Send" }).click();
   await expect(page.getByText("Your consultation information stays on this device")).toBeVisible();
+  // The site-wide floating chat is not shown inside a consultation room.
+  await expect(page.getByRole("button", { name: "💬 Ask a question" })).toHaveCount(0);
   expect(asked).toEqual([]);
 });
 

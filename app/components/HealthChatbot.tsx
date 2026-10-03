@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { usePathname } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import { findAnswer, type Answer } from "./healthAnswers";
 import { OPEN_CHAT_EVENT } from "./openChat";
@@ -15,6 +16,9 @@ const quickQuestions = [
 type Message = Answer & { role: "user" | "bot" };
 
 export default function HealthChatbot() {
+  // Inside a consultation room the guide is the conversation; a second
+  // floating chat would compete with it and cover the answer buttons.
+  const hidden = /^\/ai-hospital\/departments\/[^/]+\/room/.test(usePathname() ?? "");
   const [open, setOpen] = useState(false);
   const [loading, setLoading] = useState(false);
   const [input, setInput] = useState("");
@@ -55,6 +59,8 @@ export default function HealthChatbot() {
       setLoading(false);
     }, 400);
   }
+
+  if (hidden) return null;
 
   return (
     <div className="fixed bottom-4 right-4 z-50">

@@ -39,6 +39,7 @@ const PAGES = [
   "/ai-hospital/screening",
   "/ai-hospital/calm",
   "/ai-hospital/first-aid",
+  "/ai-hospital/sources",
   "/ai-hospital/departments/general-medicine/room",
   "/ai-hospital/departments/cardiology/room",
   "/ai-hospital/departments/mental-health/room",

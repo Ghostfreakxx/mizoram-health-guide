@@ -61,9 +61,9 @@ export default function Doctor2D({
   }, [paused, state, lips]);
 
   return (
-    <svg viewBox="0 0 320 300" className="h-full w-full" preserveAspectRatio="xMidYMid slice" aria-hidden>
-      <rect width="320" height="300" fill={room.wall} />
-      <rect y="200" width="320" height="100" fill={room.dado} />
+    <svg viewBox="-90 -10 500 310" className="h-full w-full" preserveAspectRatio="xMidYMid slice" aria-hidden>
+      <rect x="-90" y="-10" width="500" height="310" fill={room.wall} />
+      <rect x="-90" y="200" width="500" height="100" fill={room.dado} />
       <rect x="18" y="16" width="160" height="34" rx="3" fill={room.accent} />
       <text x="98" y="38" textAnchor="middle" fontSize="11" fontWeight="700" fill="#fde68a">{room.title}</text>
       <rect x="236" y="36" width="66" height="130" rx="3" fill="#f8fafc" stroke="#cbd5e1" />
@@ -97,7 +97,7 @@ export default function Doctor2D({
           <path ref={smile} d="M146 166 Q160 168 174 166" stroke="#a55a55" strokeWidth="3.5" fill="none" strokeLinecap="round" />
         </g>
       </g>
-      <rect x="0" y="262" width="320" height="38" fill="#d8c3a5" />
+      <rect x="-90" y="262" width="500" height="38" fill="#d8c3a5" />
       <g ref={hand}>
         <ellipse cx="196" cy="262" rx="16" ry="8" fill="#c99a7b" />
       </g>
