@@ -14,7 +14,7 @@
 //   routing information from the engine. Missing items say "Not provided".
 
 import { getDepartment } from "../ai-hospital/data/departments";
-import { DESCRIBE_OPTIONS, type Uncertain, feelingWord, isVagueConcern, metaIntent, normalizeWords, plainMeanings, plainTerms, soundsDistressed, uncertainty } from "./consultHelp";
+import { DESCRIBE_OPTIONS, type ProfessionalTopic, type Uncertain, feelingWord, isVagueConcern, metaIntent, normalizeWords, plainMeanings, plainTerms, professionalQuestion, soundsDistressed, uncertainty } from "./consultHelp";
 import { type EducationAnswer, findEducation, isGeneralQuestion, isQuestion } from "./education";
 import { askedTerm } from "./knowledge/glossary";
 import { LEVEL_TEXT } from "./safety/language";
@@ -131,6 +131,7 @@ export type ConsultState = {
   corrections: string[]; // what the patient corrected (for the summary)
   said: string[]; // everything the patient typed or said, in order (this visit only)
   explainedTerms: string[]; // words already explained (not offered again)
+  doctorQuestions: string[]; // questions only a professional can answer, saved for them
 };
 
 export type Side = "left" | "right" | "both" | "middle";
@@ -200,6 +201,7 @@ export function startConsultation(department: string, intro = defaultIntro(depar
     corrections: [],
     said: [],
     explainedTerms: [],
+    doctorQuestions: [],
   };
 }
 
@@ -1326,11 +1328,22 @@ export type Outcome =
   | { kind: "corrected"; state: ConsultState; line: string } // "I said left, not right"
   | { kind: "professional"; line: string } // the patient asks for a real doctor
   | { kind: "control"; action: "slower" | "faster"; line: string } // "speak slower"
+  | { kind: "needs-professional"; topic: ProfessionalTopic; state: ConsultState; line: string } // prescription, diagnosis, tests
   | { kind: "unclear"; state: ConsultState; line: string; difficulty: Difficulty };
 
 export const KNOWLEDGE_LINE = "I don't have verified information about that in my health guide yet, and I don't want to guess about medical information.";
 // Kept for older callers; the same honest knowledge limitation.
 export const UNKNOWN_LINE = `${KNOWLEDGE_LINE} Let's carry on with your consultation.`;
+const PROFESSIONAL_ANSWER: Record<ProfessionalTopic, string> = {
+  prescription:
+    "I can't suggest or prescribe medicines or doses — that needs a doctor or pharmacist who can check what is right for you. I've added your question to your summary so you can ask them.",
+  diagnosis:
+    "I can't tell you what it is — only a doctor, with an examination and sometimes tests, can do that. What I can do is help decide how soon you should be seen, and prepare your summary. I've added your question to it.",
+  test: "Whether a test is needed is a decision for a doctor or health worker. I've added your question to your summary so you can ask them.",
+  serious:
+    "I can't tell how serious it is yet — that is what these questions help with. At the end I'll tell you how soon to be seen, and why.",
+};
+
 export const PROFESSIONAL_LINE =
   "Of course. Speaking with a real doctor or health worker is always your choice. I can prepare a summary of what you've told me so far to take with you. You can see the ways to reach one now, or we can carry on so the summary is more complete.";
 
@@ -1455,6 +1468,12 @@ export function converse(s0: ConsultState, turn: Turn, text: string): Outcome {
   const fix = correction(s, words);
   if (fix) return { kind: "corrected", state: fix.state, line: fix.line };
   if (WANTS_PROFESSIONAL.test(words)) return { kind: "professional", line: PROFESSIONAL_LINE };
+  // A question only a professional can answer: say so honestly, keep it for them.
+  const pro = professionalQuestion(words);
+  if (pro && turn.step !== "medicines") {
+    const keep = pro === "serious" ? s.doctorQuestions : [...new Set([...s.doctorQuestions, words])];
+    return { kind: "needs-professional", topic: pro, state: { ...s, doctorQuestions: keep }, line: `${PROFESSIONAL_ANSWER[pro]} ${turn.step === "concern" ? "What brought you here today?" : "Let's carry on."}` };
+  }
 
   const term = askedTerm(normalizeWords(words));
   // A fuller verified answer wins over the one-line glossary meaning.

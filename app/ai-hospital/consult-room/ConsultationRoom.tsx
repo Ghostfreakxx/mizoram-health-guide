@@ -10,7 +10,7 @@ import { DEMO_SCENARIOS, demoAnswer } from "../../lib/demoScenarios";
 import type { Level } from "../../lib/safety/triage";
 import { questionsFor } from "../../lib/safety/triage";
 import EmergencyMode from "../components/EmergencyMode";
-import ResultView from "../components/ResultView";
+import ResultView, { type SummaryExtra } from "../components/ResultView";
 import { BigChoice } from "../components/ui";
 import BodyMap from "./BodyMap";
 import { type Tier, chooseTier, readDevice, stepDown } from "./capability";
@@ -110,6 +110,43 @@ const resultState = (level: Level): DoctorState => (level === "RED" || level ===
 function chartLines(chart: ReturnType<typeof chartOf>): ChartLine[] {
   const rows = [...chart.reported, ...chart.safety, ...(chart.routing ?? [])].filter((r) => r.provided);
   return rows.map((r) => [r.label, r.value]);
+}
+
+// What the doctor learned in conversation, for the real doctor's summary.
+const UNKNOWN_LABEL: Record<string, string> = {
+  duration: "When it started",
+  progression: "How it has changed",
+  severity: "How bad it is",
+  medicines: "Current medicines",
+  allergies: "Allergies",
+  conditions: "Long-term conditions",
+  body: "Where it is",
+  side: "Which side",
+  describe: "How it feels",
+  simplePain: "Whether there is pain",
+  pattern: "Whether it comes and goes",
+  modifiers: "What makes it better or worse",
+  special: "Pregnancy / immune status",
+  complaint: "Main problem",
+  "c:temp": "Temperature",
+};
+function summaryExtra(s: ConsultState): SummaryExtra {
+  const notes = [
+    ...Object.entries(s.unknown).map(([k, v]) => `${UNKNOWN_LABEL[k] ?? k}: ${v.toLowerCase()}`),
+    ...s.corrections.map((c) => `Corrected by the patient: ${c}`),
+    ...(s.style.distressed && (!s.medicinesDone || !s.allergiesDone || !s.conditionsDone)
+      ? ["Medicines, allergies and long-term conditions were not asked, to keep the consultation short — please ask."]
+      : []),
+  ];
+  return {
+    feels: s.description,
+    pattern: s.pattern === "constant" ? "All the time" : s.pattern === "comes-and-goes" ? "Comes and goes" : undefined,
+    triggers: s.modifiers,
+    painScore: s.painScore,
+    temperature: s.temperature,
+    notes,
+    questions: s.doctorQuestions,
+  };
 }
 
 export default function ConsultationRoom({ room }: { room: RoomStyle }) {
@@ -451,6 +488,10 @@ export default function ConsultationRoom({ room }: { room: RoomStyle }) {
     }
     if (o.kind === "why") return reply([{ text: o.line, state: "clarifying" }], o.line);
     if (o.kind === "term") {
+      replaceState(o.state);
+      return reply([{ text: o.line, state: "clarifying" }], o.line);
+    }
+    if (o.kind === "needs-professional") {
       replaceState(o.state);
       return reply([{ text: o.line, state: "clarifying" }], o.line);
     }
@@ -1093,6 +1134,7 @@ export default function ConsultationRoom({ room }: { room: RoomStyle }) {
       return where?.provided ? where.value : BODY_AREAS.find((b) => b.id === state.bodyArea)?.label;
     })(),
     safety: safetyAnswers,
+    extra: summaryExtra(state),
   };
 
   // Desktop: a side panel. Phones and tablets: a bottom sheet that peeks

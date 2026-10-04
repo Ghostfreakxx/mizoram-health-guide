@@ -14,6 +14,10 @@ export type SummaryData = {
   progression?: string;
   severity?: string;
   location?: string;
+  feels?: string; // how it feels, in the patient's words
+  pattern?: string; // all the time / comes and goes
+  triggers?: string; // what makes it better or worse
+  notes?: string[]; // uncertainties, corrections, things not asked
   relevant?: string[];
   safety?: string[]; // answers to danger-sign questions
   negatives?: string[];
@@ -51,6 +55,9 @@ export function summarySections(d: SummaryData): SummarySection[] {
     has(d.progression) && `How it has changed: ${clean(d.progression)}`,
     has(d.severity) && `How bad: ${clean(d.severity)}`,
     has(d.location) && `Where: ${clean(d.location)}`,
+    has(d.feels) && `How it feels: ${clean(d.feels)}`,
+    has(d.pattern) && `Pattern: ${clean(d.pattern)}`,
+    has(d.triggers) && `Better or worse with: ${clean(d.triggers)}`,
   ]);
   add("Relevant symptoms reported", d.relevant ?? []);
   add("Measurements reported", (d.measurements ?? []).filter((m) => has(m.value)).map((m) => `${m.label}: ${m.value}`));
@@ -58,6 +65,7 @@ export function summarySections(d: SummaryData): SummarySection[] {
   const safety = new Set(d.safety ?? []);
   add("Asked about and reported as NOT present", (d.negatives ?? []).filter((n) => !safety.has(n)));
   add("Patient was not sure about", d.unsure ?? []);
+  add("Notes from the conversation", d.notes ?? []);
   add("Existing health conditions", [has(d.conditions) && clean(d.conditions)]);
   add("Current medicines", [has(d.medicines) && clean(d.medicines)]);
   add("Known allergies", [has(d.allergies) && clean(d.allergies)]);

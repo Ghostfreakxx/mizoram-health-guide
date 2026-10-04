@@ -217,9 +217,13 @@ test("consultation room: explain, why, 'not sure', and verified health education
   const edu = page.getByRole("region", { name: "What is TB?" });
   await expect(edu).toContainText("not an assessment of you");
   await expect(edu).toContainText("spreads through the air");
-  await words.fill("Is it cancer?");
+  await words.fill("What is lupus?");
   await page.getByRole("button", { name: "Send" }).click();
   await expect(page.getByRole("status").filter({ hasText: "I don't have verified information about that in my health guide yet" })).toBeVisible();
+  // A diagnosis question is answered honestly and saved for the real doctor.
+  await words.fill("Do I have TB?");
+  await page.getByRole("button", { name: "Send" }).click();
+  await expect(page.getByRole("status").filter({ hasText: "I can't tell you what it is" })).toBeVisible();
   const chart = page.getByRole("complementary", { name: "Patient chart" });
   await expect(chart).toContainText("Not sure");
 });

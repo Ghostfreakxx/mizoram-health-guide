@@ -19,6 +19,9 @@ const LEVEL_STYLE = {
   GREEN: { card: "border-emerald-400 bg-emerald-50 text-emerald-950", badge: "bg-emerald-700 text-white" },
 } as const;
 
+// What the virtual doctor learned in conversation, beyond the triage answers.
+export type SummaryExtra = { feels?: string; pattern?: string; triggers?: string; painScore?: number; temperature?: string; notes?: string[]; questions?: string[] };
+
 export default function ResultView({
   answers,
   meta,
@@ -26,7 +29,7 @@ export default function ResultView({
   onEmergency,
 }: {
   answers: Answers;
-  meta: { relation?: string; sex?: string; specialAsked: boolean; concernText?: string; medicines?: string; allergies?: string; conditions?: string; location?: string; safety?: string[] };
+  meta: { relation?: string; sex?: string; specialAsked: boolean; concernText?: string; medicines?: string; allergies?: string; conditions?: string; location?: string; safety?: string[]; extra?: SummaryExtra };
   onRestart: () => void;
   onEmergency: (flags: RedFlagId[]) => void;
 }) {
@@ -62,7 +65,11 @@ export default function ResultView({
   const ctx = answers.context;
 
   const label = <T extends { id: string; label: string }>(list: readonly T[], id?: string) => list.find((x) => x.id === id)?.label;
-  const temp = choicesFor(ctx).map((c) => ({ label: c.summaryLabel, value: c.options.find((o) => o.id === answers.choices[c.id])?.label ?? "" }));
+  const temp = choicesFor(ctx).map((c) => ({
+    label: c.summaryLabel,
+    // a measured number, when the patient gave one, is more useful than a range
+    value: c.id === "temp" && meta.extra?.temperature ? `${meta.extra.temperature} (measured by the patient)` : (c.options.find((o) => o.id === answers.choices[c.id])?.label ?? ""),
+  }));
 
   const pregnancyLine = ctx.special.includes("pregnant")
     ? "Pregnant"
@@ -81,13 +88,18 @@ export default function ResultView({
     mainConcern: [result.complaint.label, meta.concernText ? `In their words: "${meta.concernText}"` : ""].filter(Boolean).join(". "),
     started: label(DURATIONS, answers.duration),
     progression: label(PROGRESSIONS, answers.progression),
-    severity: label(SEVERITIES, answers.severity),
+    severity: [label(SEVERITIES, answers.severity), meta.extra?.painScore !== undefined ? `pain ${meta.extra.painScore}/10 (patient-rated)` : ""].filter(Boolean).join(" — "),
     relevant: result.positives,
     negatives: result.negatives,
     unsure: result.unsure,
     measurements: temp,
     conditions: [meta.conditions, ctx.special.includes("immunocompromised") ? "Weak immune system (as reported)" : ""].filter(Boolean).join("; "),
     location: meta.location,
+    feels: meta.extra?.feels,
+    pattern: meta.extra?.pattern,
+    triggers: meta.extra?.triggers,
+    notes: meta.extra?.notes,
+    questions: meta.extra?.questions,
     safety: meta.safety,
     medicines: meta.medicines,
     allergies: meta.allergies,

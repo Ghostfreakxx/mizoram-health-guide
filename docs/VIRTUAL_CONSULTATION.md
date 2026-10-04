@@ -97,6 +97,30 @@ symptom-history questions recorded for the doctor only; they never change
 urgency. Chest descriptions, and weakness or trouble seeing about the head, are
 checked by the safety engine at once (chest pain / stroke-sign confirmation).
 
+## How the doctor behaves (`consult-room/doctor/`)
+
+- **One state table** (`EFFECTS` in `state.ts`) says, for every state, whether
+  routine questions continue, whether Talk is allowed, what the caption shows
+  and whether the voice may play — so subsystems cannot disagree. New
+  INITIALIZING state while the room loads (the doctor is at her notes).
+- **Gaze:** listening = steady eye contact with rare glances down; thinking =
+  a glance at the chart and back *before* speaking (< 0.8 s); speaking = eyes
+  on the patient as each phrase starts, brief natural look-aways, glances at
+  the chart while explaining; emergency = steady, never looks away. Tiny
+  fixational eye movements prevent a fixed stare.
+- **Face:** restrained expressions per state, an eyebrow flash when greeting,
+  brows lifting at the end of a question, blinks at phrase breaks and with
+  larger gaze shifts.
+- **Listening:** an acknowledging nod when an answer arrives; more frequent
+  small nods while the patient is typing or talking; no hand movement.
+- **Lip-sync** (`lipsync.ts`): one word schedule per sentence, re-anchored to
+  the speech engine's word events (never runs ahead of the audio), blending
+  between words (no "flapping"), anticipating the next sound, full lip closure
+  for m/b/p, upper-lip shape for f/v, silent letters, stressed-word emphasis.
+  Mouth shapes open faster than they close; the mouth stops with the audio.
+  Limitation: the browser's voice gives no phonemes or audio access, and the
+  model has no tongue/teeth controls — shapes are approximated from text.
+
 ## Speech confirmation
 
 Recognised words always go into the answer box first and are only used after
@@ -123,6 +147,30 @@ knowledge limitation. To add knowledge, add reviewed content with sources.
 The plain-English glossary (`lib/knowledge/glossary.ts`, ~60 terms) offers
 "What does … mean?" buttons for hard words in the current question. **Every
 entry is `reviewed: false` and awaits clinician review.**
+
+## Messy language, memory and recall
+
+- **Typing as people really type:** text-speak and misspellings are
+  normalised for understanding ("idk", "somethin wrong wit my chest",
+  "cant breath", "3 wks"). Red flags are checked on the raw AND the
+  normalised words, so normalising can only add safety.
+- **Control phrases:** "speak slower" / "normal speed", "ask that
+  differently" / "say it more simply", "say that again".
+- **"I already told you":** the doctor looks back through everything the
+  patient said this visit (`said`). If it answers the current question she
+  uses it ("Sorry — you did tell me…"); if two problems were named she asks
+  which matters most; otherwise she says honestly she doesn't have it.
+- **Words that already answer a warning-sign question** ("fever stopped but
+  now much worse", "coughing up blood", "chills", "can't keep anything down")
+  are recorded as *yes* — never *no* — marked "(from what you said)", and not
+  asked again.
+- **Questions only a professional can answer** — a prescription or dose, a
+  diagnosis ("Do I have TB?"), whether a test is needed — get an honest,
+  specific answer and are saved under "Questions for the doctor" in the
+  summary. The consultation continues; no helpline is shown.
+- **The real doctor's summary** also includes how it feels, the pattern,
+  what makes it better or worse, the pain score, a measured temperature,
+  everything the patient was not sure about, and their corrections.
 
 ## Doctor states (`consult-room/doctor/state.ts`)
 
@@ -193,6 +241,13 @@ The avatar only *presents* what the engine decided. It has no medical logic.
   one skeleton, 16 facial morph targets). The room is built from code.
 - Errors in 3D fall back to the 2D guide (error boundary). WebGL missing →
   2D guide automatically.
+
+## Phones
+
+The doctor stays in the upper part of the screen; Talk / Type / Repeat /
+Stop / Explain / Back sit in a compact grid within thumb reach; the patient
+chart is a bottom sheet ("Visit chart · 5 noted") that opens over the page.
+Emergency guidance comes first on a phone, with the doctor below it.
 
 ## Device tiers (`consult-room/capability.ts`)
 

@@ -203,3 +203,25 @@ describe("no invented information, no diagnosis, no doses", () => {
     }
   });
 });
+
+describe("the real doctor's summary includes what the conversation learned", () => {
+  it("how it feels, pattern, triggers and notes (uncertainty, corrections) are listed — never invented", async () => {
+    const { summarySections } = await import("../../app/lib/summary");
+    const sections = summarySections({
+      generatedAt: new Date(0),
+      mainConcern: "Stomach pain",
+      location: "Lower tummy — right side",
+      feels: "Pain or cramps",
+      pattern: "Comes and goes",
+      triggers: "worse when I walk",
+      notes: ["When it started: not sure", "Corrected by the patient: Side changed to right"],
+    });
+    const text = sections.map((s) => `${s.heading}: ${s.lines.join(" | ")}`).join("\n");
+    expect(text).toMatch(/How it feels: Pain or cramps/);
+    expect(text).toMatch(/Pattern: Comes and goes/);
+    expect(text).toMatch(/Better or worse with: worse when I walk/);
+    expect(text).toMatch(/Notes from the conversation: When it started: not sure \| Corrected by the patient/);
+    // nothing appears that was not supplied
+    expect(text).not.toMatch(/Current medicines|Known allergies/);
+  });
+});

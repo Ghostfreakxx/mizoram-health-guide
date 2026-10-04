@@ -293,3 +293,36 @@ describe("emergency safeguards are unchanged", () => {
     }
   });
 });
+
+describe("questions only a professional can answer — honest, specific, saved for them, no helpline", () => {
+  it.each([
+    ["Can you prescribe me antibiotics?", "prescription"],
+    ["how much paracetamol should i take", "prescription"],
+    ["Do I have TB?", "diagnosis"],
+    ["what's wrong with me", "diagnosis"],
+    ["Do I need an x-ray?", "test"],
+    ["Is it serious?", "serious"],
+  ])("'%s' → %s", (q, topic) => {
+    const s = talk(["I have a cough"]).s;
+    const { s: after, o } = say(s, q);
+    expect(o.kind).toBe("needs-professional");
+    if (o.kind === "needs-professional") {
+      expect(o.topic).toBe(topic);
+      expect(o.line).not.toMatch(HANDOFF_WORDS);
+      expect(o.line).toMatch(/Let's carry on\.$/);
+    }
+    if (topic !== "serious") expect(after.doctorQuestions).toContain(q);
+    expect(nextTurn(after).step).toBe(nextTurn(s).step); // the consultation continues
+    expect(escalationFor(after)).toBeNull();
+  });
+
+  it("never gives a dose or names a medicine to take", () => {
+    const { o } = say(talk(["I have a fever"]).s, "what dose of paracetamol can I take");
+    if ("line" in o) expect(o.line).not.toMatch(/\b\d+\s?(mg|ml|tablets?)\b/i);
+  });
+
+  it("danger words in such a question still open the emergency", () => {
+    const { s } = say(talk(["I have a cough"]).s, "Do I have a heart attack? my chest is crushing");
+    expect(nextTurn(s).input.kind).toBe("emergency");
+  });
+});

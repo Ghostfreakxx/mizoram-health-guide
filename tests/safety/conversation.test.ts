@@ -245,7 +245,7 @@ describe("health education — verified, separate, honest", () => {
 
   it("a question it cannot answer safely gets an honest answer, never a made-up one", () => {
     const s = talk(["I have a cough"]).s;
-    for (const q of ["Is it cancer?", "What is lupus?", "Can I drink alcohol with my tablets?"]) {
+    for (const q of ["What does my spleen do?", "What is lupus?", "Can I drink alcohol with my tablets?"]) {
       const o = converse(s, nextTurn(s), q);
       expect(o.kind, q).toBe("unclear");
       if (o.kind === "unclear") {

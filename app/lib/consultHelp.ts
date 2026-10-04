@@ -157,3 +157,18 @@ export const DESCRIBE_OPTIONS = [
   { id: "other", label: "Something else", words: "" },
   { id: "unsure", label: "I can't describe it", words: "" },
 ] as const;
+
+// Questions only a qualified professional can answer: a prescription or dose,
+// a diagnosis, or whether a test is needed. These are real (clinical) reasons
+// for a human — the doctor says so honestly and saves the question for them.
+export type ProfessionalTopic = "prescription" | "diagnosis" | "test" | "serious";
+
+export function professionalQuestion(text: string): ProfessionalTopic | null {
+  const t = normalizeWords(text);
+  if (/\b(prescribe|prescription|which (medicine|tablet|antibiotic|drug)s?|what (medicine|tablet|antibiotic|drug|dose)s?|how (much|many) (should i|do i|to|can i) take|dose|dosage|(can|should) i take|give me (some )?(medicine|tablets?|antibiotics?))\b/.test(t)) return "prescription";
+  if (/\b(do i need|should i (get|have|do)|will i need)\b.*\b(test|tests|x-?ray|scan|blood test|ultrasound|ecg)\b/.test(t)) return "test";
+  if (/^(is (it|this) (serious|bad|dangerous)|how serious is (it|this))\b/.test(t)) return "serious";
+  if (/\b(do i have|have i got|is (it|this)|could (it|this) be|might (it|this) be|am i)\b.*\b(cancer|tb|tuberculosis|hiv|aids|dengue|malaria|diabetes|diabetic|heart attack|stroke|covid|infection|pneumonia|typhoid|ulcer|pregnant)\b/.test(t)) return "diagnosis";
+  if (/\b(what do i have|what'?s wrong with me|what is wrong with me|diagnose|what disease|what illness)\b/.test(t)) return "diagnosis";
+  return null;
+}
