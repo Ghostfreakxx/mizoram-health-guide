@@ -13,7 +13,7 @@ export default function PageHeader({
 }) {
   return (
     <section className="bg-blue-900 text-white">
-      <div className="max-w-6xl mx-auto px-4 sm:px-6 pt-10 pb-16">
+      <div className="max-w-6xl mx-auto px-4 sm:px-6 pt-5 pb-12 sm:pt-10 sm:pb-16">
         <nav aria-label="Breadcrumb">
           <ol className="flex flex-wrap items-center gap-2 text-sm text-blue-100">
             <li><Link href="/" className="hover:underline">Home</Link></li>
@@ -30,16 +30,16 @@ export default function PageHeader({
           </ol>
         </nav>
 
-        <div className="mt-5 flex items-center gap-4">
+        <div className="mt-3 flex items-center gap-3 sm:mt-5 sm:gap-4">
           {icon && (
-            <span aria-hidden className="grid h-16 w-16 shrink-0 place-items-center rounded-full bg-white text-4xl">
+            <span aria-hidden className="grid h-12 w-12 shrink-0 place-items-center rounded-full bg-white text-3xl sm:h-16 sm:w-16 sm:text-4xl">
               {icon}
             </span>
           )}
           <h1 className="text-3xl md:text-4xl font-bold tracking-tight">{title}</h1>
         </div>
 
-        {intro && <p className="mt-4 max-w-3xl text-lg text-blue-50 leading-relaxed">{intro}</p>}
+        {intro && <p className="mt-3 max-w-3xl text-lg text-blue-50 sm:mt-4 leading-relaxed">{intro}</p>}
       </div>
     </section>
   );

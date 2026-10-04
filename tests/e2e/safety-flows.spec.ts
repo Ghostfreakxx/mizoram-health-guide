@@ -277,3 +277,34 @@ test("consultation room: unknown topics and corrections keep the consultation go
   await expect(page.getByText("Urgent medical attention")).toHaveCount(0);
   await expect(page.getByRole("heading", { name: /When did the pain start\?/ })).toBeVisible();
 });
+
+test("My Visit: a finished consultation's summary is there (tab memory only), and can be cleared", async ({ page }) => {
+  await page.goto("/my-visit");
+  await expect(page.getByText("No visit yet in this tab")).toBeVisible();
+  await page.goto("/ai-hospital/departments/general-medicine/room");
+  await page.getByLabel("Display").selectOption("text");
+  await page.getByRole("button", { name: "Begin consultation" }).click();
+  await page.getByRole("textbox", { name: "Your answer" }).fill("I've been coughing for about three weeks");
+  await page.getByRole("button", { name: "Send" }).click();
+  await page.getByRole("button", { name: "None of these — continue" }).click();
+  await page.getByRole("button", { name: "18 to 59 years" }).click();
+  await page.getByRole("button", { name: "Female" }).click();
+  await page.getByRole("button", { name: "None of these — continue" }).click();
+  for (let i = 0; i < 40; i++) {
+    if (await page.getByRole("heading", { name: "📋 Patient-prepared visit summary" }).count()) break;
+    const no = page.getByRole("button", { name: "No", exact: true });
+    const skip = page.getByRole("button", { name: "Skip", exact: true });
+    if (await no.count()) await no.click();
+    else if (await skip.count()) await skip.click();
+    else if (await page.getByRole("button", { name: "About the same" }).count()) await page.getByRole("button", { name: "About the same" }).click();
+    else if (await page.getByRole("button", { name: /^Mild/ }).count()) await page.getByRole("button", { name: /^Mild/ }).click();
+    else await page.locator("main button.min-h-14").first().click();
+  }
+  await page.getByRole("link", { name: "📋 Open My Visit" }).click();
+  await expect(page).toHaveURL(/\/my-visit$/);
+  await expect(page.getByText("Patient-prepared visit summary")).toBeVisible();
+  await expect(page.getByText(/cough/i).first()).toBeVisible();
+  expect(await page.evaluate(() => Object.keys(localStorage).filter((k) => k.startsWith("aih:")))).toEqual([]);
+  await page.getByRole("button", { name: "Clear this visit" }).click();
+  await expect(page.getByText("No visit yet in this tab")).toBeVisible();
+});

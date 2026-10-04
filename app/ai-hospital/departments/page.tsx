@@ -24,16 +24,16 @@ export default function DepartmentsPage() {
       <PageHeader
         title="Find the right department"
         icon="🧭"
-        intro={`${departments.length} departments. Each page explains what it handles, what happens on a visit, what to bring, and when to go to Emergency instead.`}
+        intro={`What each of the ${departments.length} departments handles, what happens on a visit, what to bring, and when to go to Emergency instead.`}
         crumbs={[{ href: "/ai-hospital", label: AI_HOSPITAL.name }]}
       />
       <div className="mx-auto max-w-6xl space-y-10 px-4 py-10 sm:px-6">
-        <Link href="/ai-hospital/triage" className="flex items-center justify-between gap-4 rounded-2xl bg-blue-900 p-6 text-white hover:bg-blue-800">
+        <Link href="/ai-hospital/reception" className="flex flex-col gap-4 rounded-2xl bg-blue-900 p-6 text-white hover:bg-blue-800 sm:flex-row sm:items-center sm:justify-between">
           <span>
-            <span className="block text-xl font-bold">Not sure which department?</span>
-            <span className="block text-blue-100">Answer a few questions and we will suggest one.</span>
+            <span className="block text-xl font-bold">You don&apos;t need to know the department</span>
+            <span className="block text-blue-100">Tell us what&apos;s wrong in your own words. We&apos;ll check how urgent it is and suggest where to go.</span>
           </span>
-          <span className="shrink-0 rounded-xl bg-amber-400 px-5 py-3 text-lg font-bold text-blue-950">Start triage →</span>
+          <span className="shrink-0 rounded-xl bg-amber-400 px-5 py-3 text-center text-lg font-bold text-blue-950">Tell us what&apos;s wrong →</span>
         </Link>
 
         {groups.map((g) => (

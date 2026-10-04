@@ -1,6 +1,7 @@
 import Link from "next/link";
 import type { Level } from "../../lib/safety/triage";
 import CallLink from "../../components/ui/CallLink";
+import { readConfig } from "../../lib/consult";
 
 // The real-doctor handoff: where to take the summary next. Ordered by the
 // urgency the triage engine decided. AI Hospital never replaces a clinician.
@@ -13,8 +14,11 @@ const ESANJ: Step = { href: "/ai-hospital/doctor", icon: "💻", title: "eSanjee
 const FOLLOW: Step = { href: "/ai-hospital/follow-up", icon: "🔔", title: "Set a follow-up reminder", text: "Appointment, test or medicine reminders on your phone." };
 
 export default function HandoffPanel({ level }: { level: Level }) {
-  const steps: Step[] =
-    level === "ORANGE" ? [HOSPITAL, LIVE, FOLLOW] : level === "YELLOW" ? [LIVE, ESANJ, HOSPITAL, FOLLOW] : [FOLLOW, LIVE, ESANJ, HOSPITAL];
+  // The live room is only offered once a video server is configured.
+  const live = readConfig().enabled;
+  const steps: Step[] = (
+    level === "ORANGE" ? [HOSPITAL, LIVE, FOLLOW] : level === "YELLOW" ? [LIVE, ESANJ, HOSPITAL, FOLLOW] : [FOLLOW, LIVE, ESANJ, HOSPITAL]
+  ).filter((s) => live || s !== LIVE);
   return (
     <section aria-labelledby="handoff" className="rounded-2xl border-2 border-blue-200 bg-white p-5">
       <h2 id="handoff" className="text-xl font-bold text-blue-950">Next: a real healthcare professional</h2>
@@ -32,6 +36,12 @@ export default function HandoffPanel({ level }: { level: Level }) {
           </li>
         ))}
       </ol>
+      <p className="mt-4">
+        <Link href="/my-visit" className="font-semibold text-blue-800 underline">
+          📋 Open My Visit
+        </Link>{" "}
+        <span className="text-sm text-slate-600">— your summary and next steps, kept until you close this tab.</span>
+      </p>
       <p className="mt-3 text-sm text-slate-700">If things get worse at any time, call <CallLink id="ambulance-108" className="font-bold underline">108</CallLink> or <CallLink id="erss-112" className="font-bold underline">112</CallLink>.</p>
     </section>
   );

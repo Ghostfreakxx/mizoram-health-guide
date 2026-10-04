@@ -1,23 +1,25 @@
-# Mizoram Health Guide
+# Mizoram AI Hospital — Digital Front Door to Healthcare (Prototype)
 
-A digital public health awareness platform for citizens of Mizoram. It gives
-simple, easy-to-read information on early warning signs, harmful habits, and
-when to see a doctor, plus a Health Assistant chatbot for basic health questions.
+An independent prototype, not an official Government of Mizoram service. It
+helps a person say what is wrong, find out how urgently to get care and where,
+and arrive at a real health professional prepared. It does not diagnose or
+prescribe. In an emergency, call **108** or **112**.
 
-> For awareness only. This site does not diagnose disease or prescribe
-> medicine. In an emergency, call **108**.
+## Site structure
 
-## Features
+| Area | Address | What it is |
+| --- | --- | --- |
+| Home | `/` | Four starting points: virtual doctor, check symptoms, emergency, find care |
+| AI Hospital | `/ai-hospital` | "What can we help you with today?" — Reception, virtual doctor, real doctors, visit preparation, more services |
+| Health Library | `/health-library` | Sourced topic guides by category, practical guides, the diabetes risk check |
+| Find Care | `/find-care` | Emergency numbers, free helplines (one registry), hospitals (verified-only) |
+| My Visit | `/my-visit` | This visit's summary and next steps — tab memory only |
+| About | `/about` | Demonstration introduction: problem, proposed role, safety layers, limits |
+| Emergency | `/ai-hospital/emergency` | Always one tap away in the header |
 
-- **Health topics:** cancer, tobacco & oral health, diabetes, heart health,
-  and mental wellbeing, each with warning signs and simple advice.
-- **Health Assistant:** a chatbot that answers common health awareness
-  questions in plain English. It runs entirely in the browser from a built-in
-  answer library (`app/components/healthAnswers.ts`), so it needs no API key
-  and has no running cost. It never diagnoses or suggests medicines, and
-  points to 108 / Tele-MANAS 14416 for emergencies.
-- **Hospital & help directory:** emergency numbers and key hospitals.
-- **Citizen health awareness survey:** planned.
+There is one assistant: Reception plus the Virtual Doctor, both on the shared
+safety engine. Every phone number comes from `app/lib/helplines.ts`
+(rendered with `<CallLink />`). Shared UI lives in `app/components/ui`.
 
 ## AI Hospital — Digital Front Door to Healthcare
 
@@ -59,10 +61,10 @@ It never diagnoses or prescribes.
 - **Read aloud** on triage, results, emergency and tours.
 - **Mizo language**: built in, but switched on only for reviewed translations.
   See `docs/TRANSLATION.md`.
-- **Health Department dashboard** (`/ai-hospital/admin`): demonstration data
-  only. `app/lib/metrics.ts` accepts category codes only (no text, identifiers
-  or exact times) and hides any count below 5. Nothing is collected or sent
-  until the Health Department decides where counts go.
+- **Aggregate counts (rules only)**: `app/lib/metrics.ts` accepts category
+  codes only (no text, identifiers or exact times) and hides any count below
+  5. There is no dashboard and nothing is collected or sent until the Health
+  Department decides where counts go.
 
 ### Virtual consultation rooms (flagship)
 
@@ -141,10 +143,14 @@ The site is deployed on Vercel. No environment variables are needed.
 ```
 app/
   page.tsx              Homepage
-  layout.tsx            Shared layout (header, footer, chatbot)
+  layout.tsx            Shared layout (header, bottom nav, footer)
   topics.ts             List of health topics
   <topic>/page.tsx      Health topic pages
-  hospitals/page.tsx    Hospital & help directory
-  components/           Shared UI components
-  components/healthAnswers.ts  Health Assistant answer library
+  health-library/       Health Library
+  find-care/            Find Care (helplines + hospitals)
+  my-visit/             My Visit (in-memory visit summary)
+  about/                About this prototype
+  ai-hospital/          Reception, virtual doctor, triage, departments, …
+  components/ui/        Design system + CallLink
+  lib/helplines.ts      The single helpline registry
 ```
