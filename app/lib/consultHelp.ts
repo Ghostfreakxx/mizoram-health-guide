@@ -37,15 +37,87 @@ export function feelingWord(text: string): string | null {
 
 // ---------------- What the patient means ----------------
 
-export type Meta = "explain" | "why" | "repeat";
+// ---------------- Messy, real-world typing ----------------
+
+// Text-speak, common misspellings and missing apostrophes, so "idk",
+// "somethin wrong wit my chest" or "cant breath" are understood. Used for
+// understanding only; the patient's own words are still what is recorded.
+const FIXES: [RegExp, string][] = [
+  [/[’‘`´]/g, "'"],
+  [/\bidk\b/g, "i don't know"],
+  [/\bdunno\b/g, "don't know"],
+  [/\bidc\b/g, "i don't care"],
+  [/\b(im|iam)\b/g, "i'm"],
+  [/\bive\b/g, "i've"],
+  [/\bid\b(?= (like|want|rather))/g, "i'd"],
+  [/\b(dont|dnt)\b/g, "don't"],
+  [/\b(cant|cnt)\b/g, "can't"],
+  [/\bwont\b/g, "won't"],
+  [/\bdidnt\b/g, "didn't"],
+  [/\bdoesnt\b/g, "doesn't"],
+  [/\bisnt\b/g, "isn't"],
+  [/\bwasnt\b/g, "wasn't"],
+  [/\bhavent\b/g, "haven't"],
+  [/\bits\b(?= (been|getting|hurting|very|really|a |not|like))/g, "it's"],
+  [/\bu\b/g, "you"],
+  [/\bur\b/g, "your"],
+  [/\b(pls|plz|plez)\b/g, "please"],
+  [/\b(somethin|smthing|sumthing|somthing)\b/g, "something"],
+  [/\bnothin\b/g, "nothing"],
+  [/\bwit\b/g, "with"],
+  [/\bwat\b/g, "what"],
+  [/\b(abt|bout)\b/g, "about"],
+  [/\b(b4)\b/g, "before"],
+  [/\b(wks?)\b/g, "weeks"],
+  [/\b(hrs?)\b/g, "hours"],
+  [/\b(mins?)\b/g, "minutes"],
+  [/\b(yday|yest|yesterdy)\b/g, "yesterday"],
+  [/\b(2day|tday)\b/g, "today"],
+  [/\b(can't|cannot|can not|hard to|trouble|unable to|difficult to|struggling to) breath\b/g, "$1 breathe"],
+  [/\b(brething|breating|breathin)\b/g, "breathing"],
+  [/\b(stomache|stomch|stomac|tummy)\b/g, "stomach"],
+  [/\b(chst|chesst)\b/g, "chest"],
+  [/\b(hed)\b/g, "head"],
+  [/\b(feaver|fevr|fiver|fevar)\b/g, "fever"],
+  [/\b(coff|cogh|caugh|couf)\b/g, "cough"],
+  [/\b(cofing|coffing|caughing|coughin)\b/g, "coughing"],
+  [/\b(diarrhea|diarhea|diarrohea|diarrhoe|loose motions?)\b/g, "diarrhoea"],
+  [/\b(vomitting|vommiting|vomitin)\b/g, "vomiting"],
+  [/\b(pregnent|pragnant|pregant|pregnat)\b/g, "pregnant"],
+  [/\b(bleding|bleedin|bledding)\b/g, "bleeding"],
+  [/\b(wierd)\b/g, "weird"],
+  [/\b(dizy|dizzey)\b/g, "dizzy"],
+  [/\b(hedache|headace)\b/g, "headache"],
+  [/\b(painfull)\b/g, "painful"],
+  [/\b(alot)\b/g, "a lot"],
+  [/\bn\b(?= \w)/g, "and"],
+  [/\b(bcoz|coz|cuz|bc)\b/g, "because"],
+  [/\s+/g, " "],
+];
+
+export function normalizeWords(text: string): string {
+  let t = text.toLowerCase();
+  for (const [re, to] of FIXES) t = t.replace(re, to);
+  return t.trim();
+}
+
+export type Meta = "explain" | "why" | "repeat" | "rephrase" | "slower" | "faster" | "already";
 
 const EXPLAIN = /\b(i don'?t understand|i do not understand|don'?t get it|what do you mean|what does (that|this|it)( word| term)? mean|what do (those|these) words mean|meaning\??$|explain( that| please| it)?$|not clear|confus(ed|ing)|what is that\??$|huh\??$|pardon\??$|say (it|that) (more )?simpl\w*)\b/;
 const WHY = /\b(why (are|do) you (ask|need|want)\w*|why (does|is) (that|this|it) (matter|important)|why that question|why do you need to know|what is this for)\b/;
-const REPEAT = /^(repeat|say (it|that) again|again please|come again|sorry\??|what\??)$/;
+const REPEAT = /^(repeat( that| it| please)?|say (it|that) again|again please|come again|sorry\??|what\??|can you repeat( that| it)?\??|please repeat)$/;
+const REPHRASE = /\b((ask|say|put|explain) (it |that |this |the question )?(differently|another way|a different way|in other words|in another way|more simply|simpler|in simple words)|rephrase|use (simpler|easier|different) words|i don'?t get the question)\b/;
+const SLOWER = /\b((speak|talk|say it|go|read it) (a bit |a little |more )?slow(ly|er)?|slow down|too fast|slower please)\b/;
+const FASTER = /\b((speak|talk|go) (a bit |a little )?faster|too slow|normal speed)\b/;
+const ALREADY = /\b(already (told|said|answered|mentioned|gave|explained)|i (told|said) (you|that)( already)?|as i said|i just said)\b/;
 
 export function metaIntent(text: string): Meta | null {
-  const t = text.toLowerCase().replace(/[’‘]/g, "'").trim();
+  const t = normalizeWords(text).replace(/[.!]+$/, "");
   if (WHY.test(t)) return "why";
+  if (ALREADY.test(t)) return "already";
+  if (SLOWER.test(t)) return "slower";
+  if (FASTER.test(t)) return "faster";
+  if (REPHRASE.test(t)) return "rephrase";
   if (EXPLAIN.test(t)) return "explain";
   if (REPEAT.test(t)) return "repeat";
   return null;
@@ -55,20 +127,20 @@ export type Uncertain = "Not sure" | "Not remembered" | "Could not describe";
 
 // "I don't know", "maybe", "I forgot", "I can't explain it" — all valid answers.
 export function uncertainty(text: string): Uncertain | null {
-  const t = text.toLowerCase().replace(/[’‘]/g, "'").trim();
+  const t = normalizeWords(text);
   if (/\b(forgot|forget|forgotten|can'?t remember|cannot remember|don'?t remember|do not remember|not remember)\b/.test(t)) return "Not remembered";
   if (/\b(can'?t explain|cannot explain|don'?t know how to (explain|say|describe)|hard to (explain|describe)|can'?t describe|cannot describe)\b/.test(t)) return "Could not describe";
-  if (/^(i )?(don'?t know|do not know|dunno|not sure|i'?m not sure|unsure|maybe|perhaps|no idea|can'?t say|not certain|hard to say)\b/.test(t)) return "Not sure";
+  if (/^(i )?(really )?(don'?t know|do not know|dunno|not sure|i'?m not sure|unsure|maybe|perhaps|no idea|can'?t say|not certain|hard to say|no clue|not really sure|i guess|possibly|might be)\b/.test(t)) return "Not sure";
   return null;
 }
 
 // "I don't feel well" — true when the words name no problem we can work with.
 export function isVagueConcern(text: string, complaintIds: string[]): boolean {
   if (complaintIds.length) return false;
-  const t = text.toLowerCase().replace(/[’‘]/g, "'");
+  const t = normalizeWords(text);
   return (
     t.split(/\s+/).filter(Boolean).length <= 12 &&
-    /\b(not feeling (well|good|right)|don'?t feel (well|good|right)|feel(ing)? (unwell|sick|ill|bad|off|strange|weird|funny)|unwell|sick|ill|not well|something('s| is) wrong|don'?t (really )?know how to (explain|say|describe)|can'?t explain|hard to explain|not sure|don'?t know|help)\b/.test(t)
+    /\b(not feeling (well|good|right)|don'?t feel (well|good|right)|feel(ing)? (unwell|sick|ill|bad|off|strange|weird|funny)|unwell|sick|ill|not well|something('s| is) wrong|don'?t (really )?know how to (explain|say|describe)|can'?t explain|hard to explain|not sure|don'?t know|no idea|maybe|forgot|help|i'?m not okay|something'?s off)\b/.test(t)
   );
 }
 

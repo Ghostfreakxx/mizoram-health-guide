@@ -14,7 +14,7 @@
 //   routing information from the engine. Missing items say "Not provided".
 
 import { getDepartment } from "../ai-hospital/data/departments";
-import { DESCRIBE_OPTIONS, type Uncertain, feelingWord, isVagueConcern, metaIntent, plainMeanings, plainTerms, soundsDistressed, uncertainty } from "./consultHelp";
+import { DESCRIBE_OPTIONS, type Uncertain, feelingWord, isVagueConcern, metaIntent, normalizeWords, plainMeanings, plainTerms, soundsDistressed, uncertainty } from "./consultHelp";
 import { type EducationAnswer, findEducation, isGeneralQuestion, isQuestion } from "./education";
 import { askedTerm } from "./knowledge/glossary";
 import { LEVEL_TEXT } from "./safety/language";
@@ -129,6 +129,8 @@ export type ConsultState = {
   modifiersDone: boolean;
   unclear: { step: string; count: number }; // consecutive misunderstandings
   corrections: string[]; // what the patient corrected (for the summary)
+  said: string[]; // everything the patient typed or said, in order (this visit only)
+  explainedTerms: string[]; // words already explained (not offered again)
 };
 
 export type Side = "left" | "right" | "both" | "middle";
@@ -196,6 +198,8 @@ export function startConsultation(department: string, intro = defaultIntro(depar
     modifiersDone: false,
     unclear: { step: "", count: 0 },
     corrections: [],
+    said: [],
+    explainedTerms: [],
   };
 }
 
@@ -436,8 +440,8 @@ export function nextTurn(s: ConsultState): Turn {
   if (needsWhere || (s.sideHint && !s.bodyDone)) return bodyTurn(s);
   if (s.bodyArea && LATERAL.has(s.bodyArea) && !s.bodySide && !s.unknown.side) return sideTurn(s);
   if (!s.concernMore && !s.complaint && !s.helpDescribe && !s.whereFirst && isVagueConcern(s.concernText, s.suggested)) {
-    const cantExplain = /\b(explain|describe|say)\b/i.test(s.concernText);
-    const unclearWords = VAGUE_FEELING.test(s.concernText);
+    const cantExplain = /\b(explain|describe|say)\b/i.test(s.concernText) || uncertainty(s.concernText) !== null;
+    const unclearWords = VAGUE_FEELING.test(normalizeWords(s.concernText));
     return compose(s, {
       step: "concern-more",
       say: cantExplain
@@ -477,7 +481,8 @@ export function nextTurn(s: ConsultState): Turn {
       unsure: true,
     }, { ack: true });
   }
-  const vagueFeeling = VAGUE_FEELING.test(s.concernText) && !QUALITY.test(s.concernText);
+  const said = normalizeWords(s.concernText);
+  const vagueFeeling = VAGUE_FEELING.test(said) && !QUALITY.test(said);
   if (!s.describeDone && (s.helpDescribe || s.whereFirst || (DESCRIBES.has(s.complaint) && vagueFeeling))) return describeTurn(s);
   if (s.unknown.describe && !s.simplePain && !s.unknown.simplePain) {
     return compose(s, {
@@ -494,7 +499,7 @@ export function nextTurn(s: ConsultState): Turn {
   if (!s.duration && !s.unknown.duration) {
     return compose(s, {
       step: "duration",
-      say: PAINFUL.has(s.complaint) && (QUALITY.test(s.concernText) || QUALITY.test(s.description ?? "") || s.simplePain === "yes") ? "When did the pain start?" : "When did this start?",
+      say: PAINFUL.has(s.complaint) && (QUALITY.test(said) || QUALITY.test(s.description ?? "") || s.simplePain === "yes") ? "When did the pain start?" : "When did this start?",
       input: { kind: "single", options: DURATIONS.map((d) => ({ id: d.id, label: d.label })) },
       mood: "attentive",
       unsure: true,
@@ -706,11 +711,15 @@ function withComplaint(s: ConsultState): ConsultState {
 }
 
 // Free text anywhere can raise an emergency.
+// Checked on the words as typed AND as understood ("cant breath" → "can't
+// breathe"), so messy typing can only add safety, never hide it.
 function withTextFlags(s: ConsultState, text: string): ConsultState {
-  const d = detectRedFlags(text);
+  const a = detectRedFlags(text);
+  const b = detectRedFlags(normalizeWords(text));
+  const d = { confirmed: [...new Set([...a.confirmed, ...b.confirmed])], needsConfirmation: [...new Set([...a.needsConfirmation, ...b.needsConfirmation])] };
   const confirmed = d.confirmed.filter((f) => !s.dismissedFlags.includes(f));
   if (confirmed.length) return { ...s, emergency: { flags: confirmed, clear: { kind: "text" } } };
-  const pending = d.needsConfirmation.filter((f) => !s.dismissedFlags.includes(f) && !s.pendingFlags.includes(f));
+  const pending = d.needsConfirmation.filter((f) => !s.dismissedFlags.includes(f) && !s.pendingFlags.includes(f) && !confirmed.includes(f));
   return pending.length ? { ...s, pendingFlags: [...s.pendingFlags, ...pending] } : s;
 }
 
@@ -734,11 +743,40 @@ const UNSURE_VALUE: Record<string, Uncertain> = { "?unsure": "Not sure", "?forgo
 
 // Facts mentioned along the way ("…for three weeks", "I'm 34") are kept, so
 // they are not asked again, and the doctor says once that she noted them.
+// Things patients often say that already answer a warning-sign question
+// "yes". Only ever "yes" (it can only add care, never remove it); shown in the
+// chart as "(from what you said)", and the question is not asked again.
+const ALREADY_YES: [string, RegExp][] = [
+  ["fever-weaker", /\bfever\b.*\b(stopped|went|gone|came down|broke|better|down)\b.*\b(worse|weak\w*|sleepy|restless|tired)\b/],
+  ["fever-breathing", /\b(short of breath|breathless|breathing (very )?fast|can't catch my breath)\b/],
+  ["fever-headache", /\b(severe|bad|terrible|very bad) headache\b/],
+  ["fever-chills", /\b(chills|shivering|shivers|rigors)\b/],
+  ["fever-vomit", /\b(vomiting (again and again|a lot|repeatedly|everything)|keep (throwing up|vomiting))\b/],
+  ["cough-blood", /\bcough\w* (up )?blood\b|\bblood in (my |the )?(phlegm|sputum|spit)\b/],
+  ["cough-fever", /\bcough\w*\b.*\bfever\b|\bfever\b.*\bcough\w*\b/],
+  ["cough-wheeze", /\bwheez\w*\b/],
+  ["cough-sweats", /\b(night sweats?|losing weight|lost weight)\b/],
+  ["stomach-fluids", /\b(can't|cannot) keep (anything|any fluids?|water|food|liquids?) down\b/],
+  ["stomach-bloody", /\b(blood in (my )?(diarrhoea|stools?|poo)|bloody (diarrhoea|stools?|poo))\b/],
+  ["stomach-yellow", /\b(yellow (eyes|skin)|jaundice)\b/],
+];
+
+export function yesFromWords(text: string): string[] {
+  const t = normalizeWords(text);
+  return ALREADY_YES.filter(([, re]) => re.test(t)).map(([id]) => id);
+}
+
+function withWordAnswers(s: ConsultState, text: string): ConsultState {
+  const ids = yesFromWords(text).filter((id) => !(id in s.answers));
+  if (!ids.length) return s;
+  return { ...s, answers: { ...s.answers, ...Object.fromEntries(ids.map((id) => [id, "yes" as Answer])) }, prefilled: [...new Set([...s.prefilled, ...ids])] };
+}
+
 function absorb(s: ConsultState, text: string): ConsultState {
-  let next = s;
+  let next = withWordAnswers(s, text);
   const notes: string[] = [];
   if (!s.duration && !s.unknown.duration) {
-    const d = receive(text).duration;
+    const d = receive(normalizeWords(text)).duration;
     if (d) {
       next = { ...next, duration: d, remembered: [...next.remembered, "duration"] };
       notes.push(`You mentioned it started ${DURATION_WORDS[d]}.`);
@@ -776,12 +814,12 @@ function respondCore(s: ConsultState, step: string, value: string | string[]): C
     if (unsure) return { ...s, concernMore: true };
     const more = clip(one.startsWith("words:") ? one.slice(6) : one);
     if (!more) return s;
-    const r = receive(more);
+    const r = receive(normalizeWords(more));
     const next: ConsultState = {
       ...s,
       concernMore: true,
       concernText: clip(`${s.concernText ?? ""} — ${more}`),
-      suggested: suggestFrom(more, r.complaintIds),
+      suggested: suggestFrom(normalizeWords(more), r.complaintIds),
       duration: s.duration ?? r.duration,
       answers: { ...r.prefill, ...s.answers },
       prefilled: [...new Set([...s.prefilled, ...Object.keys(r.prefill)])],
@@ -838,7 +876,7 @@ function respondCore(s: ConsultState, step: string, value: string | string[]): C
   if (step === "concern") {
     const text = clip(one);
     if (!text) return s;
-    const r = receive(text);
+    const r = receive(normalizeWords(text));
     const mem = rememberFromWords(text, r.who, r.relation, r.ageHint);
     const next: ConsultState = {
       ...s,
@@ -847,14 +885,14 @@ function respondCore(s: ConsultState, step: string, value: string | string[]): C
       concernText: text,
       relation: r.relation,
       special: [...new Set([...s.special, ...r.special])],
-      suggested: suggestFrom(text, r.complaintIds),
+      suggested: suggestFrom(normalizeWords(text), r.complaintIds),
       duration: r.duration,
       answers: { ...r.prefill, ...s.answers },
       prefilled: Object.keys(r.prefill),
     };
     // "It hurts here", "on the right": where comes first (never guessed).
     // "I can't explain it": the patient gets help to describe it.
-    const t = text.toLowerCase().replace(/[’‘]/g, "'");
+    const t = normalizeWords(text);
     const noPart = !bodyFromWords(t) && !next.suggested.length;
     const side = sideFromWords(t);
     if (noPart && (/\b(here|over here|this (spot|area|place|part|side)|right there)\b/.test(t) || side === "left" || side === "right")) {
@@ -868,7 +906,7 @@ function respondCore(s: ConsultState, step: string, value: string | string[]): C
     const distressed = soundsDistressed(text)
       ? { ...kept, style: { ...kept.style, distressed: true }, notes: ["I can hear this is hard. I'll keep my questions short."] }
       : kept;
-    return withTextFlags(withComplaint(distressed), text);
+    return withTextFlags(withWordAnswers(withComplaint(distressed), text), text);
   }
 
   if (step.startsWith("confirm:")) {
@@ -1053,7 +1091,7 @@ const YES = /^(yes|yeah|yep|yup|haan|ha|aw|correct|right|i do|i have|i am|it is|
 const NO = /^(no|nope|nah|not really|never|none|nothing|i don'?t|i do not|i haven'?t|i have not|it isn'?t|it is not|there isn'?t|not at all)\b/;
 const UNSURE = /\b(not sure|unsure|don'?t know|do not know|maybe|perhaps|i think so|possibly|no idea|can'?t say)\b/;
 
-const clean = (t: string) => t.toLowerCase().replace(/[^a-z0-9' ]+/g, " ").replace(/\s+/g, " ").trim();
+const clean = (t: string) => normalizeWords(t).replace(/[^a-z0-9' ]+/g, " ").replace(/\s+/g, " ").trim();
 
 const NEGATION = /\b(no|not|never|none|nothing|nope|nah)\b|n't\b/;
 
@@ -1283,10 +1321,11 @@ export type Outcome =
   | { kind: "explain"; state: ConsultState; line: string }
   | { kind: "why"; line: string }
   | { kind: "repeat" }
-  | { kind: "term"; line: string } // "What does allergy mean?"
+  | { kind: "term"; line: string; state: ConsultState } // "What does allergy mean?"
   | { kind: "education"; answer: EducationAnswer }
   | { kind: "corrected"; state: ConsultState; line: string } // "I said left, not right"
   | { kind: "professional"; line: string } // the patient asks for a real doctor
+  | { kind: "control"; action: "slower" | "faster"; line: string } // "speak slower"
   | { kind: "unclear"; state: ConsultState; line: string; difficulty: Difficulty };
 
 export const KNOWLEDGE_LINE = "I don't have verified information about that in my health guide yet, and I don't want to guess about medical information.";
@@ -1323,12 +1362,12 @@ function clarify(s: ConsultState, turn: Turn, extra = ""): { state: ConsultState
   return { state, line: `${extra}${easier}`, difficulty: "language" };
 }
 
-const CORRECTION = /\b(actually|i said|i meant|i mean|not (the )?(left|right)|correction|change (it|that)|i made a mistake|that'?s wrong|sorry,? (it'?s|i meant))\b/i;
+const CORRECTION = /\b(actually|i said|i meant|i mean|not (the )?(left|right)|correction|change (it|that)|i made a mistake|that'?s wrong|sorry,? (it'?s|i meant))\b|^no\b.*\b(left|right|middle)\b|\bsorry\b.*\b(left|right|middle)\b|\bwrong side\b/i;
 
 // "Actually, I said left, not right." — the patient's correction replaces
 // what was stored, and the doctor says what she changed.
 function correction(s: ConsultState, text: string): { state: ConsultState; line: string } | null {
-  const t = text.toLowerCase().replace(/[’‘]/g, "'");
+  const t = normalizeWords(text);
   if (!CORRECTION.test(t)) return null;
   // Sides: "not right" removes right; the remaining side is the correction.
   const negated = new Set([...t.matchAll(/\bnot (?:the )?(left|right)\b/g)].map((m) => m[1]));
@@ -1362,6 +1401,38 @@ const shortAnswer = (s: ConsultState, words: string): ConsultState => {
 };
 const understood = (s: ConsultState): ConsultState => (s.unclear.count ? { ...s, unclear: { step: "", count: 0 } } : s);
 
+// "I already told you." — look back through what the patient said this visit;
+// if it answers the current question, use it (and apologise). Otherwise say
+// so honestly and ask once more. Never invent the answer.
+function recall(s: ConsultState, turn: Turn): Outcome {
+  // Two problems were named: ask which matters most rather than picking one.
+  if (turn.step === "complaint" && s.suggested.length > 1) {
+    const names = s.suggested.slice(0, 3).map((id) => getComplaint(id)?.label.toLowerCase().replace(/,.*$/, "").replace(/ or .*$/, "")).filter(Boolean);
+    return { kind: "explain", state: s, line: `Sorry — you did. You mentioned ${names.join(" and ")}. Which one is bothering you most? Tap it below.` };
+  }
+  for (const earlier of [...s.said.slice(0, -1)].reverse()) {
+    const value = interpretText(turn, earlier);
+    if (value === null || (turn.input.kind === "text" && turn.step !== "concern")) continue;
+    const next = respond(s, turn.step, value);
+    if (next !== s) {
+      return { kind: "answered", state: { ...next, notes: [`Sorry — you did tell me: “${earlier}”. I've noted it.`, ...next.notes.filter((n) => !n.startsWith("Sorry"))] } };
+    }
+  }
+  // A start time said earlier, in any form.
+  if (turn.step === "duration") {
+    for (const earlier of [...s.said].reverse()) {
+      const d = receive(normalizeWords(earlier)).duration;
+      if (d) return { kind: "answered", state: { ...respond(s, "duration", d), notes: [`Sorry — you did tell me. I've noted that it started ${DURATION_WORDS[d]}.`] } };
+    }
+  }
+  return {
+    kind: "unclear",
+    state: s,
+    line: "I'm sorry — I may have missed it. I don't have that answer from you yet. Could you tell me once more, or tap the closest answer?",
+    difficulty: "missing",
+  };
+}
+
 // Everything the patient types or says goes through here. Order matters:
 //  1. safety (red flags) — always first, can open an emergency at any step
 //  2. corrections, "I want a real doctor", "what does that word mean?",
@@ -1371,29 +1442,41 @@ const understood = (s: ConsultState): ConsultState => (s.unclear.count ? { ...s,
 //  5. a general health question → verified knowledge, or an honest
 //     "I don't have verified information about that yet"
 //  6. otherwise: the clarification ladder. Never a helpline.
-export function converse(s: ConsultState, turn: Turn, text: string): Outcome {
-  if (s.emergency) return { kind: "answered", state: s };
+export function converse(s0: ConsultState, turn: Turn, text: string): Outcome {
+  if (s0.emergency) return { kind: "answered", state: s0 };
   const words = clip(text);
-  if (!words) return { kind: "unclear", ...clarify(s, turn) };
+  if (!words) return { kind: "unclear", ...clarify(s0, turn) };
+  // Everything the patient says is remembered for this visit.
+  const s: ConsultState = { ...s0, said: [...s0.said, words].slice(-40) };
 
   const flagged = withTextFlags(s, words);
-  if (flagged !== s) return { kind: "answered", state: absorb(flagged, words) };
+  if (flagged.emergency || flagged.pendingFlags.length !== s.pendingFlags.length) return { kind: "answered", state: absorb(flagged, words) };
 
   const fix = correction(s, words);
   if (fix) return { kind: "corrected", state: fix.state, line: fix.line };
   if (WANTS_PROFESSIONAL.test(words)) return { kind: "professional", line: PROFESSIONAL_LINE };
 
-  const term = askedTerm(words);
+  const term = askedTerm(normalizeWords(words));
   // A fuller verified answer wins over the one-line glossary meaning.
   const fuller = term && isGeneralQuestion(words) ? findEducation(words) : null;
   if (fuller) return { kind: "education", answer: fuller };
-  if (term) return { kind: "term", line: `“${term.term.charAt(0).toUpperCase()}${term.term.slice(1)}” means ${term.meaning}.` };
+  if (term) {
+    const again = s.explainedTerms.includes(term.id) ? "As I mentioned, " : "";
+    const T = `${term.term.charAt(0).toUpperCase()}${term.term.slice(1)}`;
+    return { kind: "term", line: `${again}${again ? `“${term.term}”` : `“${T}”`} means ${term.meaning}.`, state: { ...s, explainedTerms: [...new Set([...s.explainedTerms, term.id])] } };
+  }
 
   let meta = metaIntent(words);
   // "I don't know how to explain it" at the start is an answer, not a request.
   if (meta === "explain" && (turn.step === "concern" || turn.step === "concern-more" || turn.step === "describe") && !/\b(what do you mean|understand|what does)\b/i.test(words)) meta = null;
   if (meta === "why") return { kind: "why", line: whyLine(turn) };
   if (meta === "repeat") return { kind: "repeat" };
+  if (meta === "slower") return { kind: "control", action: "slower", line: "Of course. I'll speak more slowly." };
+  if (meta === "faster") return { kind: "control", action: "faster", line: "Okay. I'll speak at a normal pace." };
+  if (meta === "rephrase") {
+    return { kind: "explain", state: { ...s, style: { ...s.style, explained: s.style.explained + 1 } }, line: `Sure — let me ask that another way. ${explainLine(turn, s)}` };
+  }
+  if (meta === "already") return recall(s, turn);
   if (meta === "explain") {
     return { kind: "explain", state: { ...s, style: { ...s.style, explained: s.style.explained + 1 } }, line: explainLine(turn, s) };
   }

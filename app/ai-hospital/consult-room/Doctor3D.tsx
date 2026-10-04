@@ -21,6 +21,7 @@ export type StageProps = {
   state: React.RefObject<DoctorState>;
   since: React.RefObject<number>;
   lips: React.RefObject<LipSync | null>;
+  activity?: React.RefObject<number>;
   reducedMotion: boolean;
   paused: boolean;
   tier: Exclude<Tier, "fallback">;
@@ -143,6 +144,7 @@ export default function Doctor3D(props: StageProps) {
           state={props.state}
           since={props.since}
           lips={props.lips}
+          activity={props.activity}
           reducedMotion={props.reducedMotion}
           detail={high}
           attire={props.attire}

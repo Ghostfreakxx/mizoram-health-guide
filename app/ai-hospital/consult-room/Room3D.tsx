@@ -588,7 +588,7 @@ export default function Room3D({ room, tier, chart }: { room: RoomStyle; tier: E
         <Cyl r={0.025} h={0.4} position={[0, 0.25, 0.18]} color="#6b7280" metal={0.7} rough={0.3} />
       </group>
 
-      {/* The chart screen: turned so both doctor and patient can see the visit record */}
+      {/* The chart screen, angled towards the doctor as on a real clinic desk (the patient sees the same record on their own screen) */}
       <group position={[LAYOUT.chart.position[0], LAYOUT.deskY, LAYOUT.chart.position[2]]} rotation={[0, LAYOUT.chart.rotationY, 0]}>
         <Box size={[0.2, 0.012, 0.14]} position={[0, 0.006, 0]} color="#1f2937" metal={0.3} rough={0.4} />
         <Box size={[0.04, 0.17, 0.03]} position={[0, 0.09, -0.03]} color="#1f2937" metal={0.3} rough={0.4} />

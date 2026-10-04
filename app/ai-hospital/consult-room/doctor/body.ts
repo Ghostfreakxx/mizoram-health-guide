@@ -1,7 +1,7 @@
 // Posture, breathing, head movement and hands. Movement is small: a listening
 // doctor is mostly still; explaining brings small, phrase-timed gestures.
 
-import type { Performance } from "./state";
+import type { DoctorState, Performance } from "./state";
 import { hash, noise } from "./random";
 
 export type ArmPose = "clasped" | "apart" | "tablet";
@@ -32,7 +32,18 @@ export function armPoseAt(time: number, seed = 0): ArmPose {
 export function bodyAt(
   t: number,
   perf: Performance,
-  opts: { reducedMotion?: boolean; speaking?: boolean; phrase?: number; beat?: number; reviewing?: boolean; seed?: number } = {},
+  opts: {
+    reducedMotion?: boolean;
+    speaking?: boolean;
+    phrase?: number;
+    beat?: number;
+    question?: boolean;
+    reviewing?: boolean;
+    seed?: number;
+    patientActive?: number;
+    sinceState?: number;
+    state?: DoctorState;
+  } = {},
 ): Body {
   const m = opts.reducedMotion ? 0 : 1;
   const seed = opts.seed ?? 0;
@@ -41,16 +52,27 @@ export function bodyAt(
   let headYaw = noise(t * 0.13, 1 + seed) * 0.03 * h;
   const headRoll = noise(t * 0.11, 3 + seed) * 0.014 * h;
 
-  // Listening: an occasional small nod (not on a fixed beat).
+  // Listening: an occasional small nod — more often while the patient is
+  // actually typing or talking ("mm-hm"), never on a fixed beat.
   if (perf.nods && m) {
-    const w = Math.floor(t / 4.6);
-    const into = t - w * 4.6;
-    if (hash(w * 5 + seed) < 0.55 && into < 0.7) headPitch += Math.sin((into / 0.7) * Math.PI) * 0.05;
+    const active = (opts.patientActive ?? 99) < 2;
+    const period = active ? 2.8 : 4.6;
+    const w = Math.floor(t / period);
+    const into = t - w * period;
+    if (hash(w * 5 + seed) < (active ? 0.7 : 0.4) && into < 0.6) headPitch += Math.sin((into / 0.6) * Math.PI) * (active ? 0.045 : 0.035);
   }
-  // Speaking: tiny emphasis on word beats, and small phrase-level turns.
+  // An answer arrived: a small acknowledging nod before thinking.
+  if (opts.state === "processing" && m) {
+    const x = opts.sinceState ?? 9;
+    if (x < 0.5) headPitch += Math.sin((x / 0.5) * Math.PI) * 0.035;
+  }
+  // Speaking: tiny emphasis on stressed words, small phrase-level turns, and
+  // a slight tilt at the end of a question.
+  let roll = 0;
   if (opts.speaking && m) {
     headPitch += (opts.beat ?? 0) * 0.012;
     headYaw += (hash((opts.phrase ?? 0) * 7 + seed) * 2 - 1) * 0.025 * perf.head;
+    if (opts.question) roll += 0.02;
   }
 
   // Hands: still unless speaking; a gesture belongs to a phrase, not a loop.
@@ -67,7 +89,7 @@ export function bodyAt(
     shift: noise(t * 0.04, 9 + seed) * m,
     headYaw,
     headPitch,
-    headRoll,
+    headRoll: headRoll + roll * m,
     armPose: opts.reviewing ? "tablet" : armPoseAt(t, seed),
     gesture,
   };

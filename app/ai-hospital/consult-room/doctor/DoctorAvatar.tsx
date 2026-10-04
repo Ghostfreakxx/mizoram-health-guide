@@ -26,6 +26,7 @@ export type DoctorAvatarProps = {
   state: React.RefObject<DoctorState>;
   since: React.RefObject<number>; // when the state started (performance.now()/1000)
   lips: React.RefObject<LipSync | null>;
+  activity?: React.RefObject<number>; // when the patient last typed or spoke (performance.now()/1000)
   reducedMotion: boolean;
   detail: boolean; // skin micro-detail shader (high quality only)
   attire: Attire;
@@ -50,25 +51,34 @@ const tmpQ2 = new THREE.Quaternion();
 const tmpE = new THREE.Euler();
 
 // Rotates `bone` so its child points at `target` (world space).
+// Uses scratch objects: this runs for every arm bone, every frame.
+const aimParent = new THREE.Quaternion();
+const aimInv = new THREE.Quaternion();
+const aimQ = new THREE.Quaternion();
+const aimFrom = new THREE.Vector3();
+const aimTo = new THREE.Vector3();
+const aimPos = new THREE.Vector3();
 function aim(bone: THREE.Bone, childLocal: THREE.Vector3, target: THREE.Vector3, twist = 0) {
   bone.quaternion.identity();
   bone.updateWorldMatrix(true, false);
-  const parentQ = bone.parent ? bone.parent.getWorldQuaternion(new THREE.Quaternion()) : new THREE.Quaternion();
-  const from = childLocal.clone().normalize().applyQuaternion(parentQ);
-  const to = target.clone().sub(bone.getWorldPosition(new THREE.Vector3())).normalize();
-  const q = new THREE.Quaternion().setFromUnitVectors(from, to);
-  const inv = parentQ.clone().invert();
-  bone.quaternion.copy(inv.multiply(q).multiply(parentQ));
-  if (twist) bone.quaternion.multiply(new THREE.Quaternion().setFromAxisAngle(childLocal.clone().normalize(), twist));
+  if (bone.parent) bone.parent.getWorldQuaternion(aimParent);
+  else aimParent.identity();
+  aimFrom.copy(childLocal).normalize().applyQuaternion(aimParent);
+  aimTo.copy(target).sub(bone.getWorldPosition(aimPos)).normalize();
+  aimQ.setFromUnitVectors(aimFrom, aimTo);
+  aimInv.copy(aimParent).invert();
+  bone.quaternion.copy(aimInv.multiply(aimQ).multiply(aimParent));
+  if (twist) bone.quaternion.multiply(aimQ.setFromAxisAngle(aimFrom.copy(childLocal).normalize(), twist));
   bone.updateWorldMatrix(false, true);
 }
 
 // Applies a world-space rotation to a bone (in its parent's frame).
+const rwLocal = new THREE.Quaternion();
 function rotateWorld(bone: THREE.Bone, worldQ: THREE.Quaternion) {
   bone.updateWorldMatrix(true, false);
   const parentQ = bone.parent!.getWorldQuaternion(tmpQ2);
-  const local = parentQ.clone().invert().multiply(worldQ).multiply(parentQ);
-  bone.quaternion.premultiply(local);
+  rwLocal.copy(parentQ).invert().multiply(worldQ).multiply(parentQ);
+  bone.quaternion.premultiply(rwLocal);
 }
 
 // ---------------- Materials ----------------
@@ -287,7 +297,23 @@ function seat(rig: Rig) {
 
 // ---------------- Component ----------------
 
-const MORPH_SPEED: Record<string, number> = { eyeBlink_L: 1, eyeBlink_R: 1, jawOpen: 0.4, mouthPucker: 0.4, mouthFunnel: 0.4, mouthStretch: 0.4, lipsPart: 0.4 };
+// Per-frame smoothing (at 60 fps). Blinks are instant; mouth shapes are fast
+// enough for "m/b/p" closures (~70 ms) without jitter, and open slightly
+// faster than they close; expressions change slowly.
+const MOUTH = new Set(["jawOpen", "mouthPucker", "mouthFunnel", "mouthStretch", "lipsPart", "mouthUpperUp"]);
+const MORPH_SPEED: Record<string, number> = { eyeBlink_L: 1, eyeBlink_R: 1 };
+const morphRate = (name: string, rising: boolean, speaking: boolean) =>
+  MORPH_SPEED[name] ?? (MOUTH.has(name) ? (rising ? 0.55 : 0.4) : name === "mouthPress" && speaking ? 0.6 : 0.06);
+
+// Scratch objects reused every frame (no garbage while animating).
+const fwdV = new THREE.Vector3();
+const dirV = new THREE.Vector3();
+const camDirV = new THREE.Vector3();
+const eyeDirV = new THREE.Vector3();
+const headWorld = new THREE.Vector3();
+const parentQ = new THREE.Quaternion();
+const eyeQ = new THREE.Quaternion();
+const identityQ = new THREE.Quaternion();
 
 export default function DoctorAvatar(props: DoctorAvatarProps) {
   const { camera } = useThree();
@@ -365,8 +391,9 @@ export default function DoctorAvatar(props: DoctorAvatarProps) {
     const now = performance.now() / 1000;
     const state = props.state.current ?? "idle";
     const since = (props.since.current ?? now) - now + t; // state start on the clock's timeline
-    const rhythm = props.lips.current?.rhythm(now) ?? { speaking: false, phrase: 0, beat: 0 };
-    const f = performAt(t, state, since, { reducedMotion: props.reducedMotion, ...rhythm, lastGazeShift: lastShift.current });
+    const rhythm = props.lips.current?.rhythm(now) ?? { speaking: false, phrase: 0, phraseAge: 0, beat: 0, question: false };
+    const patientActive = props.activity?.current ? now - props.activity.current : 99;
+    const f = performAt(t, state, since, { reducedMotion: props.reducedMotion, ...rhythm, lastGazeShift: lastShift.current, patientActive });
     const b = rig.bones;
     const k = (rate: number) => 1 - Math.exp(-rate * Math.min(dt, 0.1));
 
@@ -397,8 +424,8 @@ export default function DoctorAvatar(props: DoctorAvatarProps) {
       lastShift.current = t; // a natural blink accompanies a larger gaze shift
     }
     const headPos = b["head"].getWorldPosition(tmpV2);
-    const dir = target.clone().sub(headPos).normalize();
-    const camDir = tmpV.clone().sub(headPos).normalize();
+    const dir = dirV.copy(target).sub(headPos).normalize();
+    const camDir = camDirV.copy(tmpV).sub(headPos).normalize();
     const yawTo = Math.atan2(dir.x, dir.z) - Math.atan2(camDir.x, camDir.z);
     const pitchTo = Math.asin(Math.max(-1, Math.min(1, -dir.y))) - Math.asin(Math.max(-1, Math.min(1, -camDir.y)));
     headTurn.current.x += (yawTo * 0.35 - headTurn.current.x) * k(props.reducedMotion ? 2 : 4);
@@ -410,19 +437,18 @@ export default function DoctorAvatar(props: DoctorAvatarProps) {
     rig.root.updateMatrixWorld(true);
 
     // Eyes: quick but not instant (a saccade takes a few tens of milliseconds).
-    const eyeTarget = target.clone();
-    gazeDir.current.lerp(eyeTarget.sub(b["head"].getWorldPosition(new THREE.Vector3())).normalize(), k(18));
+    gazeDir.current.lerp(eyeDirV.copy(target).sub(b["head"].getWorldPosition(headWorld)).normalize(), k(18));
     for (const s of ["L", "R"]) {
       const eye = b[`eye.${s}`];
       if (!eye) continue;
-      const d = gazeDir.current.clone();
+      const d = eyeDirV.copy(gazeDir.current);
       d.x += f.gaze.sx;
       d.y += f.gaze.sy;
-      const fwd = new THREE.Vector3(0, 0, 1).applyQuaternion(eye.parent!.getWorldQuaternion(new THREE.Quaternion()));
+      const fwd = fwdV.set(0, 0, 1).applyQuaternion(eye.parent!.getWorldQuaternion(parentQ));
       // limit eye rotation to a natural range (~25°)
-      const q = new THREE.Quaternion().setFromUnitVectors(fwd, d.normalize());
+      const q = eyeQ.setFromUnitVectors(fwd, d.normalize());
       const ang = 2 * Math.acos(Math.min(1, Math.abs(q.w)));
-      if (ang > 0.45) q.slerp(new THREE.Quaternion(), 1 - 0.45 / ang);
+      if (ang > 0.45) q.slerp(identityQ, 1 - 0.45 / ang);
       rotateWorld(eye, q);
     }
 
@@ -446,13 +472,14 @@ export default function DoctorAvatar(props: DoctorAvatarProps) {
       mouthFunnel: lip?.mouthFunnel ?? 0,
       mouthStretch: lip?.mouthStretch ?? 0,
       lipsPart: lip?.lipsPart ?? 0,
+      mouthUpperUp: lip?.mouthUpperUp ?? 0,
     };
     const values: [number, number][] = [];
     for (const [name, value] of Object.entries(target2)) {
       const i = rig.morph[name];
       if (i === undefined) continue;
       const prev = smooth.current[name] ?? 0;
-      const rate = MORPH_SPEED[name] ?? 0.06;
+      const rate = morphRate(name, value > prev, speaking);
       const v = rate >= 1 ? value : prev + (value - prev) * Math.min(1, rate * dt * 60);
       smooth.current[name] = v;
       values.push([i, v]);

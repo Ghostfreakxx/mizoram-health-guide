@@ -14,6 +14,7 @@ export default function Doctor2D({
   state,
   since,
   lips,
+  activity,
   reducedMotion,
   paused,
   room,
@@ -21,6 +22,7 @@ export default function Doctor2D({
   state: React.RefObject<DoctorState>;
   since: React.RefObject<number>;
   lips: React.RefObject<LipSync | null>;
+  activity?: React.RefObject<number>;
   reducedMotion: boolean;
   paused: boolean;
   room: RoomStyle;
@@ -46,7 +48,8 @@ export default function Doctor2D({
     const tick = (now: number) => {
       const t = now / 1000;
       const r = lips.current?.rhythm(t);
-      const f = performAt(t, state.current ?? "idle", since.current ?? 0, { reducedMotion: motion.current, ...r });
+      const patientActive = activity?.current ? t - activity.current : 99;
+      const f = performAt(t, state.current ?? "idle", since.current ?? 0, { reducedMotion: motion.current, ...r, patientActive });
       const v = lips.current?.visemeAt(t);
       const p = { ...f.body, ...f.face, smile: f.face.mouthSmile };
       const deg = 180 / Math.PI;
@@ -67,7 +70,7 @@ export default function Doctor2D({
     };
     raf = requestAnimationFrame(tick);
     return () => cancelAnimationFrame(raf);
-  }, [paused, state, since, lips]);
+  }, [paused, state, since, lips, activity]);
 
   return (
     <svg viewBox="-90 -10 500 310" className="h-full w-full" preserveAspectRatio="xMidYMid slice" aria-hidden>

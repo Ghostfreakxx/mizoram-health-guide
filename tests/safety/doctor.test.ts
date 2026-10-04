@@ -2,16 +2,16 @@ import { describe, expect, it } from "vitest";
 import { bodyAt } from "../../app/ai-hospital/consult-room/doctor/body";
 import { EXPRESSIONS, blinkAt } from "../../app/ai-hospital/consult-room/doctor/face";
 import { gazeAt } from "../../app/ai-hospital/consult-room/doctor/gaze";
-import { LipSync, segments, visemeFor } from "../../app/ai-hospital/consult-room/doctor/lipsync";
+import { LipSync, REST, segments, visemeFor } from "../../app/ai-hospital/consult-room/doctor/lipsync";
 import { performAt } from "../../app/ai-hospital/consult-room/doctor/perform";
-import { type DoctorState, PERFORMANCE, STATE_LABEL, isSpeakingState } from "../../app/ai-hospital/consult-room/doctor/state";
+import { type DoctorState, EFFECTS, PERFORMANCE, STATE_LABEL, isSpeakingState } from "../../app/ai-hospital/consult-room/doctor/state";
 
 const STATES = Object.keys(PERFORMANCE) as DoctorState[];
 
 describe("the doctor's state machine", () => {
   it("has the consultation states, each with a label and a performance", () => {
     expect(STATES.sort()).toEqual(
-      ["asking", "clarifying", "complete", "concerned", "educating", "emergency", "explaining", "greeting", "handoff", "idle", "listening", "processing", "reassuring"].sort(),
+      ["asking", "clarifying", "complete", "concerned", "educating", "emergency", "explaining", "greeting", "handoff", "idle", "initializing", "listening", "processing", "reassuring"].sort(),
     );
     for (const s of STATES) expect(STATE_LABEL[s]).toBeTruthy();
   });
@@ -134,5 +134,99 @@ describe("lip-sync", () => {
       return last;
     };
     expect(lastMoving(slow)).toBeGreaterThan(lastMoving(fast));
+  });
+});
+
+describe("one state table drives every subsystem", () => {
+  it("every state has effects; the emergency stops routine questions and Talk", () => {
+    for (const st of STATES) expect(EFFECTS[st], st).toBeDefined();
+    expect(EFFECTS.emergency.routine).toBe(false);
+    expect(EFFECTS.emergency.talk).toBe(false);
+    expect(EFFECTS.listening.speaks).toBe(false);
+    expect(EFFECTS.listening.caption).toBe("listening");
+    expect(EFFECTS.clarifying.caption).not.toBe("urgent");
+  });
+  it("clarifying is never a concerned or urgent face", () => {
+    expect(PERFORMANCE.clarifying.expression).not.toMatch(/concerned|urgent/);
+  });
+});
+
+describe("gaze follows the conversation", () => {
+  it("returns from the chart to the patient before the next question is spoken (< 0.8 s)", () => {
+    expect(gazeAt(10.4, "review", 10).target).toBe("chart");
+    expect(gazeAt(10.85, "review", 10).target).toBe("patient");
+  });
+  it("starts every spoken phrase looking at the patient", () => {
+    for (let phrase = 0; phrase < 30; phrase++) {
+      expect(gazeAt(5, "conversational", 0, { speaking: true, phrase, phraseAge: 0.2 }).target).toBe("patient");
+      expect(gazeAt(5, "explaining", 0, { speaking: true, phrase, phraseAge: 0.3 }).target).toBe("patient");
+    }
+  });
+  it("while explaining, sometimes glances at the chart; in an emergency, never looks away", () => {
+    const targets = Array.from({ length: 40 }, (_, phrase) => Array.from({ length: 30 }, (_, k) => gazeAt(5, "explaining", 0, { speaking: true, phrase, phraseAge: k / 10 }).target)).flat();
+    expect(targets).toContain("chart");
+    // eye contact most of the time, even while explaining
+    expect(targets.filter((x) => x === "patient").length / targets.length).toBeGreaterThan(0.7);
+    for (let phrase = 0; phrase < 40; phrase++) expect(gazeAt(5, "steady", 0, { speaking: true, phrase, phraseAge: 0.9 }).target).toBe("patient");
+  });
+  it("while loading, the doctor is at her notes (not staring)", () => {
+    expect(gazeAt(1, "preparing", 0).target).toBe("chart");
+  });
+});
+
+describe("micro-behaviour", () => {
+  it("a brief eyebrow flash when greeting; brows lift at the end of a question", () => {
+    const g = performAt(10.5, "greeting", 10);
+    expect(g.face.browOuterUp).toBeGreaterThan(EXPRESSIONS.welcoming.browOuterUp);
+    const q = performAt(20, "asking", 10, { speaking: true, question: true, phrase: 1, phraseAge: 1 });
+    const n = performAt(20, "asking", 10, { speaking: true, question: false, phrase: 1, phraseAge: 1 });
+    expect(q.face.browInnerUp).toBeGreaterThan(n.face.browInnerUp);
+  });
+  it("nods more while the patient is actively typing or talking", () => {
+    const count = (active: number) => Array.from({ length: 600 }, (_, i) => bodyAt(i / 10, PERFORMANCE.listening, { patientActive: active }).headPitch).filter((p) => p > 0.03).length;
+    expect(count(0.5)).toBeGreaterThan(count(99));
+  });
+});
+
+describe("lip-sync quality", () => {
+  it("lips close fully for m, b and p", () => {
+    expect(visemeFor("m").mouthPress).toBeGreaterThanOrEqual(0.8);
+    expect(visemeFor("b").jawOpen).toBe(0);
+  });
+  it("silent letters take no time ('though' has no 'gh' shape)", () => {
+    expect(segments("though").length).toBe(segments("tho").length);
+  });
+  it("the mouth does not snap shut between words in a phrase", () => {
+    const l = new LipSync();
+    l.begin("we will check your answers now", 0);
+    const jaw = Array.from({ length: 120 }, (_, i) => l.visemeAt(i / 100).jawOpen);
+    // many tiny closures in a row would be "flapping": count frames at full rest mid-phrase
+    const restFrames = jaw.slice(5, 100).filter((j) => j === 0).length;
+    expect(restFrames).toBeLessThan(15);
+  });
+  it("rhythm stays 'speaking' between words, and reports questions", () => {
+    const l = new LipSync();
+    l.begin("Where does it hurt?", 0);
+    const samples = Array.from({ length: 60 }, (_, i) => l.rhythm(i / 50));
+    expect(samples.slice(1, 40).every((r) => r.speaking)).toBe(true);
+    expect(samples.some((r) => r.question)).toBe(true);
+  });
+  it("re-anchors to real word events and never runs ahead of the audio", () => {
+    const l = new LipSync();
+    const text = "please tell me more about the pain";
+    l.begin(text, 0);
+    l.word(0, 0.0);
+    // the engine is slow: the next word event has not arrived yet at 0.5 s
+    const r = l.rhythm(0.5);
+    expect(r.speaking).toBe(true);
+    l.word(text.indexOf("tell"), 0.6);
+    expect(l.visemeAt(0.65).jawOpen + l.visemeAt(0.65).lipsPart).toBeGreaterThan(0);
+  });
+  it("stops the moment the audio stops", () => {
+    const l = new LipSync();
+    l.begin("Hello there, how are you feeling today?", 0);
+    l.end();
+    expect(l.visemeAt(0.3)).toEqual(REST);
+    expect(l.rhythm(0.3).speaking).toBe(false);
   });
 });

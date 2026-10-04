@@ -34,17 +34,20 @@ type Props = {
   onExplain: () => void;
   onBack: () => void;
   canBack: boolean;
+  aboveSheet?: boolean; // phones: sit just above the chart bottom sheet
 };
 
+// Phones: a compact 3×2 grid of large-enough (44 px) targets; larger screens:
+// one row of full-size buttons.
 const btn =
-  "min-h-12 flex-1 rounded-xl border-2 px-3 py-2 text-base font-bold disabled:opacity-40 sm:flex-none sm:px-4";
+  "min-h-11 rounded-xl border-2 px-2 py-1.5 text-sm font-bold leading-tight disabled:opacity-40 sm:min-h-12 sm:flex-none sm:px-4 sm:py-2 sm:text-base";
 
 export default function ConversationControls(p: Props) {
   return (
     <div
       role="group"
       aria-label="Talk with the doctor"
-      className="sticky bottom-0 z-20 -mx-4 space-y-2 border-t border-slate-200 bg-white/95 px-4 py-3 shadow-[0_-4px_12px_rgba(15,23,42,0.08)] backdrop-blur sm:static sm:mx-0 sm:rounded-2xl sm:border sm:shadow-sm"
+      className={`sticky ${p.aboveSheet === false ? "bottom-0" : "bottom-14 lg:bottom-0"} z-20 -mx-4 space-y-1.5 border-t border-slate-200 bg-white/95 px-3 py-2 sm:space-y-2 sm:px-4 sm:py-3 shadow-[0_-4px_12px_rgba(15,23,42,0.08)] backdrop-blur sm:static sm:mx-0 sm:rounded-2xl sm:border sm:shadow-sm`}
     >
       <div className="flex items-center justify-between gap-2">
         <p role="status" aria-live="polite" className="flex items-center gap-2 text-sm font-semibold text-slate-800">
@@ -56,12 +59,12 @@ export default function ConversationControls(p: Props) {
           type="button"
           aria-pressed={p.slower}
           onClick={p.onSlower}
-          className={`min-h-11 rounded-lg border-2 px-3 text-sm font-semibold ${p.slower ? "border-blue-900 bg-blue-900 text-white" : "border-slate-300 bg-white text-slate-800"}`}
+          className={`min-h-10 rounded-lg border-2 px-3 text-sm font-semibold sm:min-h-11 ${p.slower ? "border-blue-900 bg-blue-900 text-white" : "border-slate-300 bg-white text-slate-800"}`}
         >
           🐢 Slower
         </button>
       </div>
-      <div className="flex flex-wrap gap-2">
+      <div className="grid grid-cols-3 gap-1.5 sm:flex sm:flex-wrap sm:gap-2">
         <button
           type="button"
           onClick={p.onTalk}

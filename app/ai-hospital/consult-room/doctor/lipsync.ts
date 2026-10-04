@@ -1,30 +1,48 @@
 // Lip-sync from text, timed to the speech engine.
 //
-// The phone's speech engine reports when each word starts (boundary events).
-// Each word is turned into mouth shapes from its letters — with common letter
-// pairs (th, sh, ch, oo, ee) — and blended so shapes flow into each other.
-// When the engine gives no word events, timings are estimated from the text,
-// including pauses at commas and full stops. The mouth only moves while audio
-// is actually playing, and returns to rest when it stops.
+// The browser's speech engine does not expose its audio or phonemes, so the
+// mouth is driven from the TEXT being spoken, timed to the voice:
+//  - Each word becomes mouth shapes (visemes) from its letters, with common
+//    letter pairs (th, sh, ch, oo, ee, ng, qu) and silent letters handled.
+//  - One word schedule per sentence. When the engine reports word starts
+//    (boundary events), the schedule is re-anchored to the real audio and the
+//    speaking rate is learned; without them, timing is estimated, including
+//    pauses at commas and full stops.
+//  - Shapes flow into each other (coarticulation): the end of a word blends
+//    into the start of the next, short gaps keep the mouth relaxed rather than
+//    snapping shut, and the next shape is anticipated just before it starts.
+//  - The mouth starts with the audio (begin on the engine's start event) and
+//    stops with it (end on its end event, Stop or an interruption).
+// Limitations: the avatar has 7 mouth controls (jaw, lips part, press,
+// pucker, funnel, stretch, upper lip); there are no tongue or teeth controls,
+// so sounds like "l", "t" or "th" are approximated.
 
-export type Viseme = { jawOpen: number; mouthPucker: number; mouthFunnel: number; mouthStretch: number; mouthPress: number; lipsPart: number };
+export type Viseme = { jawOpen: number; mouthPucker: number; mouthFunnel: number; mouthStretch: number; mouthPress: number; lipsPart: number; mouthUpperUp: number };
 
-export const REST: Viseme = { jawOpen: 0, mouthPucker: 0, mouthFunnel: 0, mouthStretch: 0, mouthPress: 0, lipsPart: 0 };
+export const REST: Viseme = { jawOpen: 0, mouthPucker: 0, mouthFunnel: 0, mouthStretch: 0, mouthPress: 0, lipsPart: 0, mouthUpperUp: 0 };
 const V = (o: Partial<Viseme>): Viseme => ({ ...REST, ...o });
 
-const MAX_JAW = 0.38; // never more: avoids an unnatural, "dislocated" jaw
+export const MAX_JAW = 0.38; // never more: avoids an unnatural, "dislocated" jaw
 
-const SHAPES: [RegExp, Viseme][] = [
-  [/^(th)/, V({ jawOpen: 0.08, lipsPart: 0.32 })],
-  [/^(sh|ch|j)/, V({ jawOpen: 0.1, mouthFunnel: 0.35, lipsPart: 0.25 })],
-  [/^(oo|ou|ow|w|u)/, V({ jawOpen: 0.1, mouthPucker: 0.5, lipsPart: 0.18 })],
-  [/^(ee|ea|ie|y)/, V({ jawOpen: 0.12, mouthStretch: 0.38, lipsPart: 0.35 })],
-  [/^(o)/, V({ jawOpen: 0.22, mouthFunnel: 0.42, lipsPart: 0.3 })],
-  [/^(a)/, V({ jawOpen: 0.3, lipsPart: 0.45 })],
+// Letter patterns → mouth shapes. null = silent (no time, no shape).
+const SHAPES: [RegExp, Viseme | null][] = [
+  [/^(gh)(?![aeiou])/, null], // though, night
+  [/^(kn|wr)/, V({ jawOpen: 0.08, lipsPart: 0.3 })], // know, write (first letter silent)
+  [/^(th)/, V({ jawOpen: 0.08, lipsPart: 0.34, mouthUpperUp: 0.08 })],
+  [/^(sh|ch|j|tch)/, V({ jawOpen: 0.08, mouthFunnel: 0.38, lipsPart: 0.28 })],
+  [/^(qu)/, V({ jawOpen: 0.08, mouthPucker: 0.45, lipsPart: 0.15 })],
+  [/^(oo|ou|ow|ew|w|u)/, V({ jawOpen: 0.1, mouthPucker: 0.5, lipsPart: 0.18 })],
+  [/^(ee|ea|ie|ey|y)/, V({ jawOpen: 0.11, mouthStretch: 0.4, lipsPart: 0.36 })],
+  [/^(ng)/, V({ jawOpen: 0.1, lipsPart: 0.26 })],
+  [/^(oa|o)/, V({ jawOpen: 0.22, mouthFunnel: 0.42, lipsPart: 0.3 })],
+  [/^(ai|ay|a)/, V({ jawOpen: 0.3, lipsPart: 0.46 })],
   [/^(e|i)/, V({ jawOpen: 0.16, mouthStretch: 0.3, lipsPart: 0.38 })],
-  [/^(m|b|p)/, V({ mouthPress: 0.55 })],
-  [/^(f|v)/, V({ jawOpen: 0.05, lipsPart: 0.22, mouthPress: 0.15 })],
-  [/^[a-z]/, V({ jawOpen: 0.1, lipsPart: 0.32 })],
+  [/^(mm|m|bb|b|pp|p)/, V({ mouthPress: 0.85 })], // lips fully closed
+  [/^(ff|f|ph|v)/, V({ jawOpen: 0.05, lipsPart: 0.2, mouthPress: 0.2, mouthUpperUp: 0.18 })], // lower lip to upper teeth
+  [/^(ss|s|z|c(?=[eiy])|t|d|n|l)/, V({ jawOpen: 0.06, lipsPart: 0.3, mouthStretch: 0.14 })], // teeth nearly together
+  [/^(r)/, V({ jawOpen: 0.09, mouthPucker: 0.2, lipsPart: 0.24 })],
+  [/^(k|c|g|h|x|q)/, V({ jawOpen: 0.14, lipsPart: 0.3 })],
+  [/^[a-z]/, V({ jawOpen: 0.1, lipsPart: 0.3 })],
 ];
 
 export type Segment = { v: Viseme; weight: number };
@@ -32,13 +50,15 @@ export type Segment = { v: Viseme; weight: number };
 // Splits a word into mouth-shape segments with relative durations.
 export function segments(word: string): Segment[] {
   let w = word.toLowerCase().replace(/[^a-z]/g, "");
-  if (w.length > 3 && w.endsWith("e")) w = w.slice(0, -1); // silent final e
+  if (w.length > 3 && w.endsWith("e") && !/[aeiou]e$/.test(w)) w = w.slice(0, -1); // silent final e
   const out: Segment[] = [];
   while (w.length) {
     const hit = SHAPES.find(([re]) => re.test(w))!;
     const m = w.match(hit[0])![0];
-    const vowel = /[aeiouy]/.test(m[0]);
-    out.push({ v: hit[1], weight: vowel ? 1.3 : 0.8 });
+    if (hit[1]) {
+      const vowel = /^[aeiouy]/.test(m);
+      out.push({ v: hit[1], weight: vowel ? 1.35 : 0.75 });
+    }
     w = w.slice(m.length);
   }
   return out;
@@ -48,15 +68,19 @@ export function visemeFor(ch: string): Viseme {
   return segments(ch)[0]?.v ?? REST;
 }
 
-function mix(a: Viseme, b: Viseme, f: number): Viseme {
+export function mix(a: Viseme, b: Viseme, f: number): Viseme {
   const o = { ...REST };
   for (const k of Object.keys(o) as (keyof Viseme)[]) o[k] = a[k] + (b[k] - a[k]) * f;
   o.jawOpen = Math.min(MAX_JAW, o.jawOpen);
   return o;
 }
 
-// Mouth shape `elapsed` seconds into a word lasting `duration` seconds.
-export function visemeAt(word: string, elapsed: number, duration: number): Viseme {
+const scale = (v: Viseme, s: number): Viseme => mix(REST, v, s);
+const smooth = (x: number) => x * x * (3 - 2 * x);
+
+// Mouth shape `elapsed` seconds into a word lasting `duration` seconds. The
+// last shape blends into `next` (the next word's first shape) when given.
+export function visemeAt(word: string, elapsed: number, duration: number, next: Viseme = REST, emphasis = 1): Viseme {
   const segs = segments(word);
   if (!segs.length || elapsed < 0 || elapsed > duration) return REST;
   const total = segs.reduce((a, s) => a + s.weight, 0);
@@ -65,8 +89,8 @@ export function visemeAt(word: string, elapsed: number, duration: number): Visem
     if (x <= segs[i].weight) {
       const f = x / segs[i].weight;
       // blend into the next shape over the last 40% of each segment
-      const next = segs[i + 1]?.v ?? REST;
-      return mix(segs[i].v, next, Math.max(0, (f - 0.6) / 0.4));
+      const to = segs[i + 1]?.v ?? next;
+      return scale(mix(segs[i].v, to, smooth(Math.max(0, (f - 0.6) / 0.4))), emphasis);
     }
     x -= segs[i].weight;
   }
@@ -74,43 +98,86 @@ export function visemeAt(word: string, elapsed: number, duration: number): Visem
 }
 
 const lettersOf = (w: string) => w.replace(/[^a-z]/gi, "").length;
-const pauseAfter = (w: string) => (/[.!?]$/.test(w) ? 0.32 : /[,;:]$/.test(w) ? 0.16 : 0.04);
+const pauseAfter = (w: string) => (/[.!?]$/.test(w) ? 0.32 : /[,;:]$/.test(w) ? 0.16 : 0.03);
+const firstShape = (w: string | undefined) => (w ? segments(w)[0]?.v ?? REST : REST);
+const lastShape = (w: string) => {
+  const s = segments(w);
+  return s[s.length - 1]?.v ?? REST;
+};
+
+type Word = { text: string; at: number; letters: number; pause: number; phrase: number; question: boolean; stressed: boolean; final: boolean };
+
+export type Rhythm = {
+  speaking: boolean; // an utterance is playing (true in short gaps between words too)
+  phrase: number; // phrase index (changes at punctuation)
+  phraseAge: number; // seconds since the current phrase started
+  beat: number; // emphasis pulse on stressed words (0..1)
+  question: boolean; // in the last words of a question
+};
+
+const SILENT: Rhythm = { speaking: false, phrase: 0, phraseAge: 0, beat: 0, question: false };
 
 export class LipSync {
-  private words: { text: string; at: number }[] = [];
-  private start = 0;
-  private boundary: { index: number; time: number } | null = null;
+  private words: Word[] = [];
+  private starts: number[] = []; // seconds after t0
+  private t0 = 0;
+  private boundaryIndex = -1; // last word confirmed by the engine
+  private boundaryTime = 0;
   private perLetter = 0.068; // seconds per letter; adapts to the real voice
   private pausedAt: number | null = null;
   speaking = false;
   rate = 1;
 
   begin(text: string, now: number, rate = 1) {
-    const words: { text: string; at: number }[] = [];
+    const words: Word[] = [];
     const re = /\S+/g;
     let m: RegExpExecArray | null;
-    while ((m = re.exec(text))) words.push({ text: m[0], at: m.index });
+    let phrase = 0;
+    while ((m = re.exec(text))) {
+      const w = m[0];
+      words.push({ text: w, at: m.index, letters: lettersOf(w), pause: pauseAfter(w), phrase, question: false, stressed: lettersOf(w) >= 6, final: false });
+      if (/[.,;:!?]$/.test(w)) phrase++;
+    }
+    // Mark the last 3 words of each question, and each phrase's last word.
+    for (let i = 0; i < words.length; i++) {
+      if (/[?]$/.test(words[i].text)) for (let j = Math.max(0, i - 2); j <= i; j++) if (words[j].phrase === words[i].phrase) words[j].question = true;
+      if (i === words.length - 1 || words[i + 1].phrase !== words[i].phrase) words[i].final = true;
+    }
     this.words = words;
-    this.start = now;
-    this.boundary = null;
+    this.t0 = now;
+    this.boundaryIndex = -1;
     this.pausedAt = null;
     this.rate = rate;
-    this.speaking = true;
+    this.speaking = words.length > 0;
+    this.reschedule(0, 0);
   }
 
-  // charIndex from the speech engine's word-boundary event
+  private duration(w: Word) {
+    return Math.max(0.12, (w.letters * this.perLetter + 0.05) / this.rate);
+  }
+
+  // Lays out word start times from word `from`, starting at `at` (s after t0).
+  private reschedule(from: number, at: number) {
+    let t = at;
+    for (let i = from; i < this.words.length; i++) {
+      this.starts[i] = t;
+      t += this.duration(this.words[i]) + this.words[i].pause / this.rate;
+    }
+  }
+
+  // charIndex from the speech engine's word-boundary event: re-anchor the
+  // schedule to the real audio and learn the speaking rate.
   word(charIndex: number, now: number) {
     let i = this.words.findIndex((w, k) => charIndex >= w.at && (k === this.words.length - 1 || charIndex < this.words[k + 1].at));
     if (i < 0) i = 0;
-    const prev = this.boundary;
-    if (prev && i === prev.index + 1) {
-      // learn the real speaking rate from the gap between words
-      const gap = now - prev.time - pauseAfter(this.words[prev.index].text);
-      const letters = Math.max(1, lettersOf(this.words[prev.index].text));
-      const measured = gap / letters;
-      if (measured > 0.02 && measured < 0.2) this.perLetter = this.perLetter * 0.7 + measured * 0.3;
+    if (this.boundaryIndex >= 0 && i === this.boundaryIndex + 1) {
+      const prev = this.words[this.boundaryIndex];
+      const measured = (now - this.boundaryTime - prev.pause / this.rate) / Math.max(1, prev.letters);
+      if (measured > 0.02 && measured < 0.2) this.perLetter = this.perLetter * 0.7 + measured * 0.3 * this.rate;
     }
-    this.boundary = { index: i, time: now };
+    this.boundaryIndex = i;
+    this.boundaryTime = now;
+    this.reschedule(i, now - this.t0);
   }
 
   pause(now: number) {
@@ -120,50 +187,73 @@ export class LipSync {
   resume(now: number) {
     if (this.pausedAt === null) return;
     const d = now - this.pausedAt;
-    this.start += d;
-    if (this.boundary) this.boundary.time += d;
+    this.t0 += d;
+    this.boundaryTime += d;
     this.pausedAt = null;
   }
 
   end() {
     this.speaking = false;
-    this.boundary = null;
+    this.boundaryIndex = -1;
     this.pausedAt = null;
   }
 
-  private duration(w: string) {
-    return Math.max(0.12, (lettersOf(w) * this.perLetter + 0.05) / this.rate);
-  }
-
-  // Which word is being said now, and how far into it.
-  private locate(now: number): { index: number; elapsed: number; duration: number } | null {
+  // Where in the schedule we are.
+  private locate(now: number): { i: number; elapsed: number; dur: number; toNext: number | null } | null {
     if (!this.speaking || !this.words.length || this.pausedAt !== null) return null;
-    if (this.boundary) {
-      const w = this.words[this.boundary.index];
-      return { index: this.boundary.index, elapsed: now - this.boundary.time, duration: this.duration(w.text) };
+    let rel = now - this.t0;
+    // With real word events, never run more than one word ahead of the audio:
+    // if the next event is late, hold in the gap (up to 0.35 s), then carry on.
+    if (this.boundaryIndex >= 0) {
+      const ahead = this.boundaryIndex + 1;
+      if (ahead < this.words.length && rel > this.starts[ahead]) {
+        const late = rel - this.starts[ahead];
+        if (late < 0.35) rel = this.starts[ahead] - 0.001;
+      }
     }
-    let t = now - this.start;
-    for (let i = 0; i < this.words.length; i++) {
-      const d = this.duration(this.words[i].text);
-      if (t < d) return { index: i, elapsed: t, duration: d };
-      t -= d + pauseAfter(this.words[i].text) / this.rate;
-      if (t < 0) return null; // a pause between words: mouth at rest
-    }
-    return null;
+    if (rel < 0) return null;
+    let i = 0;
+    while (i + 1 < this.words.length && this.starts[i + 1] <= rel) i++;
+    const elapsed = rel - this.starts[i];
+    const dur = this.duration(this.words[i]);
+    const toNext = i + 1 < this.words.length ? this.starts[i + 1] - rel : null;
+    if (toNext === null && elapsed > dur + 0.25) return null; // estimated end of the sentence
+    return { i, elapsed, dur, toNext };
   }
 
   visemeAt(now: number): Viseme {
     const at = this.locate(now);
-    return at ? visemeAt(this.words[at.index].text, at.elapsed, at.duration) : REST;
+    if (!at) return REST;
+    const w = this.words[at.i];
+    const next = this.words[at.i + 1];
+    const nextShape = next && w.pause < 0.1 ? firstShape(next.text) : REST;
+    // Stressed words open a little more; phrase-final words relax.
+    const emphasis = (w.stressed ? 1.12 : 1) * (w.final ? 0.9 : 1);
+    if (at.elapsed <= at.dur) return visemeAt(w.text, at.elapsed, at.dur, nextShape, emphasis);
+    // Between words: the last shape relaxes quickly; just before the next
+    // word, its first shape is anticipated (lips close early for "m", "b", "p").
+    const after = at.elapsed - at.dur;
+    const relax = Math.exp(-after / (w.pause > 0.1 ? 0.06 : 0.09));
+    let v = scale(lastShape(w.text), relax * 0.85);
+    if (next && at.toNext !== null && at.toNext < 0.08) v = mix(v, firstShape(next.text), (1 - at.toNext / 0.08) * 0.7);
+    return v;
   }
 
-  // For body language: phrase number (changes at punctuation) and a word beat.
-  rhythm(now: number): { speaking: boolean; phrase: number; beat: number } {
+  // For body language and gaze: phrase, time into it, emphasis and questions.
+  rhythm(now: number): Rhythm {
     const at = this.locate(now);
-    if (!at) return { speaking: false, phrase: 0, beat: 0 };
-    let phrase = 0;
-    for (let i = 0; i < at.index; i++) if (/[.,;:!?]$/.test(this.words[i].text)) phrase++;
-    const long = lettersOf(this.words[at.index].text) >= 6;
-    return { speaking: true, phrase, beat: long ? Math.exp(-at.elapsed / 0.12) : 0 };
+    if (!at) return SILENT;
+    const w = this.words[at.i];
+    let first = at.i;
+    while (first > 0 && this.words[first - 1].phrase === w.phrase) first--;
+    const rel = now - this.t0;
+    const inWord = at.elapsed <= at.dur;
+    return {
+      speaking: true,
+      phrase: w.phrase,
+      phraseAge: Math.max(0, rel - this.starts[first]),
+      beat: w.stressed && inWord ? Math.exp(-at.elapsed / 0.12) : 0,
+      question: w.question,
+    };
   }
 }

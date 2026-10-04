@@ -165,12 +165,14 @@ export default function ConsultationRoom({ room }: { room: RoomStyle }) {
   const [fromReception, setFromReception] = useState<string | null>(null);
   const [education, setEducation] = useState<EducationAnswer | null>(null);
   const [wantsProfessional, setWantsProfessional] = useState(false);
+  const [sheetOpen, setSheetOpen] = useState(false); // chart bottom sheet (phones/tablets)
   const [heard, setHeard] = useState<string | null>(null); // uncertain speech awaiting confirmation
   const [tempUnit, setTempUnit] = useState<"C" | "F">("C");
   const [tempValue, setTempValue] = useState("");
   // From the Health Passport — only when the patient has turned saving on.
   const [saved, setSaved] = useState<{ medicines?: string; allergies?: string; conditions?: string }>({});
   const lastSaid = useRef("");
+  const activity = useRef(0); // when the patient last typed or spoke (drives listening behaviour)
   const speech = useRef<SpeechOutput | null>(null);
   const timers = useRef<ReturnType<typeof setTimeout>[]>([]); // demo timers
   const sayTimers = useRef<ReturnType<typeof setTimeout>[]>([]); // speech sequence timers
@@ -320,6 +322,14 @@ export default function ConsultationRoom({ room }: { room: RoomStyle }) {
     setDoctor(a.after);
   }, [setDoctor, cancelSay]);
 
+  // Before the consultation: INITIALIZING while the room loads (the doctor is
+  // finishing notes at the chart), then IDLE, waiting for the patient.
+  useEffect(() => {
+    if (started) return;
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- the doctor's state follows loading progress
+    setDoctor(begun || (is3d && !avatarReady) ? "initializing" : "idle");
+  }, [started, begun, is3d, avatarReady, setDoctor]);
+
   // ---------------- Starting: the waiting-room transition ----------------
   useEffect(() => {
     if (!begun || started) return;
@@ -439,7 +449,15 @@ export default function ConsultationRoom({ room }: { room: RoomStyle }) {
       replaceState(o.state);
       return reply([{ text: o.line, state: "clarifying" }], o.line);
     }
-    if (o.kind === "why" || o.kind === "term") return reply([{ text: o.line, state: "clarifying" }], o.line);
+    if (o.kind === "why") return reply([{ text: o.line, state: "clarifying" }], o.line);
+    if (o.kind === "term") {
+      replaceState(o.state);
+      return reply([{ text: o.line, state: "clarifying" }], o.line);
+    }
+    if (o.kind === "control") {
+      setSlowerTo(o.action === "slower");
+      return reply([{ text: o.line, state: "reassuring" }, { text: turn.question ?? turn.say, state: "asking" }], o.line);
+    }
     if (o.kind === "corrected") {
       replaceState(o.state);
       return reply([{ text: o.line, state: "clarifying" }, { text: nextTurn(o.state).question ?? nextTurn(o.state).say, state: "asking" }], o.line);
@@ -546,10 +564,13 @@ export default function ConsultationRoom({ room }: { room: RoomStyle }) {
     const s = turnSpeech.current;
     if (s) speak(s.lines, s.after);
   };
-  const toggleSlower = () => {
-    const next = !slower;
+  const setSlowerTo = (next: boolean) => {
     setSlower(next);
     rateRef.current = next ? SLOW_RATE : NORMAL_RATE;
+  };
+  const toggleSlower = () => {
+    const next = !slower;
+    setSlowerTo(next);
     // Say the current sentence again at the new pace.
     const a = active.current;
     if (a && speaking) speak(a.lines.slice(Math.max(0, a.logged - 1)), a.after, { quietFirst: true });
@@ -568,6 +589,7 @@ export default function ConsultationRoom({ room }: { room: RoomStyle }) {
     let heardConfidence: number | undefined;
     stopMic.current = await listen({
       onText: (t, final, confidence) => {
+        activity.current = performance.now() / 1000;
         setText(t);
         heardText = t;
         if (final) heardConfidence = confidence;
@@ -606,7 +628,9 @@ export default function ConsultationRoom({ room }: { room: RoomStyle }) {
     void startListening();
   };
   // Typing interrupts the doctor: she stops and listens.
+  // Typing interrupts the doctor: she stops and listens (and nods along).
   const onTyping = (value: string) => {
+    activity.current = performance.now() / 1000;
     if (active.current) stopSpeaking();
     setText(value);
   };
@@ -624,7 +648,7 @@ export default function ConsultationRoom({ room }: { room: RoomStyle }) {
   const preparing = begun && !started && is3d;
   const pct = Math.round(progress * 100);
 
-  const doctor2d = <Doctor2D state={docRef} since={since} lips={lips} reducedMotion={reducedMotion} paused={paused} room={room} />;
+  const doctor2d = <Doctor2D state={docRef} since={since} lips={lips} activity={activity} reducedMotion={reducedMotion} paused={paused} room={room} />;
   const caption =
     begun && subtitles && subtitleText && !emergency ? (
       <p aria-hidden className={`bg-slate-900 px-4 py-3 text-center font-semibold leading-snug text-white ${bigText ? "text-xl" : "text-base sm:text-lg"}`}>
@@ -648,6 +672,7 @@ export default function ConsultationRoom({ room }: { room: RoomStyle }) {
                   state={docRef}
                   since={since}
                   lips={lips}
+                  activity={activity}
                   reducedMotion={reducedMotion}
                   paused={paused}
                   tier={tier}
@@ -763,6 +788,7 @@ export default function ConsultationRoom({ room }: { room: RoomStyle }) {
       onExplain={explainNow}
       onBack={back}
       canBack={started && history.length > 1 && !done}
+      aboveSheet={!emergency}
     />
   ) : null;
 
@@ -1069,16 +1095,29 @@ export default function ConsultationRoom({ room }: { room: RoomStyle }) {
     safety: safetyAnswers,
   };
 
+  // Desktop: a side panel. Phones and tablets: a bottom sheet that peeks
+  // ("Visit chart · 5 noted") and opens over the page when tapped.
+  const noted = [...chart.reported, ...chart.safety].filter((r) => r.provided).length;
   const chartPanel = (
-    <aside aria-label="Patient chart" className="h-fit rounded-2xl border border-slate-300 bg-white p-4 shadow-sm lg:sticky lg:top-4">
-      <details open>
-        <summary className="cursor-pointer text-base font-bold text-blue-950 lg:pointer-events-none lg:list-none">
-          <span className="lg:sr-only">📋 Patient chart (tap to show or hide)</span>
-        </summary>
-        <div className="mt-3 lg:mt-0">
-          <PatientChart chart={chart} />
-        </div>
-      </details>
+    <aside
+      aria-label="Patient chart"
+      className="h-fit rounded-2xl border border-slate-300 bg-white p-4 shadow-sm lg:sticky lg:top-4 max-lg:fixed max-lg:inset-x-0 max-lg:bottom-0 max-lg:z-30 max-lg:rounded-b-none max-lg:border-x-0 max-lg:border-b-0 max-lg:p-0 max-lg:shadow-[0_-8px_24px_rgba(15,23,42,0.18)]"
+    >
+      <button
+        type="button"
+        onClick={() => setSheetOpen((o) => !o)}
+        aria-expanded={sheetOpen}
+        aria-controls="chart-sheet"
+        className="flex min-h-13 w-full items-center justify-between gap-3 px-4 py-3 text-left lg:hidden"
+      >
+        <span className="font-bold text-blue-950">
+          📋 Visit chart <span className="font-semibold text-slate-600">· {noted} noted</span>
+        </span>
+        <span className="rounded-full bg-slate-100 px-3 py-1 text-sm font-semibold text-slate-800">{sheetOpen ? "Hide ▼" : "Show ▲"}</span>
+      </button>
+      <div id="chart-sheet" className={sheetOpen ? "max-lg:max-h-[70vh] max-lg:overflow-y-auto max-lg:border-t max-lg:border-slate-200 max-lg:px-4 max-lg:py-3" : "max-lg:max-h-0 max-lg:overflow-hidden"}>
+        <PatientChart chart={chart} />
+      </div>
     </aside>
   );
 
@@ -1086,7 +1125,7 @@ export default function ConsultationRoom({ room }: { room: RoomStyle }) {
   // emergency the emergency guidance comes first (left, or top on a phone)
   // and the concerned doctor stays visible beside it.
   return (
-    <div ref={topRef} className="space-y-4">
+    <div ref={topRef} className={`space-y-4 ${emergency ? "" : "max-lg:pb-16"}`}>
       <JourneyBar current={journey} />
       {demoMode && !emergency && <DemoPanel active={demo} onPlay={playDemo} onReset={resetDemo} />}
       {fromReception && !emergency && (
