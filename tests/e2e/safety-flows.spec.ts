@@ -148,11 +148,11 @@ test("demo mode plays a scenario through the real engine and resets", async ({ p
   await page.emulateMedia({ reducedMotion: "reduce" }); // no smooth scrolling while presenting
   await page.goto("/ai-hospital/departments/general-medicine/room?demo");
   await page.getByLabel("Display").selectOption("text");
-  await page.getByRole("button", { name: /D\. Possible heart emergency/ }).click();
+  await page.getByRole("button", { name: /4\. Possible emergency/ }).click();
   await expect(page.getByText("Urgent medical attention")).toBeVisible({ timeout: 20000 });
   await page.getByRole("button", { name: "End demo scenario — reset" }).click();
   await expect(page.getByText("Urgent medical attention")).toHaveCount(0);
-  await expect(page.getByRole("button", { name: /B\. Persistent cough/ })).toBeVisible();
+  await expect(page.getByRole("button", { name: /2\. Persistent cough/ })).toBeVisible();
 });
 
 test("reception hands the patient's words to the consultation room (in memory, not the URL)", async ({ page }) => {
@@ -315,4 +315,15 @@ test("My Visit: a finished consultation's summary is there (tab memory only), an
   expect(await page.evaluate(() => Object.keys(localStorage).filter((k) => k.startsWith("aih:")))).toEqual([]);
   await page.getByRole("button", { name: "Clear this visit" }).click();
   await expect(page.getByText("No visit yet in this tab")).toBeVisible();
+});
+
+test("demo 7: a health question mid-consultation is answered from the library, then the consultation finishes", async ({ page }) => {
+  await page.emulateMedia({ reducedMotion: "reduce" });
+  await page.goto("/ai-hospital/departments/general-medicine/room?demo&view=text");
+  await page.getByRole("button", { name: /7\. Health education question/ }).click();
+  // The verified answer card appears, with its source page.
+  const card = page.getByRole("heading", { name: "How does TB spread?" });
+  await expect(card).toBeVisible({ timeout: 30000 });
+  await expect(page.getByRole("link", { name: /Tuberculosis|TB/ }).first()).toBeVisible();
+  await expect(page.getByRole("heading", { name: "📋 Patient-prepared visit summary" })).toBeVisible({ timeout: 90000 });
 });

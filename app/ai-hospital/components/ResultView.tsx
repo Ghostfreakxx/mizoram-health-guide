@@ -12,6 +12,7 @@ import type { SummaryData } from "../../lib/summary";
 import DoctorSummary from "./DoctorSummary";
 import ReadAloud from "../../components/ReadAloud";
 import CallLink from "../../components/ui/CallLink";
+import { reportFailure } from "../../lib/telemetry";
 
 const LEVEL_STYLE = {
   RED: { card: "border-red-400 bg-red-50 text-red-950", badge: "bg-red-700 text-white" },
@@ -40,6 +41,10 @@ export default function ResultView({
   useEffect(() => {
     if (result.level === "RED") onEmergency(result.emergency);
   }, [result.level, result.emergency, onEmergency]);
+  // The engine's own fail-safe fired: report the kind only.
+  useEffect(() => {
+    if (result.failsafe) reportFailure("safety-engine");
+  }, [result.failsafe]);
 
   if (result.failsafe) {
     return (

@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
+import WebVitals from "./components/WebVitals";
 import SiteHeader, { BottomNav } from "./components/SiteHeader";
 import SiteFooter from "./components/SiteFooter";
 import { SITE } from "./config";
@@ -51,6 +52,7 @@ export default function RootLayout({
         </div>
         <SiteFooter />
         <BottomNav />
+        <WebVitals />
         </LanguageProvider>
       </body>
     </html>

@@ -115,9 +115,12 @@ export default function AboutPage() {
 
         <Section id="demo" title="See it working" intro="Demonstration scenarios run through the same rules and conversation engine a patient uses — nothing is scripted around them.">
           <ul className="grid gap-2 sm:grid-cols-2">
-            {DEMO_SCENARIOS.map((d) => (
+            {DEMO_SCENARIOS.filter((d) => d.group === "core").map((d) => (
               <li key={d.id} className="rounded-xl border border-slate-200 bg-white px-4 py-3">
-                {d.title}
+                <span className="font-bold text-blue-950">
+                  {d.letter}. {d.title}
+                </span>
+                <span className="block text-sm text-slate-600">{d.shows}</span>
               </li>
             ))}
           </ul>

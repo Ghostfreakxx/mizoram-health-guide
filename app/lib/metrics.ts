@@ -9,7 +9,8 @@
 // - aggregate() hides every count below the suppression threshold, so small
 //   groups (e.g. one village, one rare condition) cannot be singled out, and
 //   never leaves a single hidden cell that could be worked out by subtraction.
-// - Nothing in the app collects or sends these events yet. Where counts go,
+// - Events are sent only when a collection address is configured
+//   (NEXT_PUBLIC_TELEMETRY_URL) — see app/lib/telemetry.ts. Where counts go,
 //   and under what agreement, is a Health Department decision.
 
 import { LEVEL_ORDER, type Level, AGE_GROUPS, type AgeGroup, complaints } from "./safety/triage";
@@ -31,10 +32,31 @@ export const DISTRICTS = [
 ] as const;
 export type District = (typeof DISTRICTS)[number];
 
+// Fixed code lists for the pilot-evaluation events. Nothing typed by a person
+// can ever fit into one of these fields.
+export const VIEWS = ["3d", "2d", "text"] as const;
+export const VIEW_REASONS = ["auto", "chosen", "fallback", "save-data"] as const;
+export const STAGES = ["start", "safety-check", "questions", "details", "summary"] as const;
+export const CLARIFICATIONS = ["unclear", "help-describe", "word-explained", "question-explained", "speech-confirmed"] as const;
+export const FAILURES = ["3d-load", "voice-output", "voice-input", "safety-engine", "app-error", "data"] as const;
+export const VITALS = ["LCP", "INP", "CLS", "FCP", "TTFB"] as const;
+export const RATINGS = ["good", "needs-improvement", "poor"] as const;
+export const AREAS = ["home", "reception", "consultation", "emergency", "find-care", "library", "my-visit", "other"] as const;
+export const ENTRIES = ["typed", "describe", "example", "direct", "demo"] as const;
+
 export type MetricEvent =
   | { type: "triage_result"; day: string; complaint: string; level: Level; ageGroup: AgeGroup; district?: District }
   | { type: "emergency_shown"; day: string; flag: RedFlagId }
-  | { type: "department_view"; day: string; slug: string };
+  | { type: "department_view"; day: string; slug: string }
+  // Pilot evaluation: is the journey working?
+  | { type: "consult_started"; day: string; view: (typeof VIEWS)[number]; entry: (typeof ENTRIES)[number] }
+  | { type: "consult_completed"; day: string; level: Level }
+  | { type: "consult_abandoned"; day: string; stage: (typeof STAGES)[number] }
+  | { type: "clarification"; day: string; kind: (typeof CLARIFICATIONS)[number] }
+  | { type: "display_used"; day: string; view: (typeof VIEWS)[number]; reason: (typeof VIEW_REASONS)[number] }
+  // Technical health: is the service working?
+  | { type: "failure"; day: string; kind: (typeof FAILURES)[number]; area: (typeof AREAS)[number] }
+  | { type: "web_vital"; day: string; name: (typeof VITALS)[number]; rating: (typeof RATINGS)[number]; area: (typeof AREAS)[number] };
 
 export const MIN_COUNT = 5;
 
@@ -48,7 +70,16 @@ const FIELDS: Record<MetricEvent["type"], { required: string[]; optional: string
   triage_result: { required: ["type", "day", "complaint", "level", "ageGroup"], optional: ["district"] },
   emergency_shown: { required: ["type", "day", "flag"], optional: [] },
   department_view: { required: ["type", "day", "slug"], optional: [] },
+  consult_started: { required: ["type", "day", "view", "entry"], optional: [] },
+  consult_completed: { required: ["type", "day", "level"], optional: [] },
+  consult_abandoned: { required: ["type", "day", "stage"], optional: [] },
+  clarification: { required: ["type", "day", "kind"], optional: [] },
+  display_used: { required: ["type", "day", "view", "reason"], optional: [] },
+  failure: { required: ["type", "day", "kind", "area"], optional: [] },
+  web_vital: { required: ["type", "day", "name", "rating", "area"], optional: [] },
 };
+
+const inList = <T extends readonly string[]>(list: T, v: unknown): v is T[number] => typeof v === "string" && (list as readonly string[]).includes(v);
 
 function validDay(d: unknown): d is string {
   if (typeof d !== "string" || !DAY_RE.test(d)) return false;
@@ -81,6 +112,20 @@ export function sanitize(input: unknown): MetricEvent | null {
       return FLAG_IDS.has(e.flag as string) ? { type: "emergency_shown", day: e.day, flag: e.flag as RedFlagId } : null;
     case "department_view":
       return SLUGS.has(e.slug as string) ? { type: "department_view", day: e.day, slug: e.slug as string } : null;
+    case "consult_started":
+      return inList(VIEWS, e.view) && inList(ENTRIES, e.entry) ? { type: "consult_started", day: e.day, view: e.view, entry: e.entry } : null;
+    case "consult_completed":
+      return LEVEL_ORDER.includes(e.level as Level) ? { type: "consult_completed", day: e.day, level: e.level as Level } : null;
+    case "consult_abandoned":
+      return inList(STAGES, e.stage) ? { type: "consult_abandoned", day: e.day, stage: e.stage } : null;
+    case "clarification":
+      return inList(CLARIFICATIONS, e.kind) ? { type: "clarification", day: e.day, kind: e.kind } : null;
+    case "display_used":
+      return inList(VIEWS, e.view) && inList(VIEW_REASONS, e.reason) ? { type: "display_used", day: e.day, view: e.view, reason: e.reason } : null;
+    case "failure":
+      return inList(FAILURES, e.kind) && inList(AREAS, e.area) ? { type: "failure", day: e.day, kind: e.kind, area: e.area } : null;
+    case "web_vital":
+      return inList(VITALS, e.name) && inList(RATINGS, e.rating) && inList(AREAS, e.area) ? { type: "web_vital", day: e.day, name: e.name, rating: e.rating, area: e.area } : null;
   }
   return null;
 }

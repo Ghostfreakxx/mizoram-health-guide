@@ -82,6 +82,19 @@ export default function PrivacyPage() {
         clearing your browser data.
       </p>
 
+      <h2>Counting how the service is used</h2>
+      <p>
+        This prototype does not count or report anything. The code to do so
+        is built in but switched off. If the Health Department switches it
+        on for a pilot, only fixed category codes are sent — for example
+        &quot;a consultation was completed&quot;, its urgency level, or
+        &quot;the 3D picture could not load&quot; — with the day, never the
+        time. Nothing you type or say, no error messages, no web addresses,
+        no cookies and no identifier that could link two events or recognise
+        you is ever sent. If your browser asks sites not to track you (Do Not
+        Track or Global Privacy Control), nothing is sent at all.
+      </p>
+
       <h2>Server logs</h2>
       <p>
         Like all websites, our hosting provider automatically records basic

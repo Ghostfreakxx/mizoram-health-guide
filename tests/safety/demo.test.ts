@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { type ConsultState, NOT_PROVIDED, chartOf, nextTurn, respond, startConsultation, toAnswers } from "../../app/lib/consultation";
+import { type ConsultState, NOT_PROVIDED, chartOf, converse, nextTurn, respond, startConsultation, toAnswers } from "../../app/lib/consultation";
 import { DEMO_SCENARIOS, demoAnswer } from "../../app/lib/demoScenarios";
 import { violatesLanguagePolicy } from "../../app/lib/safety/language";
 import { LEVEL_ORDER, triage } from "../../app/lib/safety/triage";
@@ -8,10 +8,19 @@ function play(id: string) {
   const sc = DEMO_SCENARIOS.find((x) => x.id === id)!;
   let s: ConsultState = startConsultation("General Medicine");
   const said: string[] = [];
+  let educated: string | null = null;
   for (let i = 0; i < 200; i++) {
     const t = nextTurn(s);
     said.push(t.say, ...(t.then ? [t.then] : []));
-    if (t.input.kind === "result" || t.input.kind === "emergency") return { s, t, said, steps: i };
+    if (t.input.kind === "result" || t.input.kind === "emergency") return { s, t, said, steps: i, educated };
+    if (sc.asks && t.step === sc.asks.at && educated === null) {
+      // The patient's typed question goes through the same engine.
+      const o = converse(s, t, sc.asks.question);
+      educated = o.kind === "education" ? o.answer.id : `not answered (${o.kind})`;
+      if (o.kind === "education") said.push(...o.answer.text);
+      if ("state" in o) s = o.state;
+      continue;
+    }
     const next = respond(s, t.step, demoAnswer(sc, t, s));
     if (next === s) throw new Error(`${id}: answer not accepted at ${t.step}`);
     s = next;
@@ -33,6 +42,7 @@ describe("demo scenarios run through the real engine", () => {
         if (t.input.kind === "result") expect(sc.expect.levels).toContain(t.input.level);
         expect(t.input.kind === "result" && t.input.level).toBe(triage(toAnswers(s)).level);
       }
+      if (sc.asks) expect(play(sc.id).educated).toBe(sc.asks.expectId);
       for (const line of said) expect(violatesLanguagePolicy(line), line).toBeNull();
     });
   }
@@ -89,5 +99,26 @@ describe("presentation-critical safety properties", () => {
         expect(r.value).not.toMatch(/\b\d+\s?(mg|mcg|ml)\b/i);
       }
     }
+  });
+});
+
+describe("the core demonstration scenarios show what they claim", () => {
+  it("1. 'Can't explain' goes through Help me describe it and keeps the body location", () => {
+    const { s } = play("describe");
+    expect(s.helpDescribe).toBe(true);
+    expect(s.bodyArea).toBe("upper-abdomen");
+    expect(s.bodySide).toBe("right");
+  });
+  it("3. a routine cold ends in self-care with warning signs, not a referral", () => {
+    const { t } = play("routine");
+    expect(t.input.kind === "result" && t.input.level).toBe("GREEN");
+  });
+  it("8. the visit summary carries medicines, allergies and conditions as the patient said them", () => {
+    const { s } = play("summary");
+    const chart = JSON.stringify(chartOf(s));
+    for (const w of ["Amlodipine", "Penicillin", "High blood pressure"]) expect(chart).toContain(w);
+  });
+  it("there are exactly eight core scenarios", () => {
+    expect(DEMO_SCENARIOS.filter((d) => d.group === "core")).toHaveLength(8);
   });
 });

@@ -12,6 +12,7 @@ import { roomForDepartments, setPendingConcern } from "../consult-room/handoff";
 import { preloadConsultation } from "../consult-room/preload";
 import { roomFor } from "../consult-room/rooms";
 import { BigChoice, StepTitle } from "../components/ui";
+import { track } from "../../lib/telemetry";
 
 // Reception: the patient's own words → an immediate safety check → a short
 // "here is what I understood" → the consultation. It never diagnoses and
@@ -38,6 +39,7 @@ export default function ReceptionDesk() {
   function submit(message: string) {
     const r = receive(message);
     if (r.detection.confirmed.length > 0) {
+      for (const flag of r.detection.confirmed) track({ type: "emergency_shown", flag });
       setEmergency(r.detection.confirmed);
       return;
     }
@@ -67,7 +69,15 @@ export default function ReceptionDesk() {
       <div className="space-y-5 rounded-2xl border border-slate-200 bg-white p-6 sm:p-8">
         <StepTitle hint="You mentioned this, so we need to check.">Is anyone having {titles} right now?</StepTitle>
         <div className="grid gap-3 sm:grid-cols-2">
-          <BigChoice tone="danger" onClick={() => setEmergency(stage.flags)}>Yes, or I am not sure</BigChoice>
+          <BigChoice
+            tone="danger"
+            onClick={() => {
+              for (const flag of stage.flags) track({ type: "emergency_shown", flag });
+              setEmergency(stage.flags);
+            }}
+          >
+            Yes, or I am not sure
+          </BigChoice>
           <BigChoice onClick={() => setStage({ kind: "understood", reception: stage.reception })}>No, not right now</BigChoice>
         </div>
       </div>

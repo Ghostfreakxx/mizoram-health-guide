@@ -1,11 +1,17 @@
 "use client";
 
+import { useEffect } from "react";
 import CallLink from "../components/ui/CallLink";
+import { reportFailure } from "../lib/telemetry";
 
 // Fail-safe: if anything in AI Hospital breaks, never fall back to casual
-// advice. Direct the person to human healthcare. (Errors are not logged here
-// because they may contain health information.)
+// advice. Direct the person to human healthcare. Only the KIND of failure is
+// reported (when reporting is configured) — never the error message, which
+// may contain health information.
 export default function AiHospitalError({ unstable_retry }: { error: Error & { digest?: string }; unstable_retry: () => void }) {
+  useEffect(() => {
+    reportFailure("app-error");
+  }, []);
   return (
     <main className="flex-1">
       <div className="mx-auto max-w-2xl space-y-5 px-4 py-12">

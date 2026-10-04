@@ -21,6 +21,7 @@ import { type DoctorState, STATE_LABEL } from "./doctor/state";
 import Doctor2D from "./Doctor2D";
 import HandoffPanel from "./HandoffPanel";
 import { takePendingConcern } from "./handoff";
+import { reportFailure, track } from "../../lib/telemetry";
 import JourneyBar, { type JourneyStep } from "./JourneyBar";
 import PatientChart from "./PatientChart";
 import type { ChartLine } from "./Room3D";
@@ -199,6 +200,10 @@ export default function ConsultationRoom({ room }: { room: RoomStyle }) {
   const [talk, setTalk] = useState<{ available: boolean; reason?: string }>({ available: false });
   const [demoMode, setDemoMode] = useState(false);
   const [demo, setDemo] = useState<string | null>(null);
+  const demoAsked = useRef(false);
+  const demoHoldUntil = useRef(0);
+  const counted = useRef({ started: false, ended: false, view: false }); // pilot counts, once per consultation
+  const sendWordsRef = useRef<(w: string) => void>(() => {});
   const [fromReception, setFromReception] = useState<string | null>(null);
   const [startDescribe, setStartDescribe] = useState(false); // "I can't explain it" from Reception
   const [education, setEducation] = useState<EducationAnswer | null>(null);
@@ -468,7 +473,10 @@ export default function ConsultationRoom({ room }: { room: RoomStyle }) {
   const helpMeDescribe = () => {
     stopSpeaking();
     const next = startHelpDescribe(state);
-    if (next !== state) commit(next, "Help me describe it");
+    if (next !== state) {
+      track({ type: "clarification", kind: "help-describe" });
+      commit(next, "Help me describe it");
+    }
   };
   const whyNow = () => {
     stopSpeaking();
@@ -490,11 +498,13 @@ export default function ConsultationRoom({ room }: { room: RoomStyle }) {
     setText("");
     if (o.kind === "repeat") return repeat();
     if (o.kind === "explain") {
+      track({ type: "clarification", kind: "question-explained" });
       replaceState(o.state);
       return reply([{ text: o.line, state: "clarifying" }], o.line);
     }
     if (o.kind === "why") return reply([{ text: o.line, state: "clarifying" }], o.line);
     if (o.kind === "term") {
+      track({ type: "clarification", kind: "word-explained" });
       replaceState(o.state);
       return reply([{ text: o.line, state: "clarifying" }], o.line);
     }
@@ -525,6 +535,7 @@ export default function ConsultationRoom({ room }: { room: RoomStyle }) {
       );
     }
     // unclear: still keep anything worth remembering
+    track({ type: "clarification", kind: "unclear" });
     replaceState(o.state);
     reply([{ text: o.line, state: "clarifying" }], o.line);
   };
@@ -555,6 +566,7 @@ export default function ConsultationRoom({ room }: { room: RoomStyle }) {
   };
   const restart = useCallback(() => {
     clearTimers();
+    counted.current = { started: false, ended: false, view: true };
     cancelSay();
     active.current = null;
     stopMic.current?.();
@@ -572,6 +584,25 @@ export default function ConsultationRoom({ room }: { room: RoomStyle }) {
     if (!demo || paused || !started) return;
     const sc = DEMO_SCENARIOS.find((s) => s.id === demo);
     if (!sc || turn.input.kind === "result" || turn.input.kind === "emergency" || doc !== "listening") return;
+    // A scripted health question, typed part-way through (scenario 7).
+    if (sc.asks && turn.step === sc.asks.at && !demoAsked.current) {
+      const q = sc.asks.question;
+      let i = 0;
+      const typeQ = () => {
+        i += 2;
+        setText(q.slice(0, i));
+        if (i < q.length) later(typeQ, 28);
+        else
+          later(() => {
+            // Marked only when sent: if this effect re-runs mid-typing, it types again.
+            demoAsked.current = true;
+            demoHoldUntil.current = Date.now() + 5000; // let the audience read the answer
+            sendWordsRef.current(q);
+          }, 450);
+      };
+      later(typeQ, 700);
+      return clearTimers;
+    }
     const value = demoAnswer(sc, turn, state);
     if (turn.input.kind === "text" && typeof value === "string" && value) {
       // "Type" the words, then send.
@@ -584,13 +615,14 @@ export default function ConsultationRoom({ room }: { room: RoomStyle }) {
       };
       later(typeNext, 500);
     } else {
-      later(() => answer(value), 900);
+      later(() => answer(value), Math.max(900, demoHoldUntil.current - Date.now()));
     }
     return clearTimers;
   }, [demo, paused, started, doc, turn, state, answer, later, clearTimers]);
 
   const playDemo = (id: string) => {
     restart();
+    demoAsked.current = false;
     setDemo(id);
     setBegun(true);
   };
@@ -626,6 +658,11 @@ export default function ConsultationRoom({ room }: { room: RoomStyle }) {
     setSlower(next);
     rateRef.current = next ? SLOW_RATE : NORMAL_RATE;
   };
+  // The demo types its question through the same path as a patient.
+  useEffect(() => {
+    sendWordsRef.current = sendWords;
+  });
+
   const toggleSlower = () => {
     const next = !slower;
     setSlowerTo(next);
@@ -662,6 +699,7 @@ export default function ConsultationRoom({ room }: { room: RoomStyle }) {
         } else setMicNote(heardText ? "Check the words, then press Send. You can correct them first." : "");
       },
       onError: (m) => {
+        reportFailure("voice-input");
         setListening(false);
         stopMic.current = null;
         setMicNote(m);
@@ -705,6 +743,45 @@ export default function ConsultationRoom({ room }: { room: RoomStyle }) {
   const status: MicStatus = listening ? "listening" : speaking ? "speaking" : doc === "processing" ? "processing" : "ready";
   const preparing = begun && !started && is3d;
   const pct = Math.round(progress * 100);
+
+  // ---------------- Pilot counts (category codes only; off unless configured) ----------------
+  const view = tier === "none" ? "text" : tier === "fallback" ? "2d" : "3d";
+  useEffect(() => {
+    if (!started || counted.current.started) return;
+    counted.current.started = true;
+    track({ type: "consult_started", view, entry: demo ? "demo" : fromReception ? "typed" : startDescribe ? "describe" : "direct" });
+  }, [started, view, demo, fromReception, startDescribe, turn.step]); // turn.step: counts a restarted consultation too
+  useEffect(() => {
+    if (tier === null || counted.current.view) return;
+    counted.current.view = true;
+    const saveData = detected === "fallback" && display === "auto";
+    track({ type: "display_used", view, reason: failed3d ? "fallback" : display !== "auto" ? "chosen" : saveData ? "save-data" : "auto" });
+  }, [tier, view, display, detected, failed3d]);
+  useEffect(() => {
+    if (failed3d) reportFailure("3d-load");
+  }, [failed3d]);
+  useEffect(() => {
+    if (counted.current.ended) return;
+    if (inp.kind === "emergency") {
+      counted.current.ended = true;
+      for (const flag of inp.flags) track({ type: "emergency_shown", flag });
+    } else if (inp.kind === "result") {
+      counted.current.ended = true;
+      track({ type: "consult_completed", level: inp.level });
+    }
+  }, [inp]);
+  // Leaving part-way: only the stage is counted, never the answers.
+  const stageRef = useRef<"start" | "safety-check" | "questions" | "details" | "summary">("start");
+  useEffect(() => {
+    stageRef.current = turn.step === "concern" ? "start" : turn.step === "check" || turn.step.startsWith("confirm:") ? "safety-check" : ["medicines", "allergies", "conditions"].includes(turn.step) ? "details" : "questions";
+  }, [turn.step]);
+  useEffect(() => {
+    const leave = () => {
+      if (counted.current.started && !counted.current.ended) track({ type: "consult_abandoned", stage: stageRef.current });
+    };
+    window.addEventListener("pagehide", leave);
+    return () => window.removeEventListener("pagehide", leave);
+  }, []);
 
   const doctor2d = <Doctor2D state={docRef} since={since} lips={lips} activity={activity} reducedMotion={reducedMotion} paused={paused} room={room} />;
   const caption =
