@@ -726,6 +726,25 @@ export function emergencyFrom(q: Question, a: Answer): RedFlagId | null {
   return e && "emergency" in e ? e.emergency : null;
 }
 
+// Policy rules applied after the symptom questions. They can only RAISE
+// urgency. Each has an ID so a clinician can review it by name
+// (docs/CLINICAL_REVIEW.md); the engine below uses exactly these.
+export type PolicyRule = { id: string; text: string; level: Level; now?: boolean; sourceIds: string[]; applies: string };
+export const POLICY_RULES = {
+  severe: { id: "P-SEVERE", text: "The problem is severe", level: "ORANGE", sourceIds: ["policy-uncertainty"], applies: "Patient says the problem is severe" },
+  moderate: { id: "P-MODERATE", text: "The problem makes normal activities hard", level: "YELLOW", sourceIds: ["policy-uncertainty"], applies: "Patient says it makes normal activities hard" },
+  worse: { id: "P-WORSE", text: "It is getting worse", level: "YELLOW", sourceIds: ["policy-uncertainty"], applies: "Patient says it is getting worse" },
+  long: { id: "P-2WEEKS", text: "It has lasted more than 2 weeks", level: "YELLOW", sourceIds: ["policy-uncertainty"], applies: "Duration more than 2 weeks" },
+  notBetter: { id: "P-3DAYS", text: "It has lasted more than 3 days without getting better", level: "YELLOW", sourceIds: ["policy-uncertainty"], applies: "Duration 4–14 days and not getting better" },
+  youngInfant: { id: "P-INFANT", text: "Babies under 2 months can become seriously ill quickly", level: "ORANGE", now: true, sourceIds: ["who-imci"], applies: "Age under 2 months" },
+  underFive: { id: "P-UNDER5", text: "A sick young child should be checked by a health worker", level: "YELLOW", sourceIds: ["who-imci"], applies: "Age 2 months to 4 years" },
+  older: { id: "P-OLDER", text: "People aged 60 and over should have new symptoms checked", level: "YELLOW", sourceIds: ["policy-uncertainty"], applies: "Age 60 or older" },
+  pregnant: { id: "P-PREGNANT", text: "Pregnancy needs extra care", level: "YELLOW", sourceIds: ["mohfw-mcp-card"], applies: "Pregnant" },
+  postpartum: { id: "P-POSTPARTUM", text: "The weeks after giving birth need extra care", level: "YELLOW", sourceIds: ["who-postnatal-2022"], applies: "Gave birth in the last 6 weeks" },
+  immuno: { id: "P-IMMUNO", text: "A weak immune system needs extra care", level: "YELLOW", sourceIds: ["nhs-sepsis"], applies: "Weak immune system" },
+  missing: { id: "P-MISSING", text: "Not enough information to recommend self-care", level: "YELLOW", sourceIds: ["policy-uncertainty"], applies: "Result would be self-care but duration, severity or course is unknown" },
+} as const satisfies Record<string, PolicyRule>;
+
 function evaluate(a: Answers): Result {
   const complaint = getComplaint(a.context.complaint) ?? getComplaint("other")!;
   const ctx: Context = { ...a.context, complaint: complaint.id };
@@ -786,29 +805,27 @@ function evaluate(a: Answers): Result {
     };
   }
 
-  // Course of illness (policy rules — they can only raise urgency).
-  const policy = ["policy-uncertainty"];
-  if (a.severity === "severe") raise("ORANGE", false, { text: "The problem is severe", sourceIds: policy });
-  else if (a.severity === "moderate") raise("YELLOW", false, { text: "The problem makes normal activities hard", sourceIds: policy });
+  // Course of illness and special populations (POLICY_RULES — they can only raise urgency).
+  const apply = (r: PolicyRule) => raise(r.level, r.now ?? false, { text: r.text, sourceIds: [...r.sourceIds] });
+  const P = POLICY_RULES;
+  if (a.severity === "severe") apply(P.severe);
+  else if (a.severity === "moderate") apply(P.moderate);
 
-  if (a.progression === "worse") raise("YELLOW", false, { text: "It is getting worse", sourceIds: policy });
+  if (a.progression === "worse") apply(P.worse);
 
-  if (a.duration === "over-2-weeks") raise("YELLOW", false, { text: "It has lasted more than 2 weeks", sourceIds: policy });
-  else if (a.duration === "4-14-days" && a.progression !== "better")
-    raise("YELLOW", false, { text: "It has lasted more than 3 days without getting better", sourceIds: policy });
+  if (a.duration === "over-2-weeks") apply(P.long);
+  else if (a.duration === "4-14-days" && a.progression !== "better") apply(P.notBetter);
 
   // Special populations (never GREEN).
-  if (ctx.age === "young-infant") raise("ORANGE", true, { text: "Babies under 2 months can become seriously ill quickly", sourceIds: ["who-imci"] });
-  else if (ctx.age === "child-under-5") raise("YELLOW", false, { text: "A sick young child should be checked by a health worker", sourceIds: ["who-imci"] });
-  else if (ctx.age === "older") raise("YELLOW", false, { text: "People aged 60 and over should have new symptoms checked", sourceIds: policy });
-  if (ctx.special.includes("pregnant")) raise("YELLOW", false, { text: "Pregnancy needs extra care", sourceIds: ["mohfw-mcp-card"] });
-  if (ctx.special.includes("postpartum")) raise("YELLOW", false, { text: "The weeks after giving birth need extra care", sourceIds: ["who-postnatal-2022"] });
-  if (ctx.special.includes("immunocompromised")) raise("YELLOW", false, { text: "A weak immune system needs extra care", sourceIds: ["nhs-sepsis"] });
+  if (ctx.age === "young-infant") apply(P.youngInfant);
+  else if (ctx.age === "child-under-5") apply(P.underFive);
+  else if (ctx.age === "older") apply(P.older);
+  if (ctx.special.includes("pregnant")) apply(P.pregnant);
+  if (ctx.special.includes("postpartum")) apply(P.postpartum);
+  if (ctx.special.includes("immunocompromised")) apply(P.immuno);
 
   // Missing course-of-illness answers: do not reassure.
-  if (level === "GREEN" && (!a.duration || !a.severity || !a.progression)) {
-    raise("YELLOW", false, { text: "Not enough information to recommend self-care", sourceIds: policy });
-  }
+  if (level === "GREEN" && (!a.duration || !a.severity || !a.progression)) apply(P.missing);
 
   const departments = [...complaint.departments];
   if (ctx.special.includes("pregnant") || ctx.special.includes("postpartum")) {

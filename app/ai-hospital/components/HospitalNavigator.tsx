@@ -3,18 +3,21 @@
 import { useState } from "react";
 import CallLink from "../../components/ui/CallLink";
 import { getDepartment } from "../data/departments";
-import { DISTRICTS, displayable, hospitals, mapLink, verificationStatus } from "../data/hospitals";
+import { DISTRICTS, FACILITY_LEVELS, displayable, hospitals, mapLink, verificationStatus } from "../data/hospitals";
 
 export default function HospitalNavigator() {
   const [district, setDistrict] = useState<string>("");
   const [query, setQuery] = useState("");
   const [emergencyOnly, setEmergencyOnly] = useState(false);
+  const [level, setLevel] = useState<string>("");
 
   const list = hospitals.filter((h) => {
     const d = displayable(h);
     if (district && h.district.value !== district) return false;
     if (query && !h.name.value.toLowerCase().includes(query.toLowerCase().trim())) return false;
     if (emergencyOnly && d.emergency !== true) return false;
+    // Only a verified level can match; an unverified one is never guessed.
+    if (level && d.level !== level) return false;
     return true;
   });
   const verifiedCount = hospitals.filter((h) => verificationStatus(h) === "VERIFIED").length;
@@ -33,12 +36,19 @@ export default function HospitalNavigator() {
         </p>
       </div>
 
-      <div className="grid gap-4 rounded-2xl border border-slate-200 bg-white p-5 sm:grid-cols-3">
+      <div className="grid gap-4 rounded-2xl border border-slate-200 bg-white p-5 sm:grid-cols-2 lg:grid-cols-4">
         <label className="block text-lg font-semibold text-blue-950">
           District
           <select className={field} value={district} onChange={(e) => setDistrict(e.target.value)}>
             <option value="">All districts</option>
             {DISTRICTS.map((d) => <option key={d} value={d}>{d}</option>)}
+          </select>
+        </label>
+        <label className="block text-lg font-semibold text-blue-950">
+          Type of facility
+          <select className={field} value={level} onChange={(e) => setLevel(e.target.value)}>
+            <option value="">Any type</option>
+            {FACILITY_LEVELS.map((l) => <option key={l} value={l}>{l}</option>)}
           </select>
         </label>
         <label className="block text-lg font-semibold text-blue-950">
@@ -52,6 +62,12 @@ export default function HospitalNavigator() {
       </div>
 
       <p className="text-slate-600" aria-live="polite">{list.length} {list.length === 1 ? "hospital" : "hospitals"} shown</p>
+      {list.length === 0 && (
+        <p className="rounded-2xl border-2 border-dashed border-slate-300 bg-white p-6 text-center text-lg text-slate-700">
+          No verified facility matches yet. Facility types and emergency services are shown only once confirmed from an official source. In an emergency, call{" "}
+          <CallLink id="ambulance-108" />.
+        </p>
+      )}
 
       <ul className="grid gap-4 md:grid-cols-2">
         {list.map((h) => {
@@ -65,7 +81,7 @@ export default function HospitalNavigator() {
                   {status === "VERIFIED" ? "✓ VERIFIED" : "NEEDS VERIFICATION"}
                 </span>
               </div>
-              <p className="mt-1 text-slate-600">{h.district.value} district{d.type ? ` · ${d.type}` : ""}</p>
+              <p className="mt-1 text-slate-600">{h.district.value} district{d.level ? ` · ${d.level}` : ""}{d.ownership ? ` · ${d.ownership}` : ""}</p>
               <dl className="mt-4 space-y-2 text-lg">
                 {d.address && <div><dt className="text-sm text-slate-600">Address</dt><dd>{d.address}</dd></div>}
                 {d.phone && <div><dt className="text-sm text-slate-600">Phone</dt><dd><a href={`tel:${d.phone.replace(/[^0-9+]/g, "")}`} className="font-bold text-blue-800 underline">{d.phone}</a></dd></div>}

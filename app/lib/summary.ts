@@ -1,6 +1,8 @@
 // Builds the patient-prepared doctor summary. Pure function: it includes only
 // information the patient actually supplied, and never invents anything.
 
+import { SITE } from "../config";
+
 export const SUMMARY_LABEL = "Patient-prepared summary — not a medical diagnosis.";
 
 export type SummaryData = {
@@ -43,6 +45,18 @@ export function summarySections(d: SummaryData): SummarySection[] {
     if (kept.length) sections.push({ heading, lines: kept });
   };
 
+  // One line a busy clinician can read first.
+  const glance = [
+    has(d.mainConcern) && clean(d.mainConcern),
+    has(d.started) && `since ${clean(d.started).toLowerCase()}`,
+    has(d.severity) && clean(d.severity).toLowerCase(),
+    has(d.location) && clean(d.location).toLowerCase(),
+  ].filter(Boolean);
+  add("At a glance", [
+    glance.length > 1 && (glance as string[]).join(" · "),
+    d.triage && `Navigation urgency: ${d.triage.level} (guidance, not a diagnosis)`,
+  ]);
+
   add("Patient", [
     has(d.forWhom) && `Prepared for: ${clean(d.forWhom)}`,
     has(d.age) && `Age group: ${clean(d.age)}`,
@@ -72,7 +86,7 @@ export function summarySections(d: SummaryData): SummarySection[] {
   add("Reports and tests brought", [has(d.reports) && clean(d.reports)]);
   add("Questions for the doctor", (d.questions ?? []).map(clean));
   if (d.triage) {
-    add("AI Hospital navigation result (guidance on urgency, not a diagnosis)", [
+    add("Navigation result (guidance on urgency and where to go — not a diagnosis)", [
       `Urgency: ${d.triage.level}`,
       d.triage.recommendation,
       d.triage.departments.length > 0 && `Suggested service: ${d.triage.departments.join(", ")}`,
@@ -98,6 +112,6 @@ export function summaryText(d: SummaryData): string {
     for (const l of s.lines) out.push(`- ${l}`);
     out.push("");
   }
-  out.push("Prepared with AI Hospital (Mizoram Health Guide). This is information from the patient, not a medical diagnosis.");
+  out.push(`Prepared with ${SITE.name} (${SITE.status}). This is information from the patient, not a medical diagnosis.`);
   return out.join("\n");
 }

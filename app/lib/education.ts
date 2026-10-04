@@ -48,8 +48,9 @@ const HEART_ATTACK = /\b(heart attack|stroke)\b/;
 const SPREAD = /\b(spread|spreads|spreading|catch|infect\w*|contagious|transmit\w*)\b|\bhow (do|does|can) (you|i|people|someone) (get|catch)\b|\bpass(ed)? (on|from)\b/;
 
 const ENTRIES: Entry[] = [
+  // More specific questions first: "Is TB treatment free?" is about cost, not finishing.
+  { id: "tb-free", question: "Is TB treatment free?", topic: tb, match: [TB, /\b(free|cost|pay|price|charge)\b/], text: (t) => [faq(t, /free/i)] },
   { id: "tb-finish", question: "Why should I finish my TB medicine?", topic: tb, match: [TB, /\b(finish|complete|stop|stopping|full course|medicine|treatment|tablets?)\b/], text: (t) => [t.overview[2]] },
-  { id: "tb-free", question: "Is TB treatment free?", topic: tb, match: [TB, /\b(free|cost|pay|price)\b/], text: (t) => [faq(t, /free/i)] },
   { id: "tb-spread", question: "How does TB spread?", topic: tb, match: [TB, SPREAD], text: (t) => [t.overview[0]] },
   { id: "tb-what", question: "What is TB?", topic: tb, match: [TB], text: (t) => [t.overview[0], t.intro] },
 

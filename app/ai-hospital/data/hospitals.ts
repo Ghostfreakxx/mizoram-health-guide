@@ -20,11 +20,26 @@ export type Evidence = {
 
 export type Field<T> = { value: T; evidence?: Evidence };
 
+// What kind of facility it is (the level of care), separate from who runs it.
+// Never inferred from a name: "X Hospital" does not tell us its services.
+export const FACILITY_LEVELS = [
+  "Medical college hospital",
+  "District hospital",
+  "Sub-divisional hospital",
+  "Community Health Centre (CHC)",
+  "Primary Health Centre (PHC)",
+  "Sub-centre / Health and Wellness Centre",
+  "Specialist hospital",
+  "Other hospital or clinic",
+] as const;
+export type FacilityLevel = (typeof FACILITY_LEVELS)[number];
+
 export type Hospital = {
   id: string;
   name: Field<string>;
   district: Field<District>;
-  type: Field<"Public" | "Private" | "Mission / NGO">;
+  level?: Field<FacilityLevel>;
+  ownership: Field<"Public" | "Private" | "Mission / NGO">;
   address?: Field<string>;
   coordinates?: Field<{ lat: number; lng: number }>;
   phone?: Field<string>;
@@ -35,7 +50,7 @@ export type Hospital = {
   lastVerified: string | null;
 };
 
-export const REQUIRED_FIELDS = ["name", "district", "type", "address", "phone", "emergency"] as const;
+export const REQUIRED_FIELDS = ["name", "district", "level", "ownership", "address", "phone", "emergency"] as const;
 
 export type Status = "VERIFIED" | "NEEDS VERIFICATION";
 
@@ -59,7 +74,8 @@ export function displayable(h: Hospital) {
     departments: isEvidenced(h.departments) ? h.departments.value : undefined,
     services: isEvidenced(h.services) ? h.services.value : undefined,
     programmes: isEvidenced(h.programmes) ? h.programmes.value : undefined,
-    type: isEvidenced(h.type) ? h.type.value : undefined,
+    ownership: isEvidenced(h.ownership) ? h.ownership.value : undefined,
+    level: isEvidenced(h.level) ? h.level.value : undefined,
   };
 }
 
@@ -70,21 +86,21 @@ export const hospitals: Hospital[] = [
     id: "civil-hospital-aizawl",
     name: { value: "Civil Hospital Aizawl" },
     district: { value: "Aizawl" },
-    type: { value: "Public" },
+    ownership: { value: "Public" },
     lastVerified: null,
   },
   {
     id: "zoram-medical-college",
     name: { value: "Zoram Medical College" },
     district: { value: "Aizawl" },
-    type: { value: "Public" },
+    ownership: { value: "Public" },
     lastVerified: null,
   },
   {
     id: "mizoram-state-cancer-institute",
     name: { value: "Mizoram State Cancer Institute" },
     district: { value: "Aizawl" },
-    type: { value: "Public" },
+    ownership: { value: "Public" },
     lastVerified: null,
   },
 ];

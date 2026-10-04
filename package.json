@@ -10,7 +10,8 @@
     "test": "vitest run",
     "test:e2e": "playwright test",
     "i18n:export": "tsx scripts/i18n-export.ts",
-    "i18n:import": "tsx scripts/i18n-import.ts"
+    "i18n:import": "tsx scripts/i18n-import.ts",
+    "review:export": "tsx scripts/review-export.ts"
   },
   "dependencies": {
     "@react-three/fiber": "^9.8.1",

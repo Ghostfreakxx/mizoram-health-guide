@@ -11,7 +11,7 @@ export type Visit = {
   updatedAt: number;
   sections: SummarySection[];
   text: string; // plain text, for copy and share
-  level?: string; // navigation urgency, if a triage was done
+  level?: "RED" | "ORANGE" | "YELLOW" | "GREEN" | string; // navigation urgency code, if a triage was done
   recommendation?: string;
   departments?: string[];
 };

@@ -44,7 +44,8 @@ export default function DoctorSummary({ base, editable = true }: { base: Summary
 
   // Keep the latest version for "My Visit" (this tab's memory only).
   useEffect(() => {
-    recordVisit({ sections, text, level: base.triage?.level, recommendation: base.triage?.recommendation, departments: base.triage?.departments });
+    const code = base.triage?.level?.split(" ")[0]; // "ORANGE — Urgent assessment" → "ORANGE"
+    recordVisit({ sections, text, level: code && ["RED", "ORANGE", "YELLOW", "GREEN"].includes(code) ? code : undefined, recommendation: base.triage?.recommendation, departments: base.triage?.departments });
   }, [text]); // eslint-disable-line react-hooks/exhaustive-deps -- sections and triage follow text
 
   async function copy() {

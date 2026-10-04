@@ -3,7 +3,9 @@ import Link from "next/link";
 import HospitalNavigator from "../ai-hospital/components/HospitalNavigator";
 import PageHeader from "../components/PageHeader";
 import { ActionCard, Section } from "../components/ui";
+import CallLink from "../components/ui/CallLink";
 import { HELPLINES } from "../lib/helplines";
+import CareTypeGuide from "./CareTypeGuide";
 
 export const metadata: Metadata = {
   title: "Find Care",
@@ -22,9 +24,9 @@ export default function FindCare() {
           <p className="text-lg font-bold text-red-950">Emergency? Chest pain, trouble breathing, heavy bleeding, fits, or someone who will not wake.</p>
           <div className="flex shrink-0 gap-2">
             {urgent.map((h) => (
-              <a key={h.id} href={`tel:${h.tel}`} className="min-h-12 rounded-xl bg-red-700 px-5 py-3 text-lg font-bold text-white hover:bg-red-800">
+              <CallLink key={h.id} id={h.id} className="min-h-12 rounded-xl bg-red-700 px-5 py-3 text-lg font-bold text-white hover:bg-red-800">
                 📞 {h.number}
-              </a>
+              </CallLink>
             ))}
           </div>
         </div>
@@ -36,6 +38,10 @@ export default function FindCare() {
           <ActionCard href="/ai-hospital/doctor" icon="👩‍⚕️" title="Talk to a real doctor" text="Online or in person" />
           <ActionCard href="/ai-hospital/departments" icon="🧭" title="Hospital departments" text="What each department does" />
         </div>
+      </Section>
+
+      <Section id="care-type" title="What type of care should I look for?" intro="How urgently to be seen decides where to go. The consultation tells you which of these fits; this is what each one means.">
+        <CareTypeGuide />
       </Section>
 
       <Section id="helplines" title="Free helplines" intro="Tap a number to call. Each number is recorded with the official source it comes from.">
