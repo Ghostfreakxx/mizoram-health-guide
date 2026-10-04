@@ -1,87 +1,78 @@
-# Demonstration script — Mizoram AI Hospital (prototype)
+# Demonstration script — Mizoram AI Hospital (Prototype)
 
-About 10 minutes. Works on a laptop (Chrome or Edge) and on a phone.
-Before you start: open the site once on the presentation device so the 3D
-guide is cached, and turn the device volume on.
+About 10–12 minutes, on a laptop (Chrome or Edge) or a phone. Before you
+start: open the site once on the presentation device (so it is cached and
+works even if the venue internet fails) and turn the volume on.
 
 ## 1. The front door (1 min)
 
-1. Open **AI Hospital** from the top menu.
-2. Point out: *Tell us what is wrong* (Reception), *Emergency*, the
-   *General Medicine consultation*, and the privacy note.
-3. Say: "AI Hospital helps people decide how urgently to seek care and
-   where to go, and prepares information for a real doctor. It never
-   diagnoses or prescribes. Fixed, sourced safety rules decide urgency."
+1. Open the **home page**. Point out the four starting points: *Talk to the
+   virtual doctor*, *Check my symptoms*, *Emergency help*, *Find healthcare*.
+2. Open **About** briefly: the problem, the proposed role, the four safety
+   layers, where a professional takes over, and what it is **not**.
+3. Say: "It helps people go from *I have a problem* to *I know what to do
+   next*. Fixed, sourced rules decide urgency. It never diagnoses or
+   prescribes."
 
-## 2. Emergency interruption (1 min)
+## 2. Reception (2 min)
 
-1. Open **General Medicine consultation** → **Begin consultation**.
-   The guide greets the patient and introduces herself as a *virtual health
-   guide*, not a doctor.
-2. Type: **My chest feels very tight and I'm struggling to breathe.** → Send.
-3. The consultation stops immediately: **Urgent medical attention**, Call 108,
-   Call 112, what to do while waiting.
-4. Press **This is not an emergency — go back**, then **↺ Start again**.
+1. **AI Hospital → Something is wrong** (Reception).
+2. Type **my chest is paining and I can't breathe** → *Continue*. Emergency
+   Mode appears at once — Call 108 / 112 and what to do while waiting.
+3. Back at Reception, press **I can't explain it — help me describe it**:
+   the consultation opens at the body map. (No medical words needed.)
 
-## 3. A full consultation (4 min)
+## 3. Demo mode — the real engine (6 min)
 
-1. Type: **I've had a cough for three weeks.** → Send.
-2. Show the **live patient chart** on the right: the concern and
-   "More than 2 weeks" were understood from the patient's words; everything
-   else says *Not provided*.
-3. Answer: none of the danger signs → Myself → 18 to 59 years → Female →
-   none → *Cough or breathing problem* → **No** to each question → About the
-   same → Mild → skip medicines, allergies and conditions.
-4. The guide explains the result and says the handoff line. Show:
-   - **Next: a real healthcare professional** (live doctor, eSanjeevani,
-     hospital, reminders)
-   - the **Patient-prepared visit summary** — *Not a medical diagnosis* —
-     with Print / Save as PDF, Copy and Share
-   - the chart's **System routing information**, kept separate from what the
-     patient reported
+Open `/ai-hospital/departments/general-medicine/room?demo` (add `&view=text`
+on a slow projector). Play the core scenarios in order; each card says what
+it demonstrates. The patient's side is scripted; **every reply, question and
+result comes from the real safety and consultation engine.**
 
-## 4. Reception and departments (2 min)
+| # | Scenario | What to point out |
+| --- | --- | --- |
+| 1 | Can't explain the problem | Body map → side → feeling → timing → pattern; unclear words never trigger a handoff |
+| 2 | Persistent cough | "Three weeks" is remembered, not asked again; TB pathway; free government service |
+| 3 | Routine illness | Self-care with clear warning signs — no unnecessary referral |
+| 4 | Possible emergency | Everything stops; 108 / 112 first |
+| 5 | Pregnancy concern | Pregnancy danger sign → emergency |
+| 6 | Child concern | Child danger-sign questions; a young child is never told self-care |
+| 7 | Health education question | "How does TB spread?" answered from the verified Health Library, with its source, then the consultation continues |
+| 8 | Visit summary | Medicines, allergies, conditions in the summary; Print / PDF / Copy / Share; open **My Visit** |
 
-1. Open **Reception**, tap the example **“I think I was exposed to HIV.”** →
-   *Start your consultation*. The room for the matched department opens and
-   the patient's words are carried over (in memory only — not in the address).
-2. Mention the six consultation rooms (General Medicine, Cardiology,
-   Respiratory, Paediatrics, Mental Health, Obstetrics & Gynaecology) — one
-   shared system, different equipment and greetings.
+*More scenarios* has: fever in Mizoram (same-day malaria test), stroke in a
+family member, possible HIV exposure, mental-health crisis (Tele-MANAS).
 
-## 5. Demo mode (optional, 2 min)
+## 4. Find Care and review (2 min)
 
-Open the room with `?demo` at the end of the address
-(`/ai-hospital/departments/general-medicine/room?demo`). Choose a scenario
-(A–H). The scripted *patient* answers play through the **real** engine — no
-outcome is pre-written. Use **Reset demo** (or *End demo scenario — reset*
-inside Emergency Mode).
+1. **Find Care**: "What type of care should I look for?" — your result from
+   the consultation is highlighted. Helplines come from one registry with
+   sources. Facilities show **only verified** details — today, none are, and
+   the page says so.
+2. Show `docs/CLINICAL_REVIEW.md` (or the CSV): every rule a clinician must
+   approve, by ID, with its source and status. "Nothing is marked verified
+   until a clinician signs it off."
 
-| | Scenario | Expected |
-|---|---|---|
-| A | Routine fever | Urgent assessment today (fever in Mizoram is tested for malaria the same day) |
-| B | Persistent cough | See a doctor soon; TB services suggested |
-| C | Pregnancy warning sign | Emergency |
-| D | Possible heart emergency | Emergency |
-| E | Possible stroke | Emergency |
-| F | Child illness | Urgent or soon, depending on answers |
-| G | Possible HIV exposure | Urgent (time-sensitive treatment) |
-| H | Mental-health crisis | Emergency with Tele-MANAS 14416 |
+## If something goes wrong
 
-## 6. If something goes wrong
+- 3D slow or not loading: it switches to a simple picture automatically, or
+  choose *Display → Text only*. The consultation and safety checks are the
+  same.
+- No sound: subtitles always show; press *Voice on*.
+- No internet: pages opened before still work, including Emergency,
+  Reception and the text consultation.
 
-- 3D slow or not loading: the guide switches to a simple picture
-  automatically, or choose *Display → Low data (2D)* or *Text only*. The
-  consultation and safety checks are unaffected.
-- No sound: press *🔇 Muted* to turn the voice on; subtitles always show.
-
-## Points to make honestly
+## Say honestly
 
 - **Prototype.** Not approved, endorsed or operated by the Government of
-  Mizoram or the Health Department.
-- **Sources** are listed at *AI Hospital → Sources and verification*; all are
-  awaiting formal verification.
-- **Clinical review** of the triage rules by Health Department clinicians is
-  required before any real use.
-- **Privacy:** nothing a patient types is sent or stored unless they choose
-  to save or share it. No camera, no location, no tracking.
+  Mizoram or the Health Department. No "first" claims.
+- **No clinical review yet** — 244 items wait for clinicians.
+- **Local data unverified** — helpline numbers, facilities and source records
+  must be checked by the Health Department.
+- **Privacy:** no accounts, no analytics, nothing typed is sent or stored
+  unless the patient chooses to save or share it.
+- **Evidence:** it does not yet claim any effect on visits, costs or
+  outcomes. Privacy-preserving counts are built in (switched off) so a
+  pilot can measure: consultations started and completed, where people stop,
+  how often clarification helps, routing levels, emergencies shown, and
+  low-bandwidth use.

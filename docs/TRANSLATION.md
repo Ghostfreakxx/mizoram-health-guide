@@ -34,5 +34,5 @@ through review before they appear on the website.
 ## Order of work
 
 1. **Emergency Mode** (`emergency` screen) — highest priority.
-2. **Triage Desk** (`triage` screen): questions, answers, and results.
+2. **Consultation** (the room in text-only view): questions, answers, and results.
 3. Everything else.

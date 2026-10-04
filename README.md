@@ -21,10 +21,25 @@ There is one assistant: Reception plus the Virtual Doctor, both on the shared
 safety engine. Every phone number comes from `app/lib/helplines.ts`
 (rendered with `<CallLink />`). Shared UI lives in `app/components/ui`.
 
+## Documentation
+
+| Document | For |
+| --- | --- |
+| [`PROJECT_STATUS.md`](PROJECT_STATUS.md) | What works, what is blocked, measurements |
+| [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) | How it is built; failure behaviour; scale |
+| [`docs/SAFETY_MODEL.md`](docs/SAFETY_MODEL.md) | Safety layers, what is tested, known limits |
+| [`docs/CLINICAL_REVIEW.md`](docs/CLINICAL_REVIEW.md) | Every rule and datum to review, with IDs and sources (generated) |
+| [`docs/DATA_PRIVACY.md`](docs/DATA_PRIVACY.md) | Where data goes; audit; telemetry rules |
+| [`docs/DEPLOYMENT.md`](docs/DEPLOYMENT.md) | Build, environment variables, headers, release checklist |
+| [`docs/ROADMAP.md`](docs/ROADMAP.md) | What comes next and who is needed |
+| [`docs/government/DEMO_SCRIPT.md`](docs/government/DEMO_SCRIPT.md) | A 10-minute demonstration |
+| [`docs/VIRTUAL_CONSULTATION.md`](docs/VIRTUAL_CONSULTATION.md) | The consultation room in detail |
+
 ## AI Hospital — Digital Front Door to Healthcare
 
 `/ai-hospital` is an automated health-navigation and patient-preparation
-platform: Reception → Triage → Department → Visit preparation → Real doctor.
+platform: Reception → safety check → consultation (Help me describe it) →
+triage and routing → visit summary → real healthcare pathway.
 It never diagnoses or prescribes.
 
 - **Deterministic safety core** (`app/lib/safety/`): shared red flags,
@@ -55,7 +70,7 @@ It never diagnoses or prescribes.
   `/ai-hospital/doctor-desk`): self-hosted Jitsi video, off until
   `NEXT_PUBLIC_LIVE_CONSULT_DOMAIN` is set. See `docs/LIVE_CONSULTATION.md`.
 - **Offline / installable app**: service worker, offline page, install button.
-- **Read aloud** on triage, results, emergency and tours.
+- **Read aloud** on results and emergency guidance.
 - **Mizo language**: built in, but switched on only for reviewed translations.
   See `docs/TRANSLATION.md`.
 - **Aggregate counts (rules only)**: `app/lib/metrics.ts` accepts category
@@ -97,8 +112,9 @@ npm run build && npm run test:e2e
 ```
 
 Runs Playwright tests in `tests/e2e/`: an axe-core WCAG 2.1 A/AA scan of every
-page on desktop and phone, plus key safety flows (emergency interruption,
-crisis support, consent-gated Health Passport).
+page on desktop and phone, key safety flows (emergency interruption, crisis
+support, consent-gated Health Passport), fallbacks (no 3D, no voice, Data
+Saver, text only), offline use, My Visit and demo mode.
 
 ## Tech stack
 
@@ -130,10 +146,14 @@ crisis support, consent-gated Health Passport).
 | `npm run start` | Run the production build         |
 | `npm run lint`  | Check the code with ESLint       |
 | `npm test`      | Run the safety test suite        |
+| `npm run test:e2e` | Browser tests (after a build)  |
+| `npm run review:export` | Regenerate the clinical review list |
 
 ## Deployment
 
-The site is deployed on Vercel. No environment variables are needed.
+Deployed on Vercel from `main`. Optional environment variables (live video,
+voice input mode, pilot counts) and security headers are described in
+[`docs/DEPLOYMENT.md`](docs/DEPLOYMENT.md). No secrets are used.
 
 ## Project structure
 

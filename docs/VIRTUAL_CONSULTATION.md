@@ -193,7 +193,7 @@ beside it (first on a phone).
 
 ## Demo mode (`app/lib/demoScenarios.ts`)
 
-Scenarios A–H play only the *patient's* answers; every result comes from the
+The eight core scenarios (1–8) and four more (A–D) play only the *patient's* answers; every result comes from the
 real engine. `tests/safety/demo.test.ts` checks each expected outcome. Reset:
 "Reset demo", or "End demo scenario — reset" inside Emergency Mode.
 
@@ -208,7 +208,7 @@ patient types (or, later, speaks)
         │
         ▼
 app/lib/consultation.ts   ← what to ask next, how to phrase it (pure, tested)
-        │  every answer goes into the same Answers object as the Triage Desk
+        │  every answer goes into the same Answers object as the triage engine expects
         ▼
 app/lib/safety/*          ← detectRedFlags, receive, triage  (AUTHORITATIVE)
         │
