@@ -5,6 +5,7 @@ import ReadAloud from "../../components/ReadAloud";
 import { effectiveLocale, translate } from "../../i18n";
 import { useLanguage } from "../../i18n/LanguageProvider";
 import { type RedFlagId, getRedFlag, redFlags } from "../../lib/safety/redFlags";
+import CallLink from "../../components/ui/CallLink";
 
 // Full-screen emergency interface. It covers the whole page so nothing else
 // distracts. Nothing entered here is saved or sent anywhere.
@@ -77,28 +78,28 @@ export default function EmergencyMode({
         {/* Immediate action */}
         <div className="grid gap-3">
           {crisis && (
-            <a href="tel:14416" className="flex items-center justify-between rounded-2xl bg-violet-800 px-6 py-5 text-white">
+            <CallLink id="telemanas" className="flex items-center justify-between rounded-2xl bg-violet-800 px-6 py-5 text-white">
               <span>
                 <span className="block text-sm font-semibold uppercase tracking-wide">{tr("emergency.crisis.talk")}</span>
                 <span className="block text-2xl font-bold">{tr("emergency.crisis.telemanas")}</span>
               </span>
               <span aria-hidden className="text-4xl">📞</span>
-            </a>
+            </CallLink>
           )}
-          <a href="tel:108" className="flex items-center justify-between rounded-2xl bg-red-700 px-6 py-5 text-white">
+          <CallLink id="ambulance-108" className="flex items-center justify-between rounded-2xl bg-red-700 px-6 py-5 text-white">
             <span>
               <span className="block text-sm font-semibold uppercase tracking-wide">{tr("emergency.ambulance")}</span>
               <span className="block text-4xl font-black">{tr("emergency.call108")}</span>
             </span>
             <span aria-hidden className="text-4xl">🚑</span>
-          </a>
-          <a href="tel:112" className="flex items-center justify-between rounded-2xl border-4 border-red-700 px-6 py-4 text-red-800">
+          </CallLink>
+          <CallLink id="erss-112" className="flex items-center justify-between rounded-2xl border-4 border-red-700 px-6 py-4 text-red-800">
             <span>
               <span className="block text-sm font-semibold uppercase tracking-wide">{tr("emergency.national")}</span>
               <span className="block text-3xl font-black">{tr("emergency.call112")}</span>
             </span>
             <span aria-hidden className="text-3xl">📞</span>
-          </a>
+          </CallLink>
         </div>
 
         <p className="rounded-xl bg-amber-100 p-4 text-lg font-semibold text-amber-950">

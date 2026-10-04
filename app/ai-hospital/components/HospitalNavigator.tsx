@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import CallLink from "../../components/ui/CallLink";
 import { getDepartment } from "../data/departments";
 import { DISTRICTS, displayable, hospitals, mapLink, verificationStatus } from "../data/hospitals";
 
@@ -28,8 +29,7 @@ export default function HospitalNavigator() {
           {verifiedCount === 0
             ? "No hospital has been fully verified yet. Contact details, services, and emergency availability will appear only after they are confirmed from an official source."
             : `${verifiedCount} of ${hospitals.length} hospitals are fully verified.`}{" "}
-          In an emergency, call <a href="tel:108" className="font-bold underline">108</a> or{" "}
-          <a href="tel:112" className="font-bold underline">112</a>.
+          In an emergency, call <CallLink id="ambulance-108" /> or <CallLink id="erss-112" />.
         </p>
       </div>
 
@@ -60,7 +60,7 @@ export default function HospitalNavigator() {
           return (
             <li key={h.id} className="rounded-2xl border-2 border-slate-200 bg-white p-6">
               <div className="flex flex-wrap items-start justify-between gap-2">
-                <h2 className="text-xl font-bold text-blue-950">{h.name.value}</h2>
+                <h3 className="text-xl font-bold text-blue-950">{h.name.value}</h3>
                 <span className={`rounded-full px-3 py-1 text-xs font-bold ${status === "VERIFIED" ? "bg-emerald-100 text-emerald-900" : "bg-amber-100 text-amber-900"}`}>
                   {status === "VERIFIED" ? "✓ VERIFIED" : "NEEDS VERIFICATION"}
                 </span>

@@ -19,8 +19,8 @@ export default function manifest(): MetadataRoute.Manifest {
     ],
     shortcuts: [
       { name: "Emergency", url: "/ai-hospital/emergency", icons: [{ src: "/icon-192.png", sizes: "192x192" }] },
-      { name: "I feel sick", url: "/ai-hospital/triage", icons: [{ src: "/icon-192.png", sizes: "192x192" }] },
-      { name: "Helplines", url: "/helplines", icons: [{ src: "/icon-192.png", sizes: "192x192" }] },
+      { name: "Tell us what's wrong", url: "/ai-hospital/reception", icons: [{ src: "/icon-192.png", sizes: "192x192" }] },
+      { name: "Find care", url: "/find-care", icons: [{ src: "/icon-192.png", sizes: "192x192" }] },
     ],
   };
 }

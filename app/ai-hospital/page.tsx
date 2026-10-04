@@ -1,205 +1,142 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import RoomLink from "./consult-room/RoomLink";
-import { AI_HOSPITAL } from "../config";
+import { AI_HOSPITAL, SITE } from "../config";
+import { Section } from "../components/ui";
 
 export const metadata: Metadata = {
   title: `${AI_HOSPITAL.name} — ${AI_HOSPITAL.subtitle}`,
   description: AI_HOSPITAL.definition,
 };
 
-const actions = [
-  { href: "/ai-hospital/reception", icon: "🛎️", label: "Tell us what is wrong", sub: "Start at Reception", style: "bg-blue-900 text-white border-blue-900 hover:bg-blue-800" },
-  { href: "/ai-hospital/emergency", icon: "🚨", label: "Emergency", sub: "Call for help now", style: "bg-red-700 text-white border-red-700 hover:bg-red-800" },
-  { href: "/ai-hospital/departments/general-medicine/room", icon: "🪑", label: "General Medicine consultation", sub: "Sit with the virtual health guide" },
-  { href: "/ai-hospital/triage", icon: "🤒", label: "Quick urgency check", sub: "A few questions, text only" },
-  { href: "/ai-hospital/departments", icon: "🧭", label: "Find the right department", sub: "Where should I go?" },
-  { href: "/ai-hospital/consult", icon: "👩‍⚕️", label: "Talk to a real doctor", sub: "Live, in real time" },
-  { href: "/ai-hospital/prepare", icon: "📋", label: "Prepare for a hospital visit", sub: "Make a summary for the doctor" },
-  { href: "/ai-hospital/departments/obstetrics-gynaecology", icon: "🤱", label: "Mother & Child", sub: "Pregnancy, babies, children" },
-  { href: "/ai-hospital/departments/mental-health", icon: "🧠", label: "Mental Health", sub: "Stress, sadness, worry" },
-  { href: "/ai-hospital/departments/oncology", icon: "🎗️", label: "Cancer", sub: "Warning signs and screening" },
-  { href: "/ai-hospital/departments#hiv-tb", icon: "🛡️", label: "HIV / TB", sub: "Free testing and treatment" },
-  { href: "/ai-hospital/hospitals", icon: "🏥", label: "Find a hospital", sub: "Hospitals in Mizoram" },
-  { href: "/ai-hospital/passport", icon: "🗂️", label: "My health records", sub: "Health Passport and saved summaries" },
-  { href: "/#topics", icon: "📚", label: "Learn about a condition", sub: "Simple health guides" },
+// The lobby asks one question and offers five answers. Everything else is
+// one step further down, grouped by when people need it.
+
+const choices = [
+  { href: "/ai-hospital/reception", icon: "💬", title: "Something is wrong", text: "Tell us in your own words — we'll help you find out how urgent it is and where to go.", tone: "primary" as const },
+  { href: "/ai-hospital/departments/general-medicine/room", icon: "🩺", title: "Talk to the virtual doctor", text: "A guided consultation. It helps you describe the problem and prepares a summary.", room: true },
+  { href: "/ai-hospital/emergency", icon: "🚨", title: "It's an emergency", text: "Call 108 and see what to do while help comes.", tone: "danger" as const },
+  { href: "/ai-hospital/doctor", icon: "👩‍⚕️", title: "See a real doctor", text: "Free online consultations and how to get the most from a visit." },
+  { href: "/ai-hospital/prepare", icon: "📝", title: "Prepare for a visit", text: "Write down what to tell the doctor, in one page." },
 ];
 
-const journey = [
-  { icon: "🛎️", label: "Reception", text: "Tell us what is wrong" },
-  { icon: "🩺", label: "Triage", text: "How urgent is it?" },
-  { icon: "🧭", label: "Department", text: "The right service" },
-  { icon: "📋", label: "Preparation", text: "Summary for the doctor" },
-  { icon: "👩‍⚕️", label: "Real doctor", text: "Online or in person" },
-  { icon: "🔁", label: "Follow-up", text: "Reminders and records" },
+const more = [
+  {
+    title: "After a visit",
+    links: [
+      { href: "/ai-hospital/medicines", label: "Understand a prescription" },
+      { href: "/ai-hospital/lab-reports", label: "Understand a lab report" },
+      { href: "/ai-hospital/follow-up", label: "Set reminders" },
+      { href: "/ai-hospital/passport", label: "Health Passport (your records, on your phone)" },
+    ],
+  },
+  {
+    title: "Stay healthy",
+    links: [
+      { href: "/ai-hospital/vaccinations", label: "Child vaccination planner" },
+      { href: "/ai-hospital/screening", label: "Free check-ups (age 30+)" },
+      { href: "/ai-hospital/first-aid", label: "First aid" },
+      { href: "/ai-hospital/calm", label: "Calm corner" },
+    ],
+  },
+  {
+    title: "Departments",
+    links: [
+      { href: "/ai-hospital/departments", label: "All departments" },
+      { href: "/ai-hospital/departments/general-medicine/simulator", label: "Walk through a visit in 3D" },
+      { href: "/ai-hospital/triage", label: "Quick urgency check (text only)" },
+      { href: "/ai-hospital/sources", label: "Sources and verification" },
+    ],
+  },
 ];
+
+const tone = {
+  primary: "border-blue-900 bg-blue-900 text-white hover:bg-blue-800",
+  danger: "border-red-700 bg-red-700 text-white hover:bg-red-800",
+  default: "border-slate-200 bg-white text-slate-900 hover:border-blue-500 hover:bg-blue-50",
+};
 
 export default function AiHospitalLobby() {
   return (
-    <main className="flex-1">
-      {/* Entrance */}
-      <section className="bg-gradient-to-br from-blue-950 via-blue-900 to-blue-700 text-white">
-        <div className="mx-auto max-w-6xl px-4 py-10 sm:px-6 sm:py-14">
-          <p className="inline-block rounded-full bg-white/15 px-4 py-1 text-sm font-semibold uppercase tracking-wide">
-            Mizoram Health Guide
+    <main className="flex-1 bg-slate-50">
+      <section className="border-b border-slate-200 bg-white">
+        <div className="mx-auto max-w-6xl px-4 py-8 sm:px-6 sm:py-10">
+          <p className="text-sm font-bold uppercase tracking-wider text-blue-800">
+            {SITE.name} · {AI_HOSPITAL.subtitle}
           </p>
-          <h1 className="mt-4 text-4xl font-black sm:text-6xl">
-            🏥 {AI_HOSPITAL.name}
-          </h1>
-          <p className="mt-2 text-xl font-semibold text-amber-300 sm:text-2xl">{AI_HOSPITAL.subtitle}</p>
-          <p className="mt-4 max-w-3xl text-lg leading-relaxed text-blue-50">
-            Find out how urgently you need care, where to go, and get ready to see a real doctor — in simple steps.
-          </p>
+          <h1 className="mt-2 text-3xl font-black text-blue-950 sm:text-5xl">What can we help you with today?</h1>
+          <p className="mt-3 max-w-2xl text-lg text-slate-700">{AI_HOSPITAL.shortBoundary}</p>
         </div>
       </section>
 
-      {/* Reception */}
-      <section className="mx-auto max-w-6xl px-4 sm:px-6">
-        <Link
-          href="/ai-hospital/reception"
-          className="-mt-6 flex items-center gap-4 rounded-2xl border-2 border-amber-300 bg-white p-5 shadow-lg hover:border-amber-400 sm:p-6"
-        >
-          <span aria-hidden className="grid h-16 w-16 shrink-0 place-items-center rounded-full bg-amber-100 text-4xl">🛎️</span>
-          <span className="flex-1">
-            <span className="block text-2xl font-bold text-blue-950">Reception</span>
-            <span className="block text-lg text-slate-600">Tell us in your own words what is wrong. We will guide you.</span>
-          </span>
-          <span aria-hidden className="text-3xl text-blue-900">→</span>
-        </Link>
-      </section>
-
-      {/* Main actions */}
-      <section aria-labelledby="actions-heading" className="mx-auto max-w-6xl px-4 py-10 sm:px-6">
-        <h2 id="actions-heading" className="text-2xl font-bold text-blue-950">What do you need?</h2>
-        <div className="mt-5 grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
-          {actions.map((a) => {
-            // Links into a consultation room warm up the 3D doctor on hover/focus.
-            const L = a.href.endsWith("/room") ? RoomLink : Link;
+      <nav aria-label="Choose what you need" className="mx-auto max-w-6xl px-4 py-6 sm:px-6">
+        <ul className="grid gap-3 md:grid-cols-2 lg:grid-cols-3">
+          {choices.map((c, i) => {
+            const L = c.room ? RoomLink : Link;
+            const t = tone[c.tone ?? "default"];
             return (
-            <L
-              key={a.label}
-              href={a.href}
-              className={`flex min-h-24 items-center gap-4 rounded-2xl border-2 p-5 transition ${a.style ?? "border-slate-200 bg-white text-slate-900 hover:border-blue-400 hover:bg-blue-50"}`}
-            >
-              <span aria-hidden className="text-4xl">{a.icon}</span>
-              <span>
-                <span className="block text-xl font-bold">{a.label}</span>
-                <span className={`block text-base ${a.style ? "text-white/85" : "text-slate-600"}`}>{a.sub}</span>
-              </span>
-            </L>
+              <li key={c.href} className={i === 0 ? "md:col-span-2 lg:col-span-1 lg:row-span-2" : ""}>
+                <L href={c.href} className={`flex h-full min-h-24 items-start gap-4 rounded-2xl border-2 p-5 transition-colors ${t}`}>
+                  <span aria-hidden className="text-4xl">
+                    {c.icon}
+                  </span>
+                  <span>
+                    <span className="block text-xl font-bold">{c.title}</span>
+                    <span className={`mt-1 block ${c.tone ? "text-white/85" : "text-slate-600"}`}>{c.text}</span>
+                  </span>
+                </L>
+              </li>
             );
           })}
-        </div>
-      </section>
+        </ul>
+      </nav>
 
-      {/* After the visit */}
-      <section aria-labelledby="after-heading" className="mx-auto max-w-6xl px-4 pb-10 sm:px-6">
-        <h2 id="after-heading" className="text-2xl font-bold text-blue-950">After your visit</h2>
-        <div className="mt-5 grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
-          {[
-            { href: "/ai-hospital/follow-up", icon: "🔔", label: "Reminders", sub: "Appointments, tests, medicines" },
-            { href: "/ai-hospital/medicines", icon: "💊", label: "Medicine information", sub: "Understand your prescription" },
-            { href: "/ai-hospital/lab-reports", icon: "🧪", label: "Lab report explainer", sub: "What a test measures" },
-            { href: "/ai-hospital/passport", icon: "🗂️", label: "Health Passport", sub: "Your records, on your phone" },
-          ].map((a) => (
-            <Link key={a.href} href={a.href} className="flex min-h-24 items-center gap-4 rounded-2xl border-2 border-slate-200 bg-white p-5 text-slate-900 transition hover:border-blue-400 hover:bg-blue-50">
-              <span aria-hidden className="text-4xl">{a.icon}</span>
-              <span>
-                <span className="block text-xl font-bold">{a.label}</span>
-                <span className="block text-base text-slate-600">{a.sub}</span>
-              </span>
-            </Link>
+      <Section id="more" title="More services" className="pt-2">
+        <div className="grid gap-4 md:grid-cols-3">
+          {more.map((g) => (
+            <div key={g.title} className="rounded-2xl border border-slate-200 bg-white p-5">
+              <h3 className="font-bold text-blue-950">{g.title}</h3>
+              <ul className="mt-2 space-y-1">
+                {g.links.map((l) => (
+                  <li key={l.href}>
+                    <Link href={l.href} className="inline-block py-1.5 font-semibold text-blue-800 underline-offset-4 hover:underline">
+                      {l.label}
+                    </Link>
+                  </li>
+                ))}
+              </ul>
+            </div>
           ))}
         </div>
-      </section>
+      </Section>
 
-      {/* Stay healthy */}
-      <section aria-labelledby="healthy-heading" className="mx-auto max-w-6xl px-4 pb-10 sm:px-6">
-        <h2 id="healthy-heading" className="text-2xl font-bold text-blue-950">Stay healthy</h2>
-        <div className="mt-5 grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
-          {[
-            { href: "/ai-hospital/vaccinations", icon: "💉", label: "Child vaccines", sub: "When each visit is due" },
-            { href: "/ai-hospital/screening", icon: "🩺", label: "Free check-ups", sub: "BP, sugar, and cancer checks" },
-            { href: "/ai-hospital/calm", icon: "🌿", label: "Calm corner", sub: "Exercises for stress" },
-            { href: "/ai-hospital/first-aid", icon: "⛑️", label: "First aid", sub: "Steps to help someone now" },
-          ].map((a) => (
-            <Link key={a.href} href={a.href} className="flex min-h-24 items-center gap-4 rounded-2xl border-2 border-slate-200 bg-white p-5 text-slate-900 transition hover:border-blue-400 hover:bg-blue-50">
-              <span aria-hidden className="text-4xl">{a.icon}</span>
-              <span>
-                <span className="block text-xl font-bold">{a.label}</span>
-                <span className="block text-base text-slate-600">{a.sub}</span>
-              </span>
-            </Link>
-          ))}
-        </div>
-      </section>
-
-      {/* 3D tours */}
-      <section className="mx-auto max-w-6xl px-4 pb-10 sm:px-6">
-        <div className="rounded-2xl border-2 border-amber-300 bg-amber-50 p-6">
-          <h2 className="text-2xl font-bold text-blue-950">🧊 Visit a department in 3D before you go</h2>
-          <p className="mt-1 text-lg text-slate-700">Walk through a typical visit, so you know what to expect.</p>
-          <div className="mt-4 flex flex-wrap gap-2">
-            {[
-              ["general-medicine", "General doctor"],
-              ["emergency", "Emergency"],
-              ["obstetrics-gynaecology", "Pregnancy care"],
-              ["paediatrics", "Children's health"],
-              ["dental", "Teeth and mouth"],
-              ["eye-care", "Eye care"],
-            ].map(([slug, label]) => (
-              <Link key={slug} href={`/ai-hospital/departments/${slug}/simulator`} className="rounded-xl border-2 border-blue-900 bg-white px-4 py-2 text-lg font-semibold text-blue-900 hover:bg-blue-50">
-                {label}
+      <Section id="how" title="How the AI Hospital keeps you safe">
+        <ul className="grid gap-3 md:grid-cols-3">
+          <li className="rounded-2xl border border-slate-200 bg-white p-5">
+            <h3 className="font-bold text-blue-950">Fixed safety rules decide urgency</h3>
+            <p className="mt-1 text-slate-700">Danger signs are checked by fixed rules based on published health guidance — not by an AI guessing.</p>
+          </li>
+          <li className="rounded-2xl border border-slate-200 bg-white p-5">
+            <h3 className="font-bold text-blue-950">No diagnosis, no prescriptions</h3>
+            <p className="mt-1 text-slate-700">{AI_HOSPITAL.boundary}</p>
+          </li>
+          <li className="rounded-2xl border border-slate-200 bg-white p-5">
+            <h3 className="font-bold text-blue-950">Nothing is kept</h3>
+            <p className="mt-1 text-slate-700">
+              Your answers are worked on in your browser and are not sent to us. They are gone when you close the tab.{" "}
+              <Link href="/privacy" className="font-semibold text-blue-800 underline">
+                Privacy
               </Link>
-            ))}
-            <Link href="/ai-hospital/departments" className="rounded-xl px-4 py-2 text-lg font-semibold text-blue-700 underline">All 17 →</Link>
-          </div>
-        </div>
-      </section>
-
-      {/* Journey */}
-      <section className="border-y border-slate-200 bg-white">
-        <div className="mx-auto max-w-6xl px-4 py-10 sm:px-6">
-          <h2 className="text-2xl font-bold text-blue-950">How AI Hospital works</h2>
-          <ol className="mt-6 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
-            {journey.map((j, i) => (
-              <li key={j.label} className="rounded-xl bg-slate-50 p-4 text-center">
-                <span aria-hidden className="block text-3xl">{j.icon}</span>
-                <span className="mt-2 block text-sm font-semibold text-slate-600">Step {i + 1}</span>
-                <span className="block text-lg font-bold text-blue-950">{j.label}</span>
-                <span className="block text-sm text-slate-600">{j.text}</span>
-              </li>
-            ))}
-          </ol>
-        </div>
-      </section>
-
-      {/* Trust */}
-      <section className="mx-auto max-w-6xl px-4 py-10 sm:px-6">
-        <div className="grid gap-5 md:grid-cols-3">
-          <div className="rounded-2xl border border-slate-200 bg-white p-6">
-            <h2 className="text-lg font-bold text-blue-950">What AI Hospital is</h2>
-            <p className="mt-2 text-slate-700">{AI_HOSPITAL.definition}</p>
-          </div>
-          <div className="rounded-2xl border border-slate-200 bg-white p-6">
-            <h2 className="text-lg font-bold text-blue-950">What it is not</h2>
-            <p className="mt-2 text-slate-700">{AI_HOSPITAL.boundary}</p>
-          </div>
-          <div className="rounded-2xl border border-slate-200 bg-white p-6">
-            <h2 className="text-lg font-bold text-blue-950">Your privacy</h2>
-            <p className="mt-2 text-slate-700">
-              Your answers stay on your phone while you use the page and are not saved or sent anywhere. Urgency is decided by
-              fixed safety rules based on published health guidance — not by a chatbot guessing.
             </p>
-          </div>
-        </div>
-        <p className="mt-6 text-sm text-slate-600">
-          For staff:{" "}
-          <Link href="/ai-hospital/doctor-desk" className="font-semibold text-blue-800 underline">Doctor&apos;s Desk</Link>
-          {" · "}
-          <Link href="/ai-hospital/admin" className="font-semibold text-blue-800 underline">Health Department dashboard (demonstration)</Link>
+          </li>
+        </ul>
+        <p className="mt-5 text-sm text-slate-600">
+          For health staff:{" "}
+          <Link href="/ai-hospital/doctor-desk" className="font-semibold text-blue-800 underline">
+            Doctor&apos;s Desk
+          </Link>
         </p>
-      </section>
+      </Section>
     </main>
   );
 }

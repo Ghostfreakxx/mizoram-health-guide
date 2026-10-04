@@ -26,12 +26,26 @@ test("receptionist: suicidal message goes straight to crisis support", async ({ 
   await expect(page.getByText("Tele-MANAS 14416").first()).toBeVisible();
 });
 
-test("Health Assistant: typo'd emergency still gets 108", async ({ page }) => {
-  await page.goto("/");
-  await page.getByRole("button", { name: "Ask a Question" }).first().click();
-  await page.getByLabel("Your health question").fill("cheast pian but im fine");
-  await page.keyboard.press("Enter");
-  await expect(page.getByRole("dialog")).toContainText("108");
+test("reception: typo'd emergency ('cheast pian but im fine') still gets 108", async ({ page }) => {
+  await page.goto("/ai-hospital/reception");
+  await page.getByLabel("What is the problem?").fill("cheast pian but im fine");
+  await page.getByRole("button", { name: "Continue →" }).click();
+  await expect(page.getByRole("alertdialog")).toBeVisible();
+  await expect(page.getByRole("link", { name: /108/ }).first()).toBeVisible();
+});
+
+test("there is one assistant: no floating chat anywhere", async ({ page }) => {
+  for (const path of ["/", "/cancer", "/ai-hospital"]) {
+    await page.goto(path);
+    await expect(page.getByRole("button", { name: /ask a question/i })).toHaveCount(0);
+  }
+});
+
+test("old addresses redirect to the new structure", async ({ page }) => {
+  for (const [from, to] of [["/hospitals", "/find-care"], ["/helplines", "/find-care"], ["/ai-hospital/hospitals", "/find-care"], ["/tools", "/health-library"]]) {
+    await page.goto(from);
+    await expect(page, from).toHaveURL(new RegExp(`${to}(#.*)?$`));
+  }
 });
 
 test("Health Passport stores nothing until saving is turned on", async ({ page }) => {
@@ -119,8 +133,6 @@ test("consultation room: never asks for camera or microphone, and works with no 
   await page.getByRole("textbox", { name: "Your answer" }).fill("headache");
   await page.getByRole("button", { name: "Send" }).click();
   await expect(page.getByText("Your consultation information stays on this device")).toBeVisible();
-  // The site-wide floating chat is not shown inside a consultation room.
-  await expect(page.getByRole("button", { name: "💬 Ask a question" })).toHaveCount(0);
   expect(asked).toEqual([]);
 });
 

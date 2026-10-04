@@ -2,153 +2,87 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useState } from "react";
+import { AREAS, SITE } from "../config";
 import AccessibilityBar from "./AccessibilityBar";
-import NewsTicker from "./NewsTicker";
-import { openChat } from "./openChat";
 
-const navLinks = [
-  { href: "/", label: "Home" },
-  { href: "/ai-hospital", label: "AI Hospital" },
-  { href: "/#topics", label: "Health Topics" },
-  { href: "/tools", label: "Self-Check Tools" },
-  { href: "/hospitals", label: "Hospitals" },
-  { href: "/helplines", label: "Helplines" },
-  { href: "/#survey", label: "Survey" },
-];
+const active = (pathname: string, href: string) => pathname === href || pathname.startsWith(`${href}/`);
 
+// One simple header: identity, five areas, search, and an Emergency button
+// that is always visible. On phones the areas move to a bottom bar.
 export default function SiteHeader() {
-  const pathname = usePathname();
-  const [menuOpen, setMenuOpen] = useState(false);
-
+  const pathname = usePathname() ?? "/";
   return (
-    <>
-      <header>
-        <AccessibilityBar />
+    <header>
+      <AccessibilityBar />
+      <div className="border-b border-slate-200 bg-white">
+        <div className="mx-auto flex max-w-7xl items-center justify-between gap-3 px-4 py-3 sm:px-6">
+          <Link href="/" className="flex min-w-0 items-center gap-3">
+            <span aria-hidden className="grid h-11 w-11 shrink-0 place-items-center rounded-xl bg-blue-900 text-2xl font-black text-white">
+              +
+            </span>
+            <span className="min-w-0 leading-tight">
+              <span className="block text-base leading-tight font-bold text-blue-950 sm:text-xl sm:leading-snug">{SITE.name}</span>
+              <span className="block truncate text-xs text-slate-600 sm:text-sm">
+                {SITE.tagline} · <span className="font-semibold text-amber-800">{SITE.status}</span>
+              </span>
+            </span>
+          </Link>
 
-        {/* Masthead */}
-        <div className="bg-white">
-          <div className="max-w-7xl mx-auto px-4 sm:px-6 py-4 flex flex-wrap items-center justify-between gap-4">
-            <Link href="/" className="flex items-center gap-3" onClick={() => setMenuOpen(false)}>
-              <span
-                aria-hidden
-                className="grid h-14 w-14 place-items-center rounded-full border-4 border-blue-900 bg-white text-3xl font-black text-red-600"
-              >
-                +
-              </span>
-              <span className="leading-tight">
-                <span className="block text-xl sm:text-2xl font-bold text-blue-950">
-                  Mizoram Health Guide
-                </span>
-                <span className="block text-sm text-slate-600">
-                  Citizen Health Awareness Portal
-                </span>
-              </span>
+          <nav aria-label="Main" className="hidden lg:block">
+            <ul className="flex items-center gap-1">
+              {AREAS.map((a) => (
+                <li key={a.href}>
+                  <Link
+                    href={a.href}
+                    aria-current={active(pathname, a.href) ? "page" : undefined}
+                    className={`rounded-lg px-3 py-2 font-semibold ${active(pathname, a.href) ? "bg-blue-50 text-blue-900" : "text-slate-700 hover:bg-slate-100 hover:text-blue-900"}`}
+                  >
+                    {a.label}
+                  </Link>
+                </li>
+              ))}
+            </ul>
+          </nav>
+
+          <div className="flex shrink-0 items-center gap-2">
+            <Link href="/search" aria-label="Search" className="hidden min-h-11 items-center rounded-lg px-3 font-semibold text-slate-700 hover:bg-slate-100 sm:flex">
+              <span aria-hidden>🔍</span>
+              <span className="ml-1.5 hidden xl:inline">Search</span>
             </Link>
-
-            <div className="flex items-center gap-4">
-              <form action="/search" role="search" className="hidden md:flex">
-                <label htmlFor="site-search" className="sr-only">Search this website</label>
-                <input
-                  id="site-search"
-                  name="q"
-                  type="search"
-                  placeholder="Search health topics…"
-                  className="w-56 rounded-l-md border border-slate-300 px-3 py-2 text-sm outline-none focus:border-blue-700"
-                />
-                <button
-                  type="submit"
-                  className="rounded-r-md bg-blue-900 px-4 text-sm font-semibold text-white hover:bg-blue-800"
-                >
-                  Search
-                </button>
-              </form>
-
-              <a
-                href="tel:108"
-                className="flex items-center gap-2 rounded-md border-2 border-red-600 px-3 py-1.5 text-red-700 hover:bg-red-50"
-              >
-                <span aria-hidden className="text-xl">🚑</span>
-                <span className="leading-tight">
-                  <span className="block text-[11px] font-semibold uppercase">Emergency</span>
-                  <span className="block text-lg font-bold">108</span>
-                </span>
-              </a>
-            </div>
+            <Link href="/ai-hospital/emergency" className="flex min-h-11 items-center gap-1.5 rounded-lg bg-red-700 px-3 font-bold text-white hover:bg-red-800 sm:px-4">
+              <span aria-hidden>🚨</span> Emergency
+            </Link>
           </div>
         </div>
-      </header>
-
-      {/* Main navigation */}
-      <div className="sticky top-0 z-40 bg-blue-900 text-white shadow">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 flex items-center justify-between">
-          <nav aria-label="Main" className="hidden lg:flex">
-            {navLinks.map((link) => {
-              const active = link.href === pathname;
-              return (
-                <Link
-                  key={link.href}
-                  href={link.href}
-                  aria-current={active ? "page" : undefined}
-                  className={`border-b-4 px-4 py-3 text-sm font-semibold transition ${
-                    active ? "border-amber-400 bg-blue-950" : "border-transparent hover:bg-blue-800"
-                  }`}
-                >
-                  {link.label}
-                </Link>
-              );
-            })}
-          </nav>
-
-          <button
-            type="button"
-            className="lg:hidden py-3 text-sm font-semibold"
-            aria-expanded={menuOpen}
-            aria-controls="mobile-nav"
-            onClick={() => setMenuOpen((v) => !v)}
-          >
-            {menuOpen ? "✕ Close menu" : "☰ Menu"}
-          </button>
-
-          <button
-            type="button"
-            onClick={openChat}
-            className="my-1.5 rounded bg-amber-400 px-4 py-1.5 text-sm font-bold text-blue-950 hover:bg-amber-300"
-          >
-            Ask a Question
-          </button>
-        </div>
-
-        {menuOpen && (
-          <nav id="mobile-nav" aria-label="Main" className="lg:hidden border-t border-blue-800 px-4 py-2">
-            {navLinks.map((link) => (
-              <Link
-                key={link.href}
-                href={link.href}
-                onClick={() => setMenuOpen(false)}
-                className="block rounded px-3 py-2 hover:bg-blue-800"
-              >
-                {link.label}
-              </Link>
-            ))}
-            <form action="/search" role="search" className="mt-2 flex pb-2">
-              <label htmlFor="site-search-mobile" className="sr-only">Search this website</label>
-              <input
-                id="site-search-mobile"
-                name="q"
-                type="search"
-                placeholder="Search health topics…"
-                className="flex-1 rounded-l-md bg-white px-3 py-2 text-sm text-slate-900 outline-none"
-              />
-              <button type="submit" className="rounded-r-md bg-amber-400 px-4 text-sm font-semibold text-blue-950">
-                Search
-              </button>
-            </form>
-          </nav>
-        )}
       </div>
+    </header>
+  );
+}
 
-      <NewsTicker />
+// Phones and tablets: the five areas within thumb reach. Hidden inside a
+// consultation room, which has its own controls at the bottom.
+export function BottomNav() {
+  const pathname = usePathname() ?? "/";
+  if (/\/room(\/|$)/.test(pathname)) return null;
+  return (
+    <>
+      <div aria-hidden className="h-16 lg:hidden" />
+      <nav aria-label="Main (bottom)" className="fixed inset-x-0 bottom-0 z-40 border-t border-slate-200 bg-white lg:hidden">
+        <ul className="mx-auto grid max-w-xl grid-cols-5">
+          {AREAS.map((a) => (
+            <li key={a.href}>
+              <Link
+                href={a.href}
+                aria-current={active(pathname, a.href) ? "page" : undefined}
+                className={`flex min-h-15 flex-col items-center justify-center gap-0.5 text-xs font-semibold ${active(pathname, a.href) ? "text-blue-900" : "text-slate-600"}`}
+              >
+                <span aria-hidden className="text-lg">{a.icon}</span>
+                {a.short}
+              </Link>
+            </li>
+          ))}
+        </ul>
+      </nav>
     </>
   );
 }

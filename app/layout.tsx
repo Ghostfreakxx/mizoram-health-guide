@@ -1,9 +1,9 @@
 import type { Metadata, Viewport } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
-import SiteHeader from "./components/SiteHeader";
+import SiteHeader, { BottomNav } from "./components/SiteHeader";
 import SiteFooter from "./components/SiteFooter";
-import HealthChatbot from "./components/HealthChatbot";
+import { SITE } from "./config";
 import OfflineSupport from "./components/OfflineSupport";
 import { LanguageProvider } from "./i18n/LanguageProvider";
 
@@ -19,12 +19,12 @@ const geistMono = Geist_Mono({
 
 export const metadata: Metadata = {
   title: {
-    template: "%s | Mizoram Health Guide",
-    default: "Mizoram Health Guide",
+    template: `%s | ${SITE.name}`,
+    default: `${SITE.name} — ${SITE.tagline}`,
   },
   description:
-    "Simple, citizen-friendly public health awareness for Mizoram: cancer, tobacco, diabetes, heart health, and mental wellbeing.",
-  appleWebApp: { capable: true, title: "Health Guide", statusBarStyle: "default" },
+    "Tell us what's wrong, get safe guidance on how urgently to seek care and where to go, talk it through with a virtual doctor, and take a clear summary to a real one.",
+  appleWebApp: { capable: true, title: "AI Hospital", statusBarStyle: "default" },
   icons: { icon: "/icon.svg", apple: "/apple-touch-icon.png" },
 };
 
@@ -50,7 +50,7 @@ export default function RootLayout({
           {children}
         </div>
         <SiteFooter />
-        <HealthChatbot />
+        <BottomNav />
         </LanguageProvider>
       </body>
     </html>

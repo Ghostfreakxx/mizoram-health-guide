@@ -3,7 +3,9 @@ import Link from "next/link";
 import { AI_HOSPITAL } from "../../config";
 import PageHeader from "../../components/PageHeader";
 import { getSource } from "../../lib/sources";
+import { readConfig } from "../../lib/consult";
 import { publicFacts, teleconsultServices } from "../data/teleconsult";
+import CallLink from "../../components/ui/CallLink";
 
 export const metadata: Metadata = {
   title: `Talk to a Real Doctor — ${AI_HOSPITAL.name}`,
@@ -33,25 +35,28 @@ export default function DoctorPage() {
       <div className="mx-auto max-w-5xl space-y-8 px-4 py-10 sm:px-6">
         <div className="rounded-2xl border-2 border-red-200 bg-red-50 p-5 text-lg text-red-950">
           <strong>Emergencies need in-person care.</strong> Chest pain, stroke signs, severe breathing difficulty, heavy bleeding,
-          fits, pregnancy danger signs, or a very sick baby — call <a href="tel:108" className="font-bold underline">108</a> or{" "}
-          <a href="tel:112" className="font-bold underline">112</a>, or go to the nearest emergency now.
+          fits, pregnancy danger signs, or a very sick baby — call <CallLink id="ambulance-108" className="font-bold underline">108</CallLink> or{" "}
+          <CallLink id="erss-112" className="font-bold underline">112</CallLink>, or go to the nearest emergency now.
         </div>
 
-        <Link href="/ai-hospital/consult" className="flex flex-col gap-3 rounded-2xl bg-gradient-to-r from-blue-900 to-blue-700 p-6 text-white sm:flex-row sm:items-center sm:justify-between">
+        {/* The live consulting room only appears once a video server is configured. */}
+        {readConfig().enabled && (
+        <Link href="/ai-hospital/consult" className="flex flex-col gap-3 rounded-2xl bg-blue-900 p-6 text-white hover:bg-blue-800 sm:flex-row sm:items-center sm:justify-between">
           <span>
             <span className="block text-2xl font-bold">🩺 Enter the consulting room</span>
             <span className="mt-1 block text-blue-100">Check your camera, get your summary ready, and talk to a real doctor in real time.</span>
           </span>
           <span className="shrink-0 rounded-xl bg-amber-400 px-5 py-3 text-center text-lg font-bold text-blue-950">Go →</span>
         </Link>
+        )}
 
         {/* Step 1: prepare */}
         <section className="rounded-2xl border-2 border-slate-200 bg-white p-6 sm:p-8">
           <h2 className="text-2xl font-bold text-blue-950">Step 1 — Get your summary ready</h2>
           <p className="mt-2 text-lg text-slate-700">A short summary means you do not have to explain everything from the start, and nothing important is forgotten.</p>
           <div className="mt-5 grid gap-3 sm:grid-cols-2">
-            <Link href="/ai-hospital/triage" className="rounded-xl bg-blue-900 px-5 py-4 text-center text-lg font-bold text-white hover:bg-blue-800">
-              🩺 Check urgency + make summary
+            <Link href="/ai-hospital/reception" className="rounded-xl bg-blue-900 px-5 py-4 text-center text-lg font-bold text-white hover:bg-blue-800">
+              🩺 Tell us what&apos;s wrong + get a summary
             </Link>
             <Link href="/ai-hospital/prepare" className="rounded-xl border-2 border-blue-900 px-5 py-4 text-center text-lg font-bold text-blue-900 hover:bg-blue-50">
               📋 Make a summary only
@@ -72,7 +77,7 @@ export default function DoctorPage() {
               <p className="mt-2 text-lg text-slate-700">Best when you need an examination, tests, or urgent care.</p>
               <div className="mt-4 flex flex-col gap-2">
                 <Link href="/ai-hospital/departments" className="font-semibold text-blue-700 underline">Find the right department →</Link>
-                <Link href="/ai-hospital/hospitals" className="font-semibold text-blue-700 underline">Find a hospital →</Link>
+                <Link href="/find-care#hospitals" className="font-semibold text-blue-700 underline">Find a hospital →</Link>
               </div>
             </div>
 

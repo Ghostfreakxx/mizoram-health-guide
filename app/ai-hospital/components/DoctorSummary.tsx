@@ -1,8 +1,10 @@
 "use client";
 
 import Link from "next/link";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { saveSummary } from "../../lib/storage";
+import { recordVisit } from "../../lib/visit";
+import { SITE } from "../../config";
 import { SUMMARY_LABEL, type SummaryData, formatGenerated, summarySections, summaryText } from "../../lib/summary";
 
 const DEFAULT_QUESTIONS = [
@@ -13,7 +15,8 @@ const DEFAULT_QUESTIONS = [
 ];
 
 // The flagship doctor handoff summary. Starts from what the patient told
-// the Triage Desk (if anything) and lets them add more. Nothing is stored.
+// the Triage Desk (if anything) and lets them add more. Nothing is stored;
+// the latest version is kept in this tab's memory for My Visit.
 export default function DoctorSummary({ base, editable = true }: { base: SummaryData; editable?: boolean }) {
   const [conditions, setConditions] = useState(base.conditions ?? "");
   const [medicines, setMedicines] = useState(base.medicines ?? "");
@@ -38,6 +41,11 @@ export default function DoctorSummary({ base, editable = true }: { base: Summary
   };
   const sections = summarySections(data);
   const text = summaryText(data);
+
+  // Keep the latest version for "My Visit" (this tab's memory only).
+  useEffect(() => {
+    recordVisit({ sections, text, level: base.triage?.level, recommendation: base.triage?.recommendation, departments: base.triage?.departments });
+  }, [text]); // eslint-disable-line react-hooks/exhaustive-deps -- sections and triage follow text
 
   async function copy() {
     try {
@@ -131,7 +139,7 @@ export default function DoctorSummary({ base, editable = true }: { base: Summary
           ))}
         </div>
         <p className="mt-5 border-t border-slate-200 pt-3 text-xs text-slate-600">
-          Prepared with AI Hospital (Mizoram Health Guide) from the patient&apos;s own answers.
+          Prepared with {SITE.name} ({SITE.status}) from the patient&apos;s own answers.
         </p>
       </article>
 

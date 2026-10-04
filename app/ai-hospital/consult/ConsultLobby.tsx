@@ -7,6 +7,7 @@ import { useState } from "react";
 import { isValidRoomId } from "../../lib/consult";
 import DeviceCheck from "./DeviceCheck";
 import SummaryPicker from "./SummaryPicker";
+import CallLink from "../../components/ui/CallLink";
 
 const ConsultRoom3D = dynamic(() => import("./ConsultRoom3D"), {
   ssr: false,
@@ -35,7 +36,7 @@ export default function ConsultLobby({ liveEnabled, esanjeevaniUrl, esanjeevaniV
     <div className="space-y-6">
       <div className="rounded-2xl border-2 border-red-200 bg-red-50 p-4 text-lg text-red-950">
         🚨 <strong>Not for emergencies.</strong> Chest pain, breathing difficulty, heavy bleeding, fits, or a very sick baby — call{" "}
-        <a href="tel:108" className="font-bold underline">108</a> or <a href="tel:112" className="font-bold underline">112</a> now.
+        <CallLink id="ambulance-108" className="font-bold underline">108</CallLink> or <CallLink id="erss-112" className="font-bold underline">112</CallLink> now.
       </div>
 
       <div className="overflow-hidden rounded-2xl border-2 border-slate-200 bg-slate-100">
@@ -108,7 +109,7 @@ export default function ConsultLobby({ liveEnabled, esanjeevaniUrl, esanjeevaniV
           <div className="rounded-2xl border-2 border-violet-200 bg-violet-50 p-5">
             <h3 className="text-xl font-bold text-violet-950">🧠 Mental health — talk now</h3>
             <p className="mt-2 text-lg text-violet-950">Tele-MANAS: free, confidential counselling by phone, 24 hours.</p>
-            <a href="tel:14416" className="mt-3 inline-block rounded-xl bg-violet-800 px-5 py-3 text-lg font-bold text-white">📞 Call 14416</a>
+            <CallLink id="telemanas" className="mt-3 inline-block rounded-xl bg-violet-800 px-5 py-3 text-lg font-bold text-white">📞 Call 14416</CallLink>
           </div>
 
           <div className="rounded-2xl border-2 border-slate-200 p-5">
@@ -116,7 +117,7 @@ export default function ConsultLobby({ liveEnabled, esanjeevaniUrl, esanjeevaniV
             <p className="mt-2 text-lg text-slate-700">Some problems need an examination or tests.</p>
             <div className="mt-3 flex flex-col gap-1">
               <Link href="/ai-hospital/departments" className="font-semibold text-blue-700 underline">Find the right department →</Link>
-              <Link href="/ai-hospital/hospitals" className="font-semibold text-blue-700 underline">Find a hospital →</Link>
+              <Link href="/find-care#hospitals" className="font-semibold text-blue-700 underline">Find a hospital →</Link>
             </div>
           </div>
         </div>

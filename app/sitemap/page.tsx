@@ -7,7 +7,7 @@ import { healthTopics } from "../topics";
 export const metadata: Metadata = { title: "Sitemap" };
 
 const groups = [
-  { title: "Main", links: [{ href: "/", title: "Home" }, { href: "/hospitals", title: "Hospital & Help Directory" }, { href: "/helplines", title: "Helplines" }, { href: "/search", title: "Search" }] },
+  { title: "Main", links: [{ href: "/", title: "Home" }, { href: "/ai-hospital", title: "AI Hospital" }, { href: "/health-library", title: "Health Library" }, { href: "/find-care", title: "Find Care" }, { href: "/my-visit", title: "My Visit" }, { href: "/about", title: "About this prototype" }, { href: "/search", title: "Search" }] },
   {
     title: "AI Hospital",
     links: [
@@ -19,7 +19,6 @@ const groups = [
       { href: "/ai-hospital/prepare", title: "Prepare for a visit" },
       { href: "/ai-hospital/doctor", title: "Talk to a real doctor" },
       { href: "/ai-hospital/consult", title: "Consulting room (live doctor)" },
-      { href: "/ai-hospital/hospitals", title: "Find a hospital" },
       { href: "/ai-hospital/passport", title: "Health Passport" },
       { href: "/ai-hospital/follow-up", title: "Follow-up reminders" },
       { href: "/ai-hospital/medicines", title: "Medicine information" },
@@ -32,7 +31,7 @@ const groups = [
     ],
   },
   { title: "Health Topics", links: healthTopics },
-  { title: "Self-Check Tools", links: [{ href: "/tools", title: "All Self-Check Tools" }, ...healthTools] },
+  { title: "Self-Check Tools", links: healthTools },
   { title: "Website Policies", links: [{ href: "/privacy", title: "Privacy Policy" }, { href: "/disclaimer", title: "Disclaimer" }, { href: "/accessibility", title: "Accessibility Statement" }] },
 ];
 

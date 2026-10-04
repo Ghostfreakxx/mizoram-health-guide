@@ -4,6 +4,7 @@ import { AI_HOSPITAL } from "../../config";
 import PageHeader from "../../components/PageHeader";
 import { SourceNote } from "../components/ui";
 import CalmTools from "./CalmTools";
+import CallLink from "../../components/ui/CallLink";
 
 export const metadata: Metadata = {
   title: `Calm Corner — ${AI_HOSPITAL.name}`,
@@ -31,8 +32,8 @@ export default function CalmPage() {
         <div role="note" className="rounded-2xl border-2 border-red-300 bg-red-50 p-5 text-lg text-red-950">
           <p className="font-bold">If you are thinking about harming yourself, or are in danger now</p>
           <p className="mt-1">
-            Call <a href="tel:112" className="font-bold underline">112</a> now, or call Tele-MANAS free on{" "}
-            <a href="tel:14416" className="font-bold underline">14416</a> (24 hours). You are not alone.
+            Call <CallLink id="erss-112" className="font-bold underline">112</CallLink> now, or call Tele-MANAS free on{" "}
+            <CallLink id="telemanas" className="font-bold underline">14416</CallLink> (24 hours). You are not alone.
           </p>
         </div>
 
@@ -52,7 +53,7 @@ export default function CalmPage() {
             Help works, and it is confidential.
           </p>
           <div className="mt-4 flex flex-wrap gap-3">
-            <a href="tel:14416" className="rounded-xl bg-blue-900 px-5 py-3 text-lg font-bold text-white hover:bg-blue-800">📞 Tele-MANAS 14416</a>
+            <CallLink id="telemanas" className="rounded-xl bg-blue-900 px-5 py-3 text-lg font-bold text-white hover:bg-blue-800">📞 Tele-MANAS 14416</CallLink>
             <Link href="/ai-hospital/departments/mental-health" className="rounded-xl border-2 border-blue-900 bg-white px-5 py-3 text-lg font-bold text-blue-900">Mental health services</Link>
             <Link href="/ai-hospital/consult" className="rounded-xl border-2 border-blue-900 bg-white px-5 py-3 text-lg font-bold text-blue-900">Talk to a doctor</Link>
           </div>

@@ -1,5 +1,7 @@
 "use client";
 
+import CallLink from "../components/ui/CallLink";
+
 // Fail-safe: if anything in AI Hospital breaks, never fall back to casual
 // advice. Direct the person to human healthcare. (Errors are not logged here
 // because they may contain health information.)
@@ -14,8 +16,8 @@ export default function AiHospitalError({ unstable_retry }: { error: Error & { d
             health worker.
           </p>
           <div className="mt-4 flex flex-wrap gap-3">
-            <a href="tel:108" className="rounded-xl bg-red-700 px-6 py-3 text-lg font-bold text-white">📞 Call 108</a>
-            <a href="tel:112" className="rounded-xl border-2 border-red-700 px-6 py-3 text-lg font-bold text-red-800">📞 Call 112</a>
+            <CallLink id="ambulance-108" className="rounded-xl bg-red-700 px-6 py-3 text-lg font-bold text-white">📞 Call 108</CallLink>
+            <CallLink id="erss-112" className="rounded-xl border-2 border-red-700 px-6 py-3 text-lg font-bold text-red-800">📞 Call 112</CallLink>
           </div>
         </div>
         <button type="button" onClick={() => unstable_retry()} className="rounded-xl border-2 border-slate-300 px-5 py-3 text-lg font-semibold">

@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { readFileSync } from "node:fs";
-import { MIN_COUNT, aggregate, demoEvents, sanitize } from "../../app/lib/metrics";
+import { MIN_COUNT, aggregate, sanitize } from "../../app/lib/metrics";
+import { demoEvents } from "./metricsFixtures";
 
 const ok = { type: "triage_result", day: "2026-09-01", complaint: "fever", level: "YELLOW", ageGroup: "adult" };
 
@@ -91,8 +92,8 @@ describe("small numbers are hidden", () => {
   });
 });
 
-describe("demonstration data and collection", () => {
-  it("demo data is deterministic and passes the same rules", () => {
+describe("generated events and collection", () => {
+  it("generated events are deterministic and passes the same rules", () => {
     const a = demoEvents();
     expect(demoEvents()).toEqual(a);
     expect(a.every((e) => sanitize(e) !== null)).toBe(true);

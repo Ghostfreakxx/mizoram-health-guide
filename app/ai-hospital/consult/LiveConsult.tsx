@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useCallback, useState } from "react";
 import { PATIENT_CONSENT, canJoin } from "../../lib/consult";
 import SummaryPicker from "./SummaryPicker";
+import CallLink from "../../components/ui/CallLink";
 
 const ConsultRoom3D = dynamic(() => import("./ConsultRoom3D"), { ssr: false });
 const LiveCall = dynamic(() => import("./LiveCall"), { ssr: false });
@@ -107,7 +108,7 @@ export default function LiveConsult({ domain, room }: { domain: string | null; r
           <h2 className="text-xl font-bold text-blue-950">Your summary</h2>
           <div className="mt-2"><SummaryPicker /></div>
         </div>
-        <a href="tel:108" className="block rounded-2xl border-2 border-red-300 bg-red-50 p-4 text-lg font-bold text-red-900">🚨 Emergency? Call 108</a>
+        <CallLink id="ambulance-108" className="block rounded-2xl border-2 border-red-300 bg-red-50 p-4 text-lg font-bold text-red-900">🚨 Emergency? Call 108</CallLink>
       </aside>
     </div>
   );

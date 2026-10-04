@@ -5,6 +5,7 @@ import { useEffect, useState } from "react";
 import { AGE_GROUPS, DURATIONS, PROGRESSIONS, SEVERITIES } from "../../lib/safety/triage";
 import DoctorSummary from "../components/DoctorSummary";
 import { BigChoice } from "../components/ui";
+import CallLink from "../../components/ui/CallLink";
 
 type Opt = { id: string; label: string };
 
@@ -60,7 +61,7 @@ export default function PrepareForm() {
       <div className="rounded-2xl border-2 border-red-200 bg-red-50 p-5 text-red-950">
         <p className="text-lg font-semibold">
           Feeling very unwell right now? <Link href="/ai-hospital/emergency" className="underline">Open Emergency Mode</Link> or call{" "}
-          <a href="tel:108" className="font-bold underline">108</a>. Not sure how urgent it is?{" "}
+          <CallLink id="ambulance-108" className="font-bold underline">108</CallLink>. Not sure how urgent it is?{" "}
           <Link href="/ai-hospital/triage" className="underline">Use the Triage Desk</Link> — it fills in this summary for you.
         </p>
       </div>

@@ -1,7 +1,7 @@
 import { readdirSync, readFileSync, statSync } from "node:fs";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
-import { FAILSAFE_ANSWER, findAnswer } from "../../app/components/healthAnswers";
+import { nextTurn, respond, startConsultation } from "../../app/lib/consultation";
 import { BANNED_PATTERNS, LEVEL_TEXT, violatesLanguagePolicy } from "../../app/lib/safety/language";
 import { redFlags } from "../../app/lib/safety/redFlags";
 import { services } from "../../app/lib/services";
@@ -82,7 +82,9 @@ describe("language policy: never diagnose, never give doses", () => {
   });
 });
 
-describe("Health Assistant uses the shared emergency detector", () => {
+// The separate "Ask a Question" chatbot was merged into the Virtual Doctor
+// (one assistant). The same messages must still open the emergency pathway.
+describe("the single assistant (Reception + Virtual Doctor) uses the shared emergency detector", () => {
   it.each([
     "I have chest pain but I'm only 24.",
     "I think I'm having a stroke but it isn't very painful.",
@@ -91,30 +93,27 @@ describe("Health Assistant uses the shared emergency detector", () => {
     "I'm pregnant and bleeding but it isn't much.",
     "I want to die but don't call anyone.",
     "cheast pian",
-  ])("%s → emergency answer", (q) => {
-    const a = findAnswer(q);
-    expect(a.emergency).toBe(true);
-    expect(a.text).toMatch(/108|112|14416/);
+  ])("%s → emergency (or an immediate safety question)", (q) => {
+    const s = respond(startConsultation("General Medicine"), "concern", q);
+    const t = nextTurn(s);
+    expect(t.input.kind === "emergency" || t.step.startsWith("confirm:"), q).toBe(true);
   });
 
-  it("suicidal messages get crisis support (14416)", () => {
-    expect(findAnswer("I want to die").text).toMatch(/14416/);
+  it("suicidal messages open the crisis pathway (Tele-MANAS 14416 is on the emergency screen)", () => {
+    const s = respond(startConsultation("General Medicine"), "concern", "I want to die");
+    const t = nextTurn(s);
+    expect(t.input.kind).toBe("emergency");
+    if (t.input.kind === "emergency") expect(t.input.flags).toContain("suicide");
   });
 
   it("negated red flags are asked about, not dismissed", () => {
-    const a = findAnswer("no chest pain, just a cough");
-    expect(a.emergency).toBe(true);
-    expect(a.text).toMatch(/108|112/);
+    const t = nextTurn(respond(startConsultation("General Medicine"), "concern", "no chest pain, just a cough"));
+    expect(t.step).toBe("confirm:chest_pain");
   });
 
-  it("ordinary questions still get normal answers", () => {
-    expect(findAnswer("how do I quit smoking").emergency).toBeFalsy();
-  });
-
-  it("fail-safe answer points to human healthcare", () => {
-    expect(FAILSAFE_ANSWER.text).toMatch(/108|112/);
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    expect(() => findAnswer(undefined as any)).not.toThrow();
+  it("ordinary questions are not emergencies", () => {
+    const t = nextTurn(respond(startConsultation("General Medicine"), "concern", "how do I quit smoking"));
+    expect(t.input.kind).not.toBe("emergency");
   });
 });
 
@@ -156,5 +155,15 @@ describe("privacy by default (static checks)", () => {
       expect(src, f).not.toMatch(/router\.push\([^)]*\?/);
       expect(src, f).not.toMatch(/href=\{`[^`]*\?[^`]*\$\{/);
     }
+  });
+});
+
+describe("the doctor's voice stays on the device", () => {
+  const v = (name: string, lang: string, localService: boolean) => ({ name, lang, localService, default: false, voiceURI: name }) as SpeechSynthesisVoice;
+  it("never picks an online (cloud) voice, even a better-sounding one", async () => {
+    const { pickVoice } = await import("../../app/ai-hospital/consult-room/voice");
+    expect(pickVoice([v("Google English (India) Online", "en-IN", false), v("Local English", "en-US", true)])?.name).toBe("Local English");
+    expect(pickVoice([v("Microsoft Neerja Online (Natural)", "en-IN", false)])).toBeNull();
+    expect(pickVoice([])).toBeNull();
   });
 });

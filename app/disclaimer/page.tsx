@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import ContentPage from "../components/ContentPage";
+import CallLink from "../components/ui/CallLink";
 
 export const metadata: Metadata = { title: "Disclaimer" };
 
@@ -15,7 +16,7 @@ export default function DisclaimerPage() {
 
       <h2>No diagnosis or prescriptions</h2>
       <p>
-        This website, including the Health Assistant and self-check tools, does
+        This website, including the virtual doctor, Reception and self-check tools, does
         not diagnose any disease and does not recommend medicines or doses.
         Self-check tool results are screening estimates only. Always see a
         doctor about your health, and follow their advice.
@@ -23,8 +24,8 @@ export default function DisclaimerPage() {
 
       <h2>Emergencies</h2>
       <p>
-        Do not use this website in a medical emergency. Call <a href="tel:108">108</a>{" "}
-        for an ambulance or <a href="tel:112">112</a> for emergency services.
+        Do not use this website in a medical emergency. Call <CallLink id="ambulance-108">108</CallLink>{" "}
+        for an ambulance or <CallLink id="erss-112">112</CallLink> for emergency services.
       </p>
 
       <h2>Accuracy</h2>

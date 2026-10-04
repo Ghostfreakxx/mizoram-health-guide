@@ -1,8 +1,8 @@
 import Link from "next/link";
 import type { TopicContent } from "../content/types";
-import { helplines } from "../site";
+import { HELPLINES } from "../lib/helplines";
 import { healthTopics } from "../topics";
-import AskAIButton from "./AskAIButton";
+import CallLink from "./ui/CallLink";
 import PageHeader from "./PageHeader";
 import ShareButton from "./ShareButton";
 
@@ -77,7 +77,7 @@ export default function TopicPage({ content: c }: { content: TopicContent }) {
         title={c.title}
         intro={c.intro}
         icon={c.icon}
-        crumbs={[{ href: "/#topics", label: "Health Topics" }]}
+        crumbs={[{ href: "/health-library", label: "Health Library" }]}
       />
 
       {/* Key facts */}
@@ -173,7 +173,7 @@ export default function TopicPage({ content: c }: { content: TopicContent }) {
           {c.tool && (
             <Link
               href={c.tool.href}
-              className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 rounded-xl bg-gradient-to-r from-blue-900 to-blue-700 p-6 text-white shadow-md hover:from-blue-950"
+              className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 rounded-xl bg-blue-900 p-6 text-white hover:bg-blue-800"
             >
               <span>
                 <span className="block text-sm font-semibold uppercase tracking-wide text-amber-300">Try the self-check tool</span>
@@ -203,9 +203,9 @@ export default function TopicPage({ content: c }: { content: TopicContent }) {
                   </ul>
                   {level.key === "urgent" && (
                     <div className="px-5 pb-4">
-                      <a href="tel:108" className="inline-block rounded bg-red-700 px-5 py-2 font-bold text-white hover:bg-red-800">
+                      <CallLink id="ambulance-108" className="inline-block rounded bg-red-700 px-5 py-2 font-bold text-white hover:bg-red-800">
                         📞 Call 108
-                      </a>
+                      </CallLink>
                     </div>
                   )}
                 </div>
@@ -248,9 +248,9 @@ export default function TopicPage({ content: c }: { content: TopicContent }) {
             </div>
             <div className="mt-4 flex flex-wrap items-center gap-3 text-slate-600">
               Have another question?
-              <AskAIButton className="rounded bg-blue-900 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-800">
-                Ask the Health Assistant
-              </AskAIButton>
+              <Link href="/ai-hospital/departments/general-medicine/room" className="rounded bg-blue-900 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-800">
+                Ask the virtual doctor
+              </Link>
             </div>
           </section>
 
@@ -314,12 +314,10 @@ export default function TopicPage({ content: c }: { content: TopicContent }) {
           <div className="rounded-lg border border-red-200 bg-white overflow-hidden shadow-sm">
             <h2 className="bg-red-700 px-5 py-3 font-bold text-white">Need help?</h2>
             <ul className="divide-y divide-slate-100 text-sm">
-              {helplines.map((h) => (
-                <li key={h.tel} className="flex items-center justify-between px-5 py-2.5">
-                  <span className="text-slate-700">{h.label}</span>
-                  <a href={`tel:${h.tel}`} className={`font-bold hover:underline ${h.urgent ? "text-red-700" : "text-blue-800"}`}>
-                    {h.number}
-                  </a>
+              {HELPLINES.map((h) => (
+                <li key={h.id} className="flex items-center justify-between gap-3 px-5 py-2.5">
+                  <span className="text-slate-700">{h.name}</span>
+                  <CallLink id={h.id} className={`shrink-0 font-bold hover:underline ${h.urgent ? "text-red-700" : "text-blue-800"}`} />
                 </li>
               ))}
             </ul>

@@ -12,7 +12,7 @@ export default function PageHeader({
   crumbs?: { href: string; label: string }[];
 }) {
   return (
-    <section className="bg-gradient-to-r from-blue-900 to-blue-700 text-white">
+    <section className="bg-blue-900 text-white">
       <div className="max-w-6xl mx-auto px-4 sm:px-6 pt-10 pb-16">
         <nav aria-label="Breadcrumb">
           <ol className="flex flex-wrap items-center gap-2 text-sm text-blue-100">

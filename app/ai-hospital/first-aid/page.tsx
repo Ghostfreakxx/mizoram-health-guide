@@ -5,6 +5,7 @@ import PageHeader from "../../components/PageHeader";
 import ReadAloud from "../../components/ReadAloud";
 import { firstAidGuides } from "../data/firstAid";
 import { SourceNote } from "../components/ui";
+import CallLink from "../../components/ui/CallLink";
 
 export const metadata: Metadata = {
   title: `First Aid — ${AI_HOSPITAL.name}`,
@@ -25,8 +26,8 @@ export default function FirstAidPage() {
       <div className="mx-auto max-w-4xl space-y-8 px-4 py-8 sm:px-6">
         <div className="flex flex-wrap items-center gap-3 rounded-2xl border-2 border-red-300 bg-red-50 p-5">
           <p className="flex-1 text-lg font-bold text-red-950">In an emergency, call for help first.</p>
-          <a href="tel:108" className="rounded-xl bg-red-700 px-5 py-3 text-lg font-bold text-white">📞 108 Ambulance</a>
-          <a href="tel:112" className="rounded-xl bg-red-700 px-5 py-3 text-lg font-bold text-white">📞 112 Emergency</a>
+          <CallLink id="ambulance-108" className="rounded-xl bg-red-700 px-5 py-3 text-lg font-bold text-white">📞 108 Ambulance</CallLink>
+          <CallLink id="erss-112" className="rounded-xl bg-red-700 px-5 py-3 text-lg font-bold text-white">📞 112 Emergency</CallLink>
         </div>
 
         {[

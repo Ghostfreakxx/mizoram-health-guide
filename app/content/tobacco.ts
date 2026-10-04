@@ -56,11 +56,6 @@ export const tobacco: TopicContent = {
     { title: "Don't give up if you slip", text: "Most people try a few times before they quit for good. Learn from it and try again." },
     { title: "Check your mouth every month", text: "Use a mirror. Look for ulcers, patches, or lumps, and see a doctor if anything lasts more than 2 weeks." },
   ],
-  tool: {
-    href: "/tools/tobacco-cost",
-    title: "Tobacco & Kuhva Cost Calculator",
-    text: "See how much your habit really costs over 10 years.",
-  },
   help: {
     urgent: [
       "Chest pain, sudden breathlessness, or signs of stroke (common in smokers)",

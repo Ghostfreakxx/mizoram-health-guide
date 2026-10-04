@@ -82,7 +82,7 @@ export default function ScreeningCheck() {
                 them how often you should be checked.
               </p>
               <p className="mt-2">
-                <Link href="/ai-hospital/hospitals" className="font-semibold text-blue-800 underline">Find a health centre</Link>
+                <Link href="/find-care#hospitals" className="font-semibold text-blue-800 underline">Find a health centre</Link>
                 {" · "}
                 <Link href="/ai-hospital/follow-up" className="font-semibold text-blue-800 underline">Set a reminder</Link>
               </p>

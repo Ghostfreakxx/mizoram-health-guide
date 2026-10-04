@@ -9,6 +9,7 @@ import { departments, getDepartment } from "../../data/departments";
 import { BoundaryNote } from "../../components/ui";
 import RoomLink from "../../consult-room/RoomLink";
 import { roomFor } from "../../consult-room/rooms";
+import CallLink from "../../../components/ui/CallLink";
 
 export const dynamicParams = false;
 
@@ -58,7 +59,7 @@ export default async function DepartmentPage({ params }: { params: Promise<{ slu
               <ul className="space-y-1">
                 {d.emergencyInstead.map((t) => <li key={t}>• {t}</li>)}
               </ul>
-              <a href="tel:108" className="mt-4 inline-block rounded-xl bg-red-700 px-6 py-3 font-bold text-white">📞 Call 108</a>
+              <CallLink id="ambulance-108" className="mt-4 inline-block rounded-xl bg-red-700 px-6 py-3 font-bold text-white">📞 Call 108</CallLink>
             </Box>
           )}
 
@@ -142,10 +143,10 @@ export default async function DepartmentPage({ params }: { params: Promise<{ slu
             <span className="block text-xl font-bold text-blue-950">📋 Prepare for your visit</span>
             <span className="mt-1 block text-slate-600">Make a one-page summary for the doctor.</span>
           </Link>
-          <a href="tel:108" className="block rounded-2xl border-2 border-red-300 bg-red-50 p-6 text-red-900">
+          <CallLink id="ambulance-108" className="block rounded-2xl border-2 border-red-300 bg-red-50 p-6 text-red-900">
             <span className="block font-bold">🚨 Emergency?</span>
             <span className="block text-3xl font-black">Call 108</span>
-          </a>
+          </CallLink>
           <Link href="/ai-hospital/departments" className="block text-center font-semibold text-blue-700 underline">All departments</Link>
         </aside>
       </div>

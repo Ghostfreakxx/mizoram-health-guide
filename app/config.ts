@@ -1,4 +1,21 @@
-// Central product naming. Change the AI Hospital's name here only.
+// Central product naming. Change names here only.
+
+// The whole website's identity.
+export const SITE = {
+  name: "Mizoram AI Hospital",
+  tagline: "Digital Front Door to Healthcare",
+  status: "Prototype",
+  boundary: "Health navigation and information — not a medical diagnosis.",
+} as const;
+
+// The five areas of the site (navigation everywhere uses this list).
+export const AREAS = [
+  { href: "/ai-hospital", label: "AI Hospital", short: "Hospital", icon: "🏥" },
+  { href: "/health-library", label: "Health Library", short: "Library", icon: "📚" },
+  { href: "/find-care", label: "Find Care", short: "Find care", icon: "📍" },
+  { href: "/my-visit", label: "My Visit", short: "My visit", icon: "📋" },
+  { href: "/about", label: "About", short: "About", icon: "ℹ️" },
+] as const;
 
 export const AI_HOSPITAL = {
   name: "AI Hospital",

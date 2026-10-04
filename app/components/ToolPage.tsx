@@ -17,7 +17,7 @@ export default function ToolPage({
         title={title}
         intro={intro}
         icon={icon}
-        crumbs={[{ href: "/tools", label: "Self-Check Tools" }]}
+        crumbs={[{ href: "/health-library", label: "Health Library" }]}
       />
       <section className="max-w-3xl mx-auto px-4 sm:px-6 py-10">{children}</section>
     </main>

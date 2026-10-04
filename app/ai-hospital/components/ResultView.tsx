@@ -11,6 +11,7 @@ import { getSource } from "../../lib/sources";
 import type { SummaryData } from "../../lib/summary";
 import DoctorSummary from "./DoctorSummary";
 import ReadAloud from "../../components/ReadAloud";
+import CallLink from "../../components/ui/CallLink";
 
 const LEVEL_STYLE = {
   RED: { card: "border-red-400 bg-red-50 text-red-950", badge: "bg-red-700 text-white" },
@@ -47,8 +48,8 @@ export default function ResultView({
           <p className="text-2xl font-bold">Please get help from a health professional</p>
           <p className="mt-3 text-lg">{FAILSAFE_MESSAGE}</p>
           <div className="mt-4 flex flex-wrap gap-3">
-            <a href="tel:108" className="rounded-xl bg-red-700 px-6 py-3 text-lg font-bold text-white">📞 108</a>
-            <a href="tel:112" className="rounded-xl border-2 border-red-700 px-6 py-3 text-lg font-bold text-red-800">📞 112</a>
+            <CallLink id="ambulance-108" className="rounded-xl bg-red-700 px-6 py-3 text-lg font-bold text-white">📞 108</CallLink>
+            <CallLink id="erss-112" className="rounded-xl border-2 border-red-700 px-6 py-3 text-lg font-bold text-red-800">📞 112</CallLink>
           </div>
         </div>
         <button type="button" onClick={onRestart} className="rounded-xl border-2 border-slate-300 px-5 py-3 text-lg font-semibold">↺ Start again</button>
@@ -120,7 +121,7 @@ export default function ResultView({
         <p className="mt-2 text-lg leading-relaxed">{result.now && text.nowMessage ? text.nowMessage : text.message}</p>
         <ReadAloud text={`${text.title}. ${result.now && text.nowMessage ? text.nowMessage : text.message}`} className="mt-3" />
         {result.level === "ORANGE" && (
-          <p className="mt-3 text-base">If things get worse before you get there, call <a href="tel:108" className="font-bold underline">108</a> or <a href="tel:112" className="font-bold underline">112</a>.</p>
+          <p className="mt-3 text-base">If things get worse before you get there, call <CallLink id="ambulance-108" className="font-bold underline">108</CallLink> or <CallLink id="erss-112" className="font-bold underline">112</CallLink>.</p>
         )}
       </div>
 
@@ -180,7 +181,7 @@ export default function ResultView({
               <span className="mt-1 block text-slate-600">May save a trip. See how →</span>
             </Link>
           )}
-          <Link href="/ai-hospital/hospitals" className="rounded-xl border-2 border-slate-200 p-5 hover:border-blue-400 hover:bg-blue-50">
+          <Link href="/find-care#hospitals" className="rounded-xl border-2 border-slate-200 p-5 hover:border-blue-400 hover:bg-blue-50">
             <span className="text-sm font-semibold text-slate-600">Where to go</span>
             <span className="mt-1 flex items-center gap-2 text-xl font-bold text-blue-900">
               <span aria-hidden className="text-2xl">🏥</span> Find a hospital

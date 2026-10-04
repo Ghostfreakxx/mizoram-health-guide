@@ -452,6 +452,14 @@ export const sources: Source[] = [
     ...pending,
     supports: ["1097 is the national AIDS helpline"],
   },
+  {
+    id: "nikshay-sampark",
+    title: "Ni-kshay Sampark — national TB helpline 1800-11-6666",
+    organisation: "Central TB Division, Ministry of Health & Family Welfare",
+    url: "https://tbcindia.mohfw.gov.in",
+    ...pending,
+    supports: ["1800-11-6666 is the free national TB helpline (Ni-kshay Sampark)"],
+  },
 
   // ---- Medicines ----
   {

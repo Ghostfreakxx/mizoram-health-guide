@@ -37,16 +37,18 @@ export type SpeechOutput = {
   resume: () => void;
 };
 
-// A calm, clear voice: Indian English if the device has one.
-function pickVoice(synth: SpeechSynthesis): SpeechSynthesisVoice | null {
-  const voices = synth.getVoices();
-  if (!voices.length) return null;
+// A calm, clear voice: Indian English if the device has one. Only voices
+// made on the device are used — some browsers offer "online" voices that send
+// the text to a cloud service, and the doctor's words can repeat the
+// patient's. With no on-device voice, the doctor does not speak (text only).
+export function pickVoice(voices: SpeechSynthesisVoice[]): SpeechSynthesisVoice | null {
+  const local = voices.filter((v) => v.localService);
+  if (!local.length) return null;
   const score = (v: SpeechSynthesisVoice) =>
     (v.lang === "en-IN" ? 10 : v.lang.startsWith("en-GB") ? 6 : v.lang.startsWith("en") ? 4 : 0) +
     (/neerja|heera|veena|female|zira|samantha|serena/i.test(v.name) ? 3 : 0) +
-    (/natural|neural|online/i.test(v.name) ? 2 : 0) +
-    (v.localService ? 1 : 0);
-  return [...voices].sort((a, b) => score(b) - score(a))[0] ?? null;
+    (/natural|neural/i.test(v.name) ? 2 : 0);
+  return [...local].sort((a, b) => score(b) - score(a))[0] ?? null;
 }
 
 export function browserSpeech(): SpeechOutput {
@@ -55,15 +57,21 @@ export function browserSpeech(): SpeechOutput {
     const noop = () => {};
     return { available: false, speak: (_t, h) => h?.onEnd?.(), stop: noop, pause: noop, resume: noop };
   }
-  let voice = pickVoice(synth);
-  synth.addEventListener?.("voiceschanged", () => (voice = pickVoice(synth)));
+  let voice = pickVoice(synth.getVoices());
+  synth.addEventListener?.("voiceschanged", () => (voice = pickVoice(synth.getVoices())));
   return {
     available: true,
     speak(text, h, rate = 0.92) {
       synth.cancel();
+      voice ??= pickVoice(synth.getVoices());
+      if (!voice) {
+        // No on-device voice: show the words only, and carry on.
+        h?.onEnd?.();
+        return;
+      }
       const u = new SpeechSynthesisUtterance(text);
-      if (voice) u.voice = voice;
-      u.lang = voice?.lang ?? "en-IN";
+      u.voice = voice;
+      u.lang = voice.lang;
       u.rate = rate;
       u.pitch = 1;
       u.onstart = () => h?.onStart?.();

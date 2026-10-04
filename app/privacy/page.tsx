@@ -12,23 +12,39 @@ export default function PrivacyPage() {
         personal information. We do not use advertising or tracking cookies.
       </p>
 
-      <h2>Self-check tools and Health Assistant</h2>
+      <h2>Reception, the virtual doctor and self-check tools</h2>
       <p>
-        The Diabetes Risk Check, Tobacco &amp; Kuhva Cost Calculator, Myth or
-        Fact Quiz, and Health Assistant run entirely in your web browser. What
-        you type or select is not sent to our servers and is not stored. It is
-        cleared when you close or reload the page.
+        Reception, the virtual doctor, triage, visit preparation, Emergency
+        Mode and the Diabetes Risk Check run in your web browser. Your
+        symptoms and answers are kept in memory only while the page is open.
+        They are not saved on your device, not sent to our servers, not put in
+        web addresses, not written to logs, and not used for analytics. If you
+        choose &quot;Share&quot; on your visit summary, you are first shown
+        exactly what will be shared, and the text is then passed to the app
+        you choose (for example WhatsApp).
       </p>
 
-      <h2>AI Hospital</h2>
+      <h2>My Visit</h2>
       <p>
-        AI Hospital (triage, reception, visit preparation, and Emergency Mode)
-        runs entirely in your browser. Your symptoms and answers are kept in
-        memory only while the page is open. They are not saved on your device,
-        not sent to our servers, not put in web addresses, and not used for
-        analytics. If you choose &quot;Share&quot; on your doctor summary, you
-        are first shown exactly what will be shared, and the text is then
-        passed to the app you choose (for example WhatsApp).
+        My Visit shows the latest summary from this visit. It is held in the
+        open browser tab&apos;s memory only. Reloading or closing the tab, or
+        pressing &quot;Clear this visit&quot;, removes it.
+      </p>
+
+      <h2>Speaking instead of typing</h2>
+      <p>
+        Voice input is off until you turn it on. Before you do, we explain
+        that your browser&apos;s own speech service turns your voice into text.
+        In Chrome, this sends the audio of what you say to Google. We do not
+        receive, record or keep the audio. The virtual doctor&apos;s spoken
+        replies are made by your device. You can always type instead.
+      </p>
+
+      <h2>The 3D virtual doctor</h2>
+      <p>
+        The 3D doctor is a file downloaded from this website, like a picture.
+        It is not downloaded when your phone asks to save data, on very slow
+        connections, or when you choose the simple display.
       </p>
 
       <h2>Health Passport and reminders</h2>
@@ -53,7 +69,7 @@ export default function PrivacyPage() {
       <h2>Offline use</h2>
       <p>
         To work without internet, this website saves copies of its own public
-        pages (such as Emergency Mode and Helplines) on your device. These
+        pages (such as Emergency Mode and Find Care) on your device. These
         copies contain only the website itself — never anything you typed or
         answered.
       </p>

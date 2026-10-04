@@ -1,6 +1,19 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
+  // Old addresses from before the site was reorganised keep working.
+  // Temporary (307) while the prototype's structure may still change.
+  async redirects() {
+    return [
+      { source: "/hospitals", destination: "/find-care#hospitals", permanent: false },
+      { source: "/helplines", destination: "/find-care#helplines", permanent: false },
+      { source: "/ai-hospital/hospitals", destination: "/find-care#hospitals", permanent: false },
+      { source: "/tools", destination: "/health-library", permanent: false },
+      { source: "/tools/quiz", destination: "/health-library", permanent: false },
+      { source: "/tools/tobacco-cost", destination: "/tobacco", permanent: false },
+      { source: "/ai-hospital/admin", destination: "/about", permanent: false },
+    ];
+  },
   async headers() {
     const common = [
       { key: "X-Content-Type-Options", value: "nosniff" },

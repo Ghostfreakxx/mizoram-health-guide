@@ -1,15 +1,6 @@
 import { healthTools } from "./tools";
 import { healthTopics } from "./topics";
 
-export const helplines = [
-  { number: "108", tel: "108", label: "Ambulance", text: "Free emergency ambulance, 24 hours", urgent: true },
-  { number: "112", tel: "112", label: "National Emergency", text: "Police, fire, and medical emergencies", urgent: true },
-  { number: "14416", tel: "14416", label: "Tele-MANAS", text: "Free mental health support, 24 hours" },
-  { number: "1800-11-2356", tel: "1800112356", label: "Tobacco Quitline", text: "Free help to quit tobacco" },
-  { number: "1097", tel: "1097", label: "AIDS Helpline", text: "Free, confidential HIV information" },
-  { number: "1800-11-6666", tel: "1800116666", label: "TB Helpline", text: "Ni-kshay Sampark: TB testing and treatment" },
-];
-
 // Official national health portals. Links open in a new tab.
 export const importantLinks = [
   { label: "Health & Family Welfare Dept., Mizoram", href: "https://health.mizoram.gov.in" },
@@ -18,16 +9,6 @@ export const importantLinks = [
   { label: "eSanjeevani (free online doctor consultation)", href: "https://esanjeevani.mohfw.gov.in" },
   { label: "Tele-MANAS (mental health)", href: "https://telemanas.mohfw.gov.in" },
   { label: "ABHA – Ayushman Bharat Health Account", href: "https://abha.abdm.gov.in" },
-];
-
-// Updates to this website, shown in the "What's New" ticker.
-export const whatsNew = [
-  { text: "New: AI Hospital — check how urgent it is, find the right department, and prepare for your doctor", href: "/ai-hospital" },
-  { text: "New: Diabetes Risk Check — know your risk in 1 minute", href: "/tools/diabetes-risk" },
-  { text: "New: Tobacco & Kuhva Cost Calculator", href: "/tools/tobacco-cost" },
-  { text: "Test yourself: Myth or Fact health quiz", href: "/tools/quiz" },
-  { text: "Mental health support is free on Tele-MANAS: call 14416", href: "/helplines" },
-  { text: "Find hospitals and emergency help in Mizoram", href: "/hospitals" },
 ];
 
 export type SearchEntry = { title: string; href: string; description: string; keywords?: string };
@@ -50,9 +31,12 @@ export const siteIndex: SearchEntry[] = [
   { title: "Calm corner", href: "/ai-hospital/calm", description: "Short breathing and grounding exercises for stress, and Tele-MANAS 14416.", keywords: "stress anxiety worry calm breathing relax panic sad mental tele-manas" },
   { title: "First aid", href: "/ai-hospital/first-aid", description: "Simple first-aid steps for bleeding, burns, fits, choking, snake bites, and more.", keywords: "first aid bleeding burn scald fits seizure choking snake bite nosebleed fracture sprain poison" },
   { title: "3D department tours", href: "/ai-hospital/departments", description: "Walk through a typical hospital visit in 3D.", keywords: "3d tour simulator visit department" },
-  { title: "Hospital & Help Directory", href: "/hospitals", description: "Hospitals and emergency help in Mizoram.", keywords: "hospital clinic doctor emergency" },
-  { title: "Helplines", href: "/helplines", description: "Free health helpline numbers: 108, 112, 14416, tobacco quitline.", keywords: "phone call number ambulance helpline mental quit" },
-  { title: "Self-Check Tools", href: "/tools", description: "Quick, private health self-check tools.", keywords: "test check calculator quiz" },
+  { title: "Find Care", href: "/find-care", description: "Emergency numbers, free helplines, online doctors, and hospitals in Mizoram.", keywords: "hospital clinic doctor emergency phone call number ambulance helpline mental quit tb phc chc" },
+  { title: "Health Library", href: "/health-library", description: "Simple, sourced health guides by category.", keywords: "learn topics information guide library" },
+  { title: "Reception — tell us what's wrong", href: "/ai-hospital/reception", description: "Say what is wrong in your own words; we show how urgently and where to get care.", keywords: "symptoms reception start help sick not sure" },
+  { title: "Virtual doctor", href: "/ai-hospital/departments/general-medicine/room", description: "A guided consultation that helps you describe the problem and prepares a visit summary.", keywords: "doctor virtual consultation 3d talk describe" },
+  { title: "My Visit", href: "/my-visit", description: "This visit's summary and next steps — kept only while the tab is open.", keywords: "summary visit my result print share" },
+  { title: "About this prototype", href: "/about", description: "What Mizoram AI Hospital is, how it stays safe, and where a professional takes over.", keywords: "about safety prototype how it works" },
   { title: "Privacy Policy", href: "/privacy", description: "How this website handles your information." },
   { title: "Accessibility Statement", href: "/accessibility", description: "Accessibility features of this website." },
   { title: "Disclaimer", href: "/disclaimer", description: "Terms for using health information on this website." },

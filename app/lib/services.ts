@@ -15,6 +15,7 @@ export const services: Service[] = [
   { id: "telemanas", name: "Tele-MANAS", description: "Free, confidential mental health support, 24 hours a day.", phone: { display: "14416", tel: "14416" }, sourceId: "telemanas" },
   { id: "quitline", name: "National Tobacco Quitline", description: "Free help to quit tobacco.", phone: { display: "1800-11-2356", tel: "1800112356" }, sourceId: "ntcp-quitline" },
   { id: "aids-helpline", name: "National AIDS Helpline", description: "Free, confidential information about HIV.", phone: { display: "1097", tel: "1097" }, sourceId: "naco-helpline" },
+  { id: "tb-helpline", name: "TB Helpline (Ni-kshay Sampark)", description: "Free information about TB testing and treatment.", phone: { display: "1800-11-6666", tel: "1800116666" }, sourceId: "nikshay-sampark" },
   { id: "ntep", name: "National TB Elimination Programme", description: "Free TB testing and treatment at government health facilities.", sourceId: "ntep-presumptive-tb" },
   { id: "malaria", name: "Malaria testing and treatment", description: "Free malaria testing and treatment through the public health system.", sourceId: "nvbdcp-malaria" },
   { id: "naco-ictc", name: "HIV testing and treatment (ICTC/ART)", description: "Free, confidential HIV testing, counselling, and treatment.", sourceId: "naco-guidelines" },
