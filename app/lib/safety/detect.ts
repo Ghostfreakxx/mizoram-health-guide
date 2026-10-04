@@ -17,10 +17,14 @@ type Pattern = {
   // All of these must also appear somewhere in the message.
   context?: RegExp;
   negatable: boolean;
+  // Words that may or may not mean an emergency ("breathing problem"):
+  // never confirmed from the words alone, always asked about directly.
+  ask?: boolean;
 };
 
 const PREGNANT = /\b(pregnan\w*|expecting a baby|weeks pregnant)\b/;
 const POSTPARTUM = /\b(gave birth|given birth|delivered (a|my|her|the) baby|after (the )?(delivery|birth)|post ?partum|just had a baby|had (a|my|her) baby)\b/;
+const FEVER = /\b(fever\w*|temperature|high temp|hot body)\b/;
 const BABY = /\b(baby|babies|infant|newborn|new born|toddler|my (son|daughter) is [0-9]+ (months?|weeks?|days?))\b/;
 
 const patterns: Pattern[] = [
@@ -32,6 +36,8 @@ const patterns: Pattern[] = [
       /\bchest (is|feels|feel|felt|was|getting|gets) (very |really |so |quite |a bit |a little |too )?(tight|heavy|painful|sore|squeezed|crushed)\b/,
       /\b(pain|pressure|tightness|ache) (in|on) (my |his |her |the )?chest\b/,
       /\bheart attack\b/,
+      // Indian English: "my chest is paining", "paining in the chest".
+      /\bchest (is |was |keeps |has been )?(paining|pains)\b|\bpaining (in|on) (my |his |her |the )?chest\b/,
     ],
   },
   {
@@ -47,7 +53,37 @@ const patterns: Pattern[] = [
       /\b(weak|weakness|numb|numbness) (in|on) (one|the left|the right|left|right) (side|arm|leg)\b/,
       /\bone side (of (my|his|her|the) (body|face) )?(is |went |feels )?(weak|numb|not moving)\b/,
       /\b(worst|sudden severe|very severe sudden) headache\b/,
+      // Same rule as the triage question "Sudden, very severe headache — the worst ever?" (nhs-stroke).
+      /\bheadache\b( \w+){0,4} (worst|worse than ever|thunderclap)\b|\bthunderclap\b/,
     ],
+  },
+  {
+    // Same rules as the triage questions fever-neck and head-neck (nhs-sepsis).
+    id: "severe_infection",
+    negatable: true,
+    context: FEVER,
+    match: [
+      /\bstiff neck\b|\bneck (is |feels |was )?(stiff|rigid)\b/,
+      /\brash (that )?(does ?n'?t|does not|won'?t|will not|is ?n'?t|is not) (fade|go away|disappear)\b/,
+      /\b(very )?confused\b|\bconfusion\b|\bnot making sense\b/,
+    ],
+  },
+  {
+    // "Breathing problem" can mean an old condition or an emergency now: ask.
+    id: "breathing",
+    negatable: true,
+    ask: true,
+    match: [
+      /\bbreathing (problem|problems|difficulty|trouble|issue|issues)\b/,
+      /\b(short of breath|shortness of breath|breathless\w*|out of breath|breathlessness)\b/,
+    ],
+  },
+  {
+    // Same rule as the triage question stomach-blood (who-diarrhoea).
+    id: "bleeding",
+    negatable: true,
+    ask: true,
+    match: [/\b(black|tarry) (stools?|poo|potty|toilet)\b|\bblood in (my |his |her |the )?(stools?|poo|potty|toilet)\b|\bbloody stools?\b/],
   },
   {
     id: "breathing",
@@ -72,7 +108,13 @@ const patterns: Pattern[] = [
   {
     id: "seizure",
     negatable: true,
-    match: [/\bseizures?\b|\bconvuls\w*\b/, /\b(having|had|has|having a|had a|has a|having some) fits?\b/, /\bfitting\b/],
+    match: [
+      /\bseizures?\b|\bconvuls\w*\b/,
+      /\b(having|had|has|having a|had a|has a|having some) fits?\b/,
+      /\bfitting\b/,
+      /\bfits? (came|come|comes|coming|started|starting|happened|happening|attack)\b/,
+      /\b(got|gets|getting|get) (a )?fits?\b|\bfit attack\b|\bepilep\w*( fit| attack)\b/,
+    ],
   },
   {
     id: "bleeding",
@@ -185,7 +227,7 @@ const VOCAB = [
   "kerosene", "snake", "suicide", "suicidal", "myself", "pregnant", "pregnancy", "headache", "blurred",
   "drooping", "slurred", "stroke", "weakness", "numbness", "accident", "injury", "newborn", "breastfeeding",
   "feeding", "drinking", "sleepy", "floppy", "delivery", "birth", "baby", "infant", "heart", "attack",
-  "choking", "gasping", "tablets", "medicine", "kill", "die",
+  "choking", "gasping", "tablets", "medicine", "kill", "die", "stiff", "fever", "confused", "breathless",
 ];
 
 // Optimal string alignment distance (Damerau-Levenshtein with adjacent transpositions).
@@ -311,14 +353,19 @@ export function detectRedFlags(text: string): Detection {
 
   const t = normalize(text.slice(0, 2000));
 
+  // "What does shortness of breath mean?" asks about a word, not a symptom.
+  // Only the uncertain "ask" patterns step aside; real red flags never do.
+  const aboutAWord = /\b(what (does|do|is|are) .{1,40} mean\w*|meaning of|what is meant by|define)\b/.test(t);
+
   for (const p of patterns) {
     if (p.context && !p.context.test(t)) continue;
+    if (p.ask && aboutAWord) continue;
     for (const re of p.match) {
       const global = new RegExp(re.source, "g");
       let m: RegExpExecArray | null;
       while ((m = global.exec(t))) {
         const scope = negationScope(t.slice(0, m.index));
-        if (p.negatable && NEGATION.test(scope)) {
+        if (p.ask || (p.negatable && NEGATION.test(scope))) {
           needsConfirmation.add(p.id);
         } else {
           confirmed.add(p.id);

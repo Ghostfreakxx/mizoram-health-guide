@@ -200,6 +200,7 @@ export default function ConsultationRoom({ room }: { room: RoomStyle }) {
   const [demoMode, setDemoMode] = useState(false);
   const [demo, setDemo] = useState<string | null>(null);
   const [fromReception, setFromReception] = useState<string | null>(null);
+  const [startDescribe, setStartDescribe] = useState(false); // "I can't explain it" from Reception
   const [education, setEducation] = useState<EducationAnswer | null>(null);
   const [wantsProfessional, setWantsProfessional] = useState(false);
   const [sheetOpen, setSheetOpen] = useState(false); // chart bottom sheet (phones/tablets)
@@ -231,7 +232,13 @@ export default function ConsultationRoom({ room }: { room: RoomStyle }) {
     // eslint-disable-next-line react-hooks/set-state-in-effect -- device checks after mount
     setDetected(chooseTier(readDevice()));
     setReducedMotion(window.matchMedia("(prefers-reduced-motion: reduce)").matches);
-    setDemoMode(new URLSearchParams(window.location.search).has("demo"));
+    // Address options carry no health information: demo mode, a starting
+    // display (text / simple picture) and "help me describe it".
+    const q = new URLSearchParams(window.location.search);
+    setDemoMode(q.has("demo"));
+    if (q.get("view") === "text") setDisplay("text");
+    else if (q.get("view") === "simple") setDisplay("2d");
+    setStartDescribe(q.get("start") === "describe");
     setFromReception(takePendingConcern());
     if (hasConsent()) {
       const p = loadPassport();
@@ -531,6 +538,16 @@ export default function ConsultationRoom({ room }: { room: RoomStyle }) {
     }, 600);
     return () => clearTimeout(t);
   }, [fromReception, started, demo, turn.step, doc, answer]);
+
+  // "I can't explain it" at Reception: the doctor starts by helping describe it.
+  useEffect(() => {
+    if (!startDescribe || !started || demo || fromReception || turn.step !== "concern" || doc !== "listening") return;
+    const t = setTimeout(() => {
+      setStartDescribe(false);
+      helpMeDescribe();
+    }, 600);
+    return () => clearTimeout(t);
+  }, [startDescribe, started, demo, fromReception, turn.step, doc]); // eslint-disable-line react-hooks/exhaustive-deps -- helpMeDescribe reads the current state
 
   const back = () => {
     stopSpeaking();

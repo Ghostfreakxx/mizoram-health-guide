@@ -41,9 +41,6 @@ It never diagnoses or prescribes.
 
 ### Phase 2
 
-- **3D department tours** (`/ai-hospital/departments/[slug]/simulator`):
-  React Three Fiber scenes built only from department content; the 3D code
-  loads only on request, with a text tour and WebGL fallback.
 - **Health Passport** (`/ai-hospital/passport`): stored only after explicit
   opt-in, via `app/lib/storage.ts` (the only module allowed to store health
   data), with delete-everything.

@@ -12,6 +12,8 @@ const nextConfig: NextConfig = {
       { source: "/tools/quiz", destination: "/health-library", permanent: false },
       { source: "/tools/tobacco-cost", destination: "/tobacco", permanent: false },
       { source: "/ai-hospital/admin", destination: "/about", permanent: false },
+      { source: "/ai-hospital/triage", destination: "/ai-hospital/departments/general-medicine/room?view=text", permanent: false },
+      { source: "/ai-hospital/departments/:slug/simulator", destination: "/ai-hospital/departments/:slug", permanent: false },
     ];
   },
   async headers() {

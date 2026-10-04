@@ -43,8 +43,7 @@ const more = [
     title: "Departments",
     links: [
       { href: "/ai-hospital/departments", label: "All departments" },
-      { href: "/ai-hospital/departments/general-medicine/simulator", label: "Walk through a visit in 3D" },
-      { href: "/ai-hospital/triage", label: "Quick urgency check (text only)" },
+      { href: "/ai-hospital/departments/general-medicine/room?view=text", label: "Text-only consultation (slow internet)" },
       { href: "/ai-hospital/sources", label: "Sources and verification" },
     ],
   },

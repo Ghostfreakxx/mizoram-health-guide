@@ -13,7 +13,7 @@ const groups = [
     links: [
       { href: "/ai-hospital", title: "AI Hospital lobby" },
       { href: "/ai-hospital/reception", title: "Reception" },
-      { href: "/ai-hospital/triage", title: "Triage Desk" },
+      { href: "/ai-hospital/departments/general-medicine/room?view=text", title: "Text-only consultation (for slow internet)" },
       { href: "/ai-hospital/emergency", title: "Emergency Mode" },
       { href: "/ai-hospital/departments", title: "Departments" },
       { href: "/ai-hospital/prepare", title: "Prepare for a visit" },

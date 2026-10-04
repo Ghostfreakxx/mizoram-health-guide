@@ -29,7 +29,7 @@ export default async function RoomPage({ params }: { params: Promise<{ slug: str
       <PageHeader
         title={`${d.plainName} consultation room`}
         icon={d.icon}
-        intro="Sit down with the virtual guide. It asks about the problem, keeps a note of what you say, and shows you the safest next step. It is not a doctor."
+        intro="The virtual doctor asks about the problem, keeps a note of what you say, and shows you the safest next step. It does not diagnose — a real health professional does."
         crumbs={[
           { href: "/ai-hospital", label: AI_HOSPITAL.name },
           { href: "/ai-hospital/departments", label: "Departments" },
@@ -37,9 +37,6 @@ export default async function RoomPage({ params }: { params: Promise<{ slug: str
         ]}
       />
       <div className="mx-auto max-w-7xl px-4 py-6 sm:px-6">
-        <p className="mb-4 rounded-xl border-2 border-amber-300 bg-amber-50 px-4 py-2 text-sm font-semibold text-amber-950">
-          Prototype — design preview for approval.
-        </p>
         <ConsultationRoom room={room} />
       </div>
     </main>

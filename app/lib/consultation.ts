@@ -1463,7 +1463,12 @@ export function converse(s0: ConsultState, turn: Turn, text: string): Outcome {
   const s: ConsultState = { ...s0, said: [...s0.said, words].slice(-40) };
 
   const flagged = withTextFlags(s, words);
-  if (flagged.emergency || flagged.pendingFlags.length !== s.pendingFlags.length) return { kind: "answered", state: absorb(flagged, words) };
+  if (flagged.emergency || flagged.pendingFlags.length !== s.pendingFlags.length) {
+    // An unsure danger word in the very first message: keep the words as the
+    // main concern too, so the safety question comes next — not the greeting.
+    const base = !flagged.emergency && turn.step === "concern" && s.concernText === undefined ? respondCore(flagged, "concern", words) : flagged;
+    return { kind: "answered", state: absorb(base, words) };
+  }
 
   const fix = correction(s, words);
   if (fix) return { kind: "corrected", state: fix.state, line: fix.line };

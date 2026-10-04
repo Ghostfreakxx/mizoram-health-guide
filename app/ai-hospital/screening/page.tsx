@@ -25,7 +25,7 @@ export default function ScreeningPage() {
         <p className="rounded-2xl border-2 border-red-200 bg-red-50 p-5 text-lg text-red-900">
           A check-up is for people who feel well. If you have symptoms now — for example chest pain, a lump, unusual bleeding,
           or a sore in the mouth that does not heal — do not wait for screening. Use the{" "}
-          <Link href="/ai-hospital/triage" className="font-semibold underline">Triage Desk</Link> or see a doctor.
+          <Link href="/ai-hospital/reception" className="font-semibold underline">Reception</Link> or see a doctor.
         </p>
         <SourceNote ids={SOURCE_IDS} />
       </div>

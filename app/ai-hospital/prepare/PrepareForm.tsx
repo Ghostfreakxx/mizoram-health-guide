@@ -62,7 +62,7 @@ export default function PrepareForm() {
         <p className="text-lg font-semibold">
           Feeling very unwell right now? <Link href="/ai-hospital/emergency" className="underline">Open Emergency Mode</Link> or call{" "}
           <CallLink id="ambulance-108" className="font-bold underline">108</CallLink>. Not sure how urgent it is?{" "}
-          <Link href="/ai-hospital/triage" className="underline">Use the Triage Desk</Link> — it fills in this summary for you.
+          <Link href="/ai-hospital/reception" className="underline">Start at Reception</Link> — the consultation fills in this summary for you.
         </p>
       </div>
 

@@ -130,7 +130,7 @@ export default function AccessibilityBar() {
           >
             <option value="en">English</option>
             <option value="lus" disabled={!mizoReady}>
-              {mizoReady ? "Mizo" : `Mizo (coming soon, ${mizoProgress}% reviewed)`}
+              {mizoReady ? "Mizo" : `Mizo — translation in review (${mizoProgress}%)`}
             </option>
           </select>
         </div>

@@ -125,19 +125,15 @@ export default async function DepartmentPage({ params }: { params: Promise<{ slu
 
         <aside className="space-y-5 lg:sticky lg:top-16 lg:self-start">
           {roomFor(d.slug) && (
-            <RoomLink href={`/ai-hospital/departments/${d.slug}/room`} className="block rounded-2xl bg-gradient-to-br from-blue-950 to-blue-700 p-6 text-white hover:from-blue-900">
+            <RoomLink href={`/ai-hospital/departments/${d.slug}/room`} className="block rounded-2xl bg-blue-950 p-6 text-white hover:bg-blue-900">
               <span className="block text-xl font-bold">🪑 Enter the consultation room</span>
               <span className="mt-1 block text-blue-100">Sit down with the virtual guide and talk through the problem.</span>
             </RoomLink>
           )}
-          <Link href={`/ai-hospital/departments/${d.slug}/simulator`} className="block rounded-2xl border-2 border-amber-300 bg-amber-50 p-6 hover:border-amber-500">
-            <span className="block text-xl font-bold text-blue-950">🧊 Take the 3D tour</span>
-            <span className="mt-1 block text-slate-700">See what usually happens on a visit, step by step.</span>
-          </Link>
-          <Link href="/ai-hospital/triage" className="block rounded-2xl bg-blue-900 p-6 text-white hover:bg-blue-800">
+          <Link href="/ai-hospital/reception" className="block rounded-2xl bg-blue-900 p-6 text-white hover:bg-blue-800">
             <span className="block text-xl font-bold">Check how urgent it is</span>
-            <span className="mt-1 block text-blue-100">The Triage Desk takes about 2 minutes.</span>
-            <span className="mt-4 block rounded-xl bg-amber-400 px-4 py-3 text-center text-lg font-bold text-blue-950">Start triage →</span>
+            <span className="mt-1 block text-blue-100">Tell us what&apos;s wrong in your own words.</span>
+            <span className="mt-4 block rounded-xl bg-amber-400 px-4 py-3 text-center text-lg font-bold text-blue-950">Tell us what&apos;s wrong →</span>
           </Link>
           <Link href="/ai-hospital/prepare" className="block rounded-2xl border-2 border-slate-200 bg-white p-6 hover:border-blue-400">
             <span className="block text-xl font-bold text-blue-950">📋 Prepare for your visit</span>

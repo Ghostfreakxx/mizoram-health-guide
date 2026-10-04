@@ -1,22 +1,30 @@
 import { expect, test } from "@playwright/test";
 
-test("emergency checklist opens Emergency Mode with 108", async ({ page }) => {
-  await page.goto("/ai-hospital/triage");
-  await page.getByRole("button", { name: /Chest pain, pressure, or tightness right now/ }).click();
-  await expect(page.getByRole("alertdialog")).toBeVisible();
-  await expect(page.getByText("Call 108").first()).toBeVisible();
+test("text-only consultation: the emergency checklist opens Emergency Mode with 108", async ({ page }) => {
+  await page.goto("/ai-hospital/departments/general-medicine/room?view=text");
+  await expect(page.getByLabel("Display")).toHaveValue("text");
+  await page.getByRole("button", { name: "Begin consultation" }).click();
+  await page.getByRole("textbox", { name: "Your answer" }).fill("my child has fever 3 days");
+  await page.getByRole("button", { name: "Send" }).click();
+  await page.getByRole("button", { name: /Chest pain, pressure, or tightness/ }).click();
+  await expect(page.getByRole("region", { name: /Emergency/ })).toBeVisible();
+  await expect(page.getByRole("link", { name: /108/ }).first()).toBeVisible();
 });
 
-test("a red-flag answer mid-questionnaire interrupts triage", async ({ page }) => {
+test("the old Triage Desk address opens the text-only consultation", async ({ page }) => {
   await page.goto("/ai-hospital/triage");
-  await page.getByRole("button", { name: /None of these/ }).click();
-  await page.getByRole("button", { name: /Myself/ }).click();
-  await page.getByRole("button", { name: /18 to 59/ }).click();
-  await page.getByRole("button", { name: /^Male$/ }).click();
-  await page.getByRole("button", { name: /None of these/ }).click();
-  await page.getByRole("button", { name: /Chest discomfort/ }).click();
-  await page.getByRole("button", { name: "Yes", exact: true }).click();
-  await expect(page.getByRole("alertdialog")).toBeVisible();
+  await expect(page).toHaveURL(/general-medicine\/room\?view=text$/);
+  await expect(page.getByLabel("Display")).toHaveValue("text");
+});
+
+test("Reception: 'I can't explain it' starts the consultation with help to describe it", async ({ page }) => {
+  await page.goto("/ai-hospital/reception");
+  await page.getByRole("button", { name: /I can't explain it/ }).click();
+  await expect(page).toHaveURL(/room\?start=describe$/);
+  await page.getByLabel("Display").selectOption("text");
+  await page.getByRole("button", { name: "Begin consultation" }).click();
+  await expect(page.getByRole("heading", { name: /describe|Where/i }).first()).toBeVisible({ timeout: 10000 });
+  await expect(page.getByRole("region", { name: /Emergency/ })).toHaveCount(0);
 });
 
 test("receptionist: suicidal message goes straight to crisis support", async ({ page }) => {
@@ -151,7 +159,7 @@ test("reception hands the patient's words to the consultation room (in memory, n
   await page.goto("/ai-hospital/reception");
   await page.getByLabel("What is the problem?").fill("I have been coughing for three weeks.");
   await page.getByRole("button", { name: "Continue →" }).click();
-  await page.getByRole("button", { name: /Start your consultation/ }).click();
+  await page.getByRole("button", { name: /Start the consultation/ }).click();
   // A cough is routed to the Respiratory room; nothing about it is in the address.
   await expect(page).toHaveURL(/\/ai-hospital\/departments\/respiratory\/room$/);
   await expect(page.getByText("From Reception:")).toBeVisible();

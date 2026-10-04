@@ -151,32 +151,6 @@ describe("doctor summary contains only what the patient supplied", () => {
   });
 });
 
-describe("3D department simulators", () => {
-  // Imported lazily so the test file stays readable.
-  it("every department has a simulation built only from department content", async () => {
-    const { simulations, getSimulation } = await import("../../app/ai-hospital/data/simulator");
-    expect(simulations).toHaveLength(17);
-    for (const d of departments) {
-      const sim = getSimulation(d.slug)!;
-      expect(sim, d.slug).toBeDefined();
-      expect(sim.stations.length, d.slug).toBeGreaterThanOrEqual(d.expect.length + 2);
-      // Every visit step in the department page appears in the tour, unchanged.
-      for (const step of d.expect) expect(sim.stations.some((s) => s.text === step), `${d.slug}: ${step}`).toBe(true);
-      for (const s of sim.stations) {
-        expect(s.equipment.length + (s.id === "wait" || s.id === "leave" ? 1 : 0), `${d.slug}/${s.id}`).toBeGreaterThan(0);
-        expect(violatesLanguagePolicy(s.text), s.text).toBeNull();
-      }
-    }
-  });
-
-  it("the emergency tour tells people to call 108/112 and skips the waiting step", async () => {
-    const { getSimulation } = await import("../../app/ai-hospital/data/simulator");
-    const sim = getSimulation("emergency")!;
-    expect(sim.stations[0].text).toMatch(/108|112/);
-    expect(sim.stations.some((s) => s.id === "wait")).toBe(false);
-  });
-});
-
 describe("medicine information never prescribes or doses", () => {
   it("has no dose instructions and every entry is sourced", async () => {
     const { medicines, generalSafety, labelTerms } = await import("../../app/ai-hospital/data/medicines");

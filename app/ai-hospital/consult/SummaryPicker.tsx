@@ -22,7 +22,7 @@ export default function SummaryPicker() {
       {summaries.length === 0 ? (
         <p className="text-lg text-slate-700">
           No saved summary on this phone. Make one in 2 minutes with the{" "}
-          <Link href="/ai-hospital/triage" className="font-semibold text-blue-700 underline">Triage Desk</Link> or{" "}
+          <Link href="/ai-hospital/reception" className="font-semibold text-blue-700 underline">Reception</Link> or{" "}
           <Link href="/ai-hospital/prepare" className="font-semibold text-blue-700 underline">Visit Preparation</Link>, then tap
           “Save to my Health Passport”.
         </p>

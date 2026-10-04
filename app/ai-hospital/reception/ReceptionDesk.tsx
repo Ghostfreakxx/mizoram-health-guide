@@ -4,29 +4,30 @@ import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { type RedFlagId, getRedFlag } from "../../lib/safety/redFlags";
 import { type Reception, receive } from "../../lib/safety/reception";
-import { AGE_GROUPS, DURATIONS, complaints, getComplaint } from "../../lib/safety/triage";
+import { AGE_GROUPS, DURATIONS, getComplaint } from "../../lib/safety/triage";
 import { getService } from "../../lib/services";
 import { getDepartment } from "../data/departments";
 import EmergencyMode from "../components/EmergencyMode";
 import { roomForDepartments, setPendingConcern } from "../consult-room/handoff";
 import { preloadConsultation } from "../consult-room/preload";
 import { roomFor } from "../consult-room/rooms";
-import TriageFlow from "../components/TriageFlow";
 import { BigChoice, StepTitle } from "../components/ui";
 
+// Reception: the patient's own words → an immediate safety check → a short
+// "here is what I understood" → the consultation. It never diagnoses and
+// never asks the patient to pick a medical category.
+
 const EXAMPLES = [
-  "My mother has been having chest pain.",
+  "I don't feel well.",
   "I have been coughing for three weeks.",
   "My child has a fever.",
-  "I think I was exposed to HIV.",
-  "I'm pregnant and bleeding.",
+  "My mother has been having chest pain.",
 ];
 
 type Stage =
   | { kind: "ask" }
   | { kind: "confirm"; flags: RedFlagId[]; reception: Reception }
-  | { kind: "understood"; reception: Reception; complaint?: string }
-  | { kind: "triage"; reception: Reception; complaint: string };
+  | { kind: "understood"; reception: Reception };
 
 export default function ReceptionDesk() {
   const [text, setText] = useState("");
@@ -44,7 +45,16 @@ export default function ReceptionDesk() {
       setStage({ kind: "confirm", flags: r.detection.needsConfirmation, reception: r });
       return;
     }
-    setStage({ kind: "understood", reception: r, complaint: r.complaintIds[0] });
+    setStage({ kind: "understood", reception: r });
+  }
+
+  // The words go to the consultation in memory (never in the address).
+  function consult(r: Reception | null, view?: "text") {
+    const c = r?.complaintIds[0] ? getComplaint(r.complaintIds[0]) : undefined;
+    const slug = roomForDepartments(c?.departments ?? [], (d) => !!roomFor(d));
+    if (r) setPendingConcern(text);
+    const q = view ? `?view=${view}` : r ? "" : "?start=describe";
+    router.push(`/ai-hospital/departments/${slug}/room${q}`);
   }
 
   if (emergency) {
@@ -58,110 +68,82 @@ export default function ReceptionDesk() {
         <StepTitle hint="You mentioned this, so we need to check.">Is anyone having {titles} right now?</StepTitle>
         <div className="grid gap-3 sm:grid-cols-2">
           <BigChoice tone="danger" onClick={() => setEmergency(stage.flags)}>Yes, or I am not sure</BigChoice>
-          <BigChoice onClick={() => setStage({ kind: "understood", reception: stage.reception, complaint: stage.reception.complaintIds[0] })}>
-            No, not right now
-          </BigChoice>
+          <BigChoice onClick={() => setStage({ kind: "understood", reception: stage.reception })}>No, not right now</BigChoice>
         </div>
       </div>
     );
   }
 
-  if (stage.kind === "triage") {
-    const r = stage.reception;
-    return (
-      <TriageFlow
-        start={{
-          who: r.who,
-          relation: r.relation,
-          age: r.ageHint,
-          special: r.special,
-          complaint: stage.complaint,
-          prefill: stage.complaint === r.complaintIds[0] ? r.prefill : {},
-          duration: r.duration,
-          concernText: text.trim().slice(0, 200),
-        }}
-      />
-    );
-  }
-
   if (stage.kind === "understood") {
     const r = stage.reception;
-    const c = stage.complaint ? getComplaint(stage.complaint) : undefined;
+    const c = r.complaintIds[0] ? getComplaint(r.complaintIds[0]) : undefined;
     const dept = c ? getDepartment(c.departments[0]) : undefined;
-    const services = (c?.services ?? []).map(getService).filter((s): s is NonNullable<typeof s> => !!s);
+    const service = (c?.services ?? []).map(getService).find((s) => !!s);
     const age = AGE_GROUPS.find((g) => g.id === r.ageHint)?.label;
     const duration = DURATIONS.find((d) => d.id === r.duration)?.label;
     return (
-      <div className="space-y-6">
+      <div className="space-y-5">
         <div className="rounded-2xl border border-slate-200 bg-white p-6 sm:p-8">
           <StepTitle>Here is what I understood</StepTitle>
           <dl className="mt-5 grid gap-4 text-lg sm:grid-cols-2">
-            <div><dt className="text-sm font-semibold text-slate-600">For</dt><dd>{r.who === "other" ? `Someone else${r.relation ? ` (${r.relation})` : ""}` : r.who === "self" ? "You" : "Not sure yet"}</dd></div>
-            <div><dt className="text-sm font-semibold text-slate-600">Main concern</dt><dd>{c ? `${c.icon} ${c.label}` : "Not sure yet — please choose below"}</dd></div>
-            {age && <div><dt className="text-sm font-semibold text-slate-600">Age</dt><dd>{age} (please confirm)</dd></div>}
-            {duration && <div><dt className="text-sm font-semibold text-slate-600">How long</dt><dd>{duration}</dd></div>}
-          </dl>
-        </div>
-
-        <div className="rounded-2xl border border-slate-200 bg-white p-6 sm:p-8">
-          <h3 className="text-xl font-bold text-blue-950">{c ? "Is this the main concern? You can change it." : "Choose the main concern"}</h3>
-          <div className="mt-4 grid gap-2 sm:grid-cols-2">
-            {complaints.map((x) => (
-              <BigChoice key={x.id} selected={stage.complaint === x.id} onClick={() => setStage({ ...stage, complaint: x.id })} className="flex items-center gap-3">
-                <span aria-hidden className="text-2xl">{x.icon}</span> {x.label}
-              </BigChoice>
-            ))}
-          </div>
-        </div>
-
-        {c && (
-          <div className="grid gap-4 sm:grid-cols-2">
+            <div>
+              <dt className="text-sm font-semibold text-slate-600">You said</dt>
+              <dd>“{text.trim()}”</dd>
+            </div>
+            <div>
+              <dt className="text-sm font-semibold text-slate-600">For</dt>
+              <dd>{r.who === "other" ? `Someone else${r.relation ? ` (${r.relation})` : ""}` : r.who === "self" ? "You" : "Not sure yet — the doctor will ask"}</dd>
+            </div>
+            <div>
+              <dt className="text-sm font-semibold text-slate-600">Main concern</dt>
+              <dd>{c ? `${c.icon} ${c.label}` : "Not clear yet — that's fine, the doctor will help you describe it"}</dd>
+            </div>
+            {age && (
+              <div>
+                <dt className="text-sm font-semibold text-slate-600">Age</dt>
+                <dd>{age} (the doctor will confirm)</dd>
+              </div>
+            )}
+            {duration && (
+              <div>
+                <dt className="text-sm font-semibold text-slate-600">How long</dt>
+                <dd>{duration}</dd>
+              </div>
+            )}
             {dept && (
-              <div className="rounded-2xl border border-slate-200 bg-white p-5">
-                <p className="text-sm font-semibold text-slate-600">Likely department</p>
-                <p className="mt-1 text-xl font-bold text-blue-900">{dept.icon} {dept.plainName}</p>
+              <div>
+                <dt className="text-sm font-semibold text-slate-600">Usually seen by</dt>
+                <dd>
+                  {dept.icon} {dept.plainName}
+                </dd>
               </div>
             )}
-            {services.length > 0 && (
-              <div className="rounded-2xl border border-slate-200 bg-white p-5">
-                <p className="text-sm font-semibold text-slate-600">Government service that may help</p>
-                <p className="mt-1 text-lg font-bold text-blue-900">{services[0].name}</p>
-                <p className="text-slate-600">{services[0].description}</p>
-              </div>
-            )}
-          </div>
-        )}
+          </dl>
+          {service && (
+            <p className="mt-4 rounded-xl bg-slate-50 px-4 py-3 text-slate-700">
+              A free government service that may help: <strong>{service.name}</strong> — {service.description}
+            </p>
+          )}
+        </div>
 
         <div className="rounded-2xl bg-blue-900 p-6 text-white">
-          <p className="text-lg">Next, the virtual health guide will ask a few questions — one at a time — to find out how urgent this is and prepare a summary for a doctor.</p>
-          {(() => {
-            const slug = roomForDepartments(c?.departments ?? [], (d) => !!roomFor(d));
-            const rm = roomFor(slug);
-            return (
-              <button
-                type="button"
-                onPointerEnter={preloadConsultation}
-                onFocus={preloadConsultation}
-                onClick={() => {
-                  setPendingConcern(text);
-                  router.push(`/ai-hospital/departments/${slug}/room`);
-                }}
-                className="mt-4 w-full rounded-xl bg-amber-400 px-6 py-4 text-xl font-bold text-blue-950"
-              >
-                Start your consultation{rm ? ` — ${rm.greeting}` : ""} →
-              </button>
-            );
-          })()}
+          <p className="text-lg">Next, the virtual doctor asks a few questions, one at a time, to find out how urgent this is and prepare a summary for a real doctor or nurse.</p>
           <button
             type="button"
-            disabled={!stage.complaint}
-            onClick={() => stage.complaint && setStage({ kind: "triage", reception: r, complaint: stage.complaint })}
-            className="mt-3 w-full rounded-xl border-2 border-white/70 px-6 py-3 text-lg font-semibold text-white disabled:opacity-50"
+            onPointerEnter={preloadConsultation}
+            onFocus={preloadConsultation}
+            onClick={() => consult(r)}
+            className="mt-4 w-full rounded-xl bg-amber-400 px-6 py-4 text-xl font-bold text-blue-950"
           >
-            Or answer quick questions here (text only)
+            Start the consultation →
+          </button>
+          <button type="button" onClick={() => consult(r, "text")} className="mt-3 w-full rounded-xl border-2 border-white/70 px-6 py-3 text-lg font-semibold text-white">
+            Text only — lighter, for slow internet
           </button>
         </div>
-        <button type="button" onClick={() => setStage({ kind: "ask" })} className="text-lg text-blue-700 underline">← Change what I wrote</button>
+        <button type="button" onClick={() => setStage({ kind: "ask" })} className="text-lg text-blue-700 underline">
+          ← Change what I wrote
+        </button>
       </div>
     );
   }
@@ -178,7 +160,7 @@ export default function ReceptionDesk() {
         <label htmlFor="reception-text" className="block text-2xl font-bold text-blue-950">
           What is the problem?
         </label>
-        <p className="mt-1 text-lg text-slate-600">Write a short sentence. For example: who is unwell, what is wrong, and since when.</p>
+        <p className="mt-1 text-lg text-slate-600">In your own words. Simple words are fine — for example who is unwell, what is wrong, and since when.</p>
         <textarea
           id="reception-text"
           value={text}
@@ -191,14 +173,33 @@ export default function ReceptionDesk() {
         <button type="submit" disabled={!text.trim()} className="mt-4 w-full rounded-xl bg-blue-900 px-6 py-4 text-xl font-bold text-white hover:bg-blue-800 disabled:opacity-50">
           Continue →
         </button>
-        <p className="mt-3 text-sm text-slate-600">What you write stays on this page. It is not saved or sent anywhere.</p>
+        <p className="mt-3 text-sm text-slate-600">What you write stays in this browser tab. It is not saved or sent anywhere.</p>
       </form>
+
+      <button
+        type="button"
+        onPointerEnter={preloadConsultation}
+        onClick={() => consult(null)}
+        className="flex w-full items-center gap-4 rounded-2xl border-2 border-blue-900 bg-white p-5 text-left hover:bg-blue-50"
+      >
+        <span aria-hidden className="text-4xl">🧍</span>
+        <span>
+          <span className="block text-xl font-bold text-blue-950">I can&apos;t explain it — help me describe it</span>
+          <span className="block text-slate-600">Show where it is on a body picture, then answer simple questions.</span>
+        </span>
+      </button>
 
       <div>
         <p className="text-lg font-semibold text-slate-700">Or tap an example:</p>
         <div className="mt-2 grid gap-2">
           {EXAMPLES.map((e) => (
-            <BigChoice key={e} onClick={() => { setText(e); submit(e); }}>
+            <BigChoice
+              key={e}
+              onClick={() => {
+                setText(e);
+                submit(e);
+              }}
+            >
               “{e}”
             </BigChoice>
           ))}

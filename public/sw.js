@@ -2,9 +2,9 @@
 //
 // Caches only public website files (pages and code). It never caches API
 // responses or anything a person types: health answers stay in page memory.
-const VERSION = "v5";
+const VERSION = "v6";
 const CACHE = `mhg-${VERSION}`;
-const CORE_PAGES = ["/offline", "/ai-hospital/emergency", "/ai-hospital/first-aid", "/ai-hospital/departments/general-medicine/room", "/find-care", "/ai-hospital", "/ai-hospital/reception", "/ai-hospital/triage", "/"];
+const CORE_PAGES = ["/offline", "/ai-hospital/emergency", "/ai-hospital/first-aid", "/ai-hospital/departments/general-medicine/room", "/find-care", "/ai-hospital", "/ai-hospital/reception", "/health-library", "/my-visit", "/"];
 
 async function precache() {
   const cache = await caches.open(CACHE);

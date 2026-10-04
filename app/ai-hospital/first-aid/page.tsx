@@ -61,7 +61,7 @@ export default function FirstAidPage() {
         ))}
 
         <p className="text-lg text-slate-700">
-          Not sure how serious it is? Use the <Link href="/ai-hospital/triage" className="font-semibold text-blue-800 underline">Triage Desk</Link>,
+          Not sure how serious it is? Use the <Link href="/ai-hospital/reception" className="font-semibold text-blue-800 underline">Reception</Link>,
           or open <Link href="/ai-hospital/emergency" className="font-semibold text-blue-800 underline">Emergency Mode</Link>.
         </p>
       </div>

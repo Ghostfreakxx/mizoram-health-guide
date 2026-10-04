@@ -22,7 +22,7 @@ export default function OfflinePage() {
           <li><Link href="/ai-hospital/emergency" className="font-semibold text-blue-800 underline">Emergency Mode</Link></li>
           <li><Link href="/find-care" className="font-semibold text-blue-800 underline">Find Care (helplines)</Link></li>
           <li><Link href="/ai-hospital" className="font-semibold text-blue-800 underline">AI Hospital</Link></li>
-          <li><Link href="/ai-hospital/triage" className="font-semibold text-blue-800 underline">Triage Desk</Link></li>
+          <li><Link href="/ai-hospital/reception" className="font-semibold text-blue-800 underline">Reception</Link></li>
           <li>…and any page you opened before while online.</li>
         </ul>
       </div>

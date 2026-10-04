@@ -20,11 +20,9 @@ const PAGES = [
   "/offline",
   "/ai-hospital",
   "/ai-hospital/reception",
-  "/ai-hospital/triage",
   "/ai-hospital/emergency",
   "/ai-hospital/departments",
   "/ai-hospital/departments/paediatrics",
-  "/ai-hospital/departments/dental/simulator",
   "/ai-hospital/prepare",
   "/ai-hospital/doctor",
   "/ai-hospital/consult",
@@ -60,7 +58,7 @@ test("keyboard: skip link moves focus to main content", async ({ page, isMobile 
 });
 
 test("every page has exactly one main landmark and a page heading", async ({ page }) => {
-  for (const path of ["/", "/ai-hospital", "/ai-hospital/triage", "/cancer", "/find-care", "/health-library"]) {
+  for (const path of ["/", "/ai-hospital", "/cancer", "/find-care", "/health-library"]) {
     await page.goto(path);
     await expect(page.locator("main")).toHaveCount(1);
     await expect(page.locator("h1").first()).toBeVisible();
@@ -69,7 +67,7 @@ test("every page has exactly one main landmark and a page heading", async ({ pag
 
 test("no sideways scrolling on small phones (320px)", async ({ page }) => {
   await page.setViewportSize({ width: 320, height: 800 });
-  for (const path of ["/", "/ai-hospital", "/ai-hospital/triage", "/find-care", "/health-library", "/ai-hospital/emergency"]) {
+  for (const path of ["/", "/ai-hospital", "/find-care", "/health-library", "/ai-hospital/emergency"]) {
     await page.goto(path);
     const width = await page.evaluate(() => document.documentElement.scrollWidth);
     expect(width, path).toBeLessThanOrEqual(320);
