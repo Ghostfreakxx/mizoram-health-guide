@@ -3,53 +3,8 @@
 // result, and replies (why / what does that mean / health questions).
 
 import { describe, expect, it } from "vitest";
-import { type ConsultState, type Outcome, type Turn, converse, nextTurn, respond, startConsultation } from "../../app/lib/consultation";
-import { planReply, planTurn } from "../../app/ai-hospital/consult-room/doctor/director";
 import { LipSync, MAX_JAW, REST, type Viseme, segments, spokenForm, visemeAt } from "../../app/ai-hospital/consult-room/doctor/lipsync";
-import { ROOMS } from "../../app/ai-hospital/consult-room/rooms";
-
-const OPENINGS = ["I've been coughing for three weeks", "fever since yesterday", "my stomach hurts", "I have a rash on my arm", "my child has a fever", "my temperature was 39°C"];
-const ASIDES = ["why do you ask", "what does that mean", "how does TB spread?", "can I take paracetamol?", "I already told you"];
-const RED = /^(breathing|chest_pain|stroke|unconscious|seizure|bleeding|allergy|severe_infection|overdose|poisoning|snakebite|injury|suicide|pregnancy|postpartum|infant)$/;
-
-function spokenLines(): string[] {
-  const lines = new Set<string>();
-  const say = (t: Turn, first: boolean) => planTurn(t, { first, lastSaid: "", reducedMotion: false }).lines.forEach((l) => lines.add(l.text));
-  const reply = (o: Outcome, s: ConsultState, t: Turn) => {
-    if (o.kind === "answered" || o.kind === "repeat") return;
-    const next = nextTurn("state" in o ? o.state : s);
-    planReply(o, t, next).lines.forEach((l) => lines.add(l.text));
-  };
-  const rooms = [{ greeting: "General Medicine", intro: undefined, focus: undefined }, ...Object.values(ROOMS)];
-  for (const room of rooms) {
-    for (const [k, opening] of OPENINGS.entries()) {
-      let s = startConsultation(room.greeting, room.intro, room.focus);
-      for (let i = 0; i < 60; i++) {
-        const t = nextTurn(s);
-        say(t, i === 0);
-        if (t.input.kind === "emergency" || t.input.kind === "result") break;
-        if (i === 3) reply(converse(s, t, ASIDES[k % ASIDES.length]), s, t);
-        if (t.step === "concern") {
-          const o = converse(s, t, opening);
-          s = "state" in o ? o.state : s;
-          continue;
-        }
-        const opts = "options" in t.input ? t.input.options.map((o) => o.id) : [];
-        const value = t.input.kind === "multi" ? [] : t.input.kind === "text" ? "" : t.step === "check" ? "none" : opts.includes("no") ? "no" : (opts.find((o) => !RED.test(o)) ?? opts[0] ?? "");
-        const next = respond(s, t.step, value);
-        if (next === s) break;
-        s = next;
-      }
-    }
-  }
-  // The emergency, spoken mid-visit.
-  let s = startConsultation("General Medicine");
-  const t = nextTurn(s);
-  const o = converse(s, t, "my chest feels crushed and I can't breathe");
-  s = "state" in o ? o.state : s;
-  say(nextTurn(s), false);
-  return [...lines].filter(Boolean);
-}
+import { spokenLines } from "./spokenLines";
 
 const LINES = spokenLines();
 const activity = (v: Viseme) => v.jawOpen + v.lipsPart + v.mouthPress + v.mouthPucker + v.mouthFunnel;

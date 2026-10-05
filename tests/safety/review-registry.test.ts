@@ -1,5 +1,6 @@
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
+import { spokenLines } from "./spokenLines";
 import { reviewCsv, reviewMarkdown } from "../../app/lib/review/export";
 import { SIGN_OFFS, reviewRegistry, reviewSummary } from "../../app/lib/review/registry";
 import { complaints, POLICY_RULES, populationQuestions } from "../../app/lib/safety/triage";
@@ -69,5 +70,20 @@ describe("every question the doctor asks can be traced", () => {
         s = respond(s, t.step, v);
       }
     }
+  });
+});
+
+describe("everything the doctor says about urgency, emergencies, medicines or diagnosis is on the review list", () => {
+  it("every such spoken sentence comes from a registered review item", () => {
+    const rules = reviewRegistry().map((r) => r.rule).join("\n");
+    const SAFETY = /\b(108|112|emergency|urgent|urgently|immediately|prescribe|medicines?|doses?|diagnos\w*|tests?|serious)\b/i;
+    // Not advice: the greeting (its department name and promise), the recap of
+    // the patient's own words, and history questions about medicines taken.
+    const NOT_ADVICE = /^(I'm your virtual health guide for this [A-Z][\w &]+ consultation\.|If anything you tell me suggests an emergency, I'll tell you immediately\.|You told me about\b|Do you know what medicines|Does the patient have any allergies to medicines|Do you have any allergies to medicines)/;
+    const missing = new Set<string>();
+    for (const line of spokenLines())
+      for (const sentence of line.split(/(?<=[.!?])\s+/))
+        if (SAFETY.test(sentence) && !NOT_ADVICE.test(sentence) && !rules.includes(sentence.trim())) missing.add(sentence.trim());
+    expect([...missing]).toEqual([]);
   });
 });

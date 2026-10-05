@@ -19,7 +19,8 @@ import { GLOSSARY } from "../knowledge/glossary";
 import { PASSAGES } from "../knowledge";
 import { allEducation } from "../education";
 import { getSource } from "../sources";
-import { EMERGENCY_SPOKEN, FAILSAFE_MESSAGE, LEVEL_TEXT, SAFETY_NET } from "../safety/language";
+import { EXPLAIN_LINES, WHY_LINES, WHY_SAFETY } from "../consultation";
+import { BOUNDARY_ANSWERS, EMERGENCY_SPOKEN, FAILSAFE_MESSAGE, KNOWLEDGE_LIMIT, LEVEL_TEXT, PROFESSIONAL_REQUEST, SAFETY_NET } from "../safety/language";
 import { redFlags } from "../safety/redFlags";
 import { AGE_GROUPS, POLICY_RULES, type Context, complaints, populationQuestions } from "../safety/triage";
 
@@ -212,6 +213,41 @@ export function reviewRegistry(): ReviewItem[] {
       reviewer: "clinician",
       definedIn: "app/lib/safety/language.ts",
     }),
+    ...Object.entries(BOUNDARY_ANSWERS).map(([topic, text]) =>
+      item({
+        id: `W-limit-${topic}`,
+        kind: "wording",
+        title: `Doctor's limit, said when asked about: ${topic}`,
+        rule: text,
+        sourceIds: [],
+        reviewer: "clinician",
+        definedIn: "app/lib/safety/language.ts",
+      }),
+    ),
+    item({
+      id: "W-professional-request",
+      kind: "wording",
+      title: "Said when the patient asks for a real doctor or health worker",
+      rule: PROFESSIONAL_REQUEST,
+      sourceIds: [],
+      reviewer: "clinician",
+      definedIn: "app/lib/safety/language.ts",
+    }),
+    item({
+      id: "W-knowledge-limit",
+      kind: "wording",
+      title: "Said when a health question has no verified answer",
+      rule: KNOWLEDGE_LIMIT,
+      sourceIds: [],
+      reviewer: "clinician",
+      definedIn: "app/lib/safety/language.ts",
+    }),
+    ...Object.entries(EXPLAIN_LINES).map(([step, text]) =>
+      item({ id: `W-explain-${step}`, kind: "wording", title: `“What do you mean?” — the ${step} step re-said simply`, rule: text, sourceIds: [], reviewer: "clinician", definedIn: "app/lib/consultation.ts (EXPLAIN_LINES)" }),
+    ),
+    ...Object.entries({ ...WHY_SAFETY, ...WHY_LINES }).map(([step, text]) =>
+      item({ id: `W-why-${step}`, kind: "wording", title: `“Why do you ask?” — ${step}`, rule: text, sourceIds: [], reviewer: "clinician", definedIn: "app/lib/consultation.ts (WHY_SAFETY, WHY_LINES)" }),
+    ),
     item({
       id: "W-failsafe",
       kind: "wording",

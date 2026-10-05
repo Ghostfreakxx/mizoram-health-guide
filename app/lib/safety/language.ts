@@ -46,6 +46,25 @@ export const LEVEL_TEXT: Record<
 export const EMERGENCY_SPOKEN =
   "These symptoms may need emergency medical attention. Call 108 or 112 now, or go to the nearest hospital emergency department.";
 
+// The doctor's limits, said when the patient asks for what only a clinician
+// can give. Each says what the doctor CAN do instead.
+export const BOUNDARY_ANSWERS = {
+  prescription:
+    "I can't suggest or prescribe medicines or doses — that needs a doctor or pharmacist who can check what is right for you. I've added your question to your summary so you can ask them.",
+  diagnosis:
+    "I can't tell you what it is — only a doctor, with an examination and sometimes tests, can do that. What I can do is help decide how soon you should be seen, and prepare your summary. I've added your question to it.",
+  test: "Whether a test is needed is a decision for a doctor or health worker. I've added your question to your summary so you can ask them.",
+  serious:
+    "I can't tell how serious it is yet — that is what these questions help with. At the end I'll tell you how soon to be seen, and why.",
+} as const;
+
+// The patient asks for a real doctor: always respected.
+export const PROFESSIONAL_REQUEST =
+  "Of course. Speaking with a real doctor or health worker is always your choice. I can prepare a summary of what you've told me so far to take with you. You can see the ways to reach one now, or we can carry on so the summary is more complete.";
+
+// A health question with no verified answer in the library: never guessed.
+export const KNOWLEDGE_LIMIT = "I don't have verified information about that in my health guide yet, and I don't want to guess about medical information.";
+
 export const FAILSAFE_MESSAGE =
   "We could not complete the check. If you feel very unwell or think this may be an emergency, call 108 or 112 now. Otherwise, please see a doctor or health worker today.";
 

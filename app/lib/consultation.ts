@@ -17,7 +17,7 @@ import { getDepartment } from "../ai-hospital/data/departments";
 import { DESCRIBE_OPTIONS, type ProfessionalTopic, type Uncertain, feelingWord, isVagueConcern, metaIntent, normalizeWords, plainMeanings, plainTerms, professionalQuestion, soundsDistressed, uncertainty } from "./consultHelp";
 import { type EducationAnswer, allEducation, findEducation, isGeneralQuestion, isQuestion } from "./education";
 import { askedTerm } from "./knowledge/glossary";
-import { EMERGENCY_SPOKEN, LEVEL_TEXT } from "./safety/language";
+import { BOUNDARY_ANSWERS, EMERGENCY_SPOKEN, KNOWLEDGE_LIMIT, LEVEL_TEXT, PROFESSIONAL_REQUEST } from "./safety/language";
 import { detectRedFlags } from "./safety/detect";
 import { receive } from "./safety/reception";
 import { type RedFlagId, getRedFlag, redFlags } from "./safety/redFlags";
@@ -1423,6 +1423,28 @@ export function startHelpDescribe(s: ConsultState): ConsultState {
 
 export const AGE_HELP_LINE = "That's okay — an approximate age is fine. For example, is it a baby, a child, an adult, or someone over 60?";
 
+// How each step is re-said in everyday words ("what do you mean?"). Some
+// carry clinical examples, so each is on the review list (W-explain-*).
+export const EXPLAIN_LINES: Record<string, string> = {
+  concern: "Just tell me in your own words what is bothering you — for example pain, fever, breathing, cough, stomach problems, or something else.",
+  "concern-more": "Just tell me in your own words what is bothering you most — for example pain, fever, breathing, cough, stomach problems, or something else.",
+  check: "I'm asking if anything very serious is happening right now — like chest pain, great difficulty breathing, heavy bleeding, or someone who cannot be woken. If none of these is happening, choose “None of these”.",
+  complaint: "Choose the group that sounds closest to the main problem. If none fits, choose “Something else”.",
+  describe: "Tell me what the feeling is like — for example pain, pressure or tightness, burning, or something else. It's fine if you can't describe it.",
+  body: "Show me where on the body the problem is. You can tap the picture, or say it in words.",
+  duration: "When did this problem first start — today, a few days ago, or longer ago? A rough idea is fine.",
+  who: "Are you asking about your own health, or about someone else, like a child or a parent?",
+  age: AGE_HELP_LINE,
+  sex: "Some questions are only for women or only for men. You can also choose not to say.",
+  special: "Some things change how soon someone should be seen: being pregnant, having given birth in the last 6 weeks, or a weaker defence against infection — for example because of HIV, cancer treatment or steroid medicines.",
+  progression: "Since it first started, is it getting better, getting worse, or staying about the same?",
+  severity: "How much does it stop you doing your normal activities? Mild means you can still do them, moderate means it is hard, and severe means you can hardly do anything.",
+  medicines: "Any tablets, syrups, injections or inhalers you take now — including from a pharmacy or traditional medicine. You can say “none” or “I don't know”.",
+  allergies: "Has any medicine, food or anything else ever caused a bad reaction — like a rash, swelling, or difficulty breathing?",
+  conditions: "Has a doctor or health worker ever told you that you have a long-term illness — such as diabetes, high blood pressure, asthma or TB?",
+  "c:temp": "If you checked the temperature with a thermometer, tell me the number. If not, choose “Not measured”.",
+  recheck: "You told me two different things. I want to write down the right one. Choose “Yes” to change your earlier answer, “No” to keep it, or “Not sure”.",
+};
 // Re-says the current question in everyday words.
 export function explainLine(turn: Turn, s: ConsultState): string {
   const q = turn.question ?? turn.say;
@@ -1433,60 +1455,51 @@ export function explainLine(turn: Turn, s: ConsultState): string {
       ? `Let me put it simply. ${m.map((x) => x.charAt(0).toUpperCase() + x.slice(1)).join(". ")}. So — ${q.charAt(0).toLowerCase()}${q.slice(1)} You can say yes, no, or not sure.`
       : `I'm asking whether this is happening ${isOther(s) ? "to the patient " : ""}now. You can say yes, no, or not sure. ${q}`;
   }
-  const lines: Record<string, string> = {
-    concern: "Just tell me in your own words what is bothering you — for example pain, fever, breathing, cough, stomach problems, or something else.",
-    "concern-more": "Just tell me in your own words what is bothering you most — for example pain, fever, breathing, cough, stomach problems, or something else.",
-    check: "I'm asking if anything very serious is happening right now — like chest pain, great difficulty breathing, heavy bleeding, or someone who cannot be woken. If none of these is happening, choose “None of these”.",
-    complaint: "Choose the group that sounds closest to the main problem. If none fits, choose “Something else”.",
-    describe: "Tell me what the feeling is like — for example pain, pressure or tightness, burning, or something else. It's fine if you can't describe it.",
-    body: "Show me where on the body the problem is. You can tap the picture, or say it in words.",
-    duration: "When did this problem first start — today, a few days ago, or longer ago? A rough idea is fine.",
-    who: "Are you asking about your own health, or about someone else, like a child or a parent?",
-    age: AGE_HELP_LINE,
-    sex: "Some questions are only for women or only for men. You can also choose not to say.",
-    special: "Some things change how soon someone should be seen: being pregnant, having given birth in the last 6 weeks, or a weaker defence against infection — for example because of HIV, cancer treatment or steroid medicines.",
-    progression: "Since it first started, is it getting better, getting worse, or staying about the same?",
-    severity: "How much does it stop you doing your normal activities? Mild means you can still do them, moderate means it is hard, and severe means you can hardly do anything.",
-    medicines: "Any tablets, syrups, injections or inhalers you take now — including from a pharmacy or traditional medicine. You can say “none” or “I don't know”.",
-    allergies: "Has any medicine, food or anything else ever caused a bad reaction — like a rash, swelling, or difficulty breathing?",
-    conditions: "Has a doctor or health worker ever told you that you have a long-term illness — such as diabetes, high blood pressure, asthma or TB?",
-    "c:temp": "If you checked the temperature with a thermometer, tell me the number. If not, choose “Not measured”.",
-    recheck: "You told me two different things. I want to write down the right one. Choose “Yes” to change your earlier answer, “No” to keep it, or “Not sure”.",
-  };
-  return lines[step] ?? (step.startsWith("c:") ? "Choose the answer that fits best. If you're not sure, you can say so." : q);
+
+  return EXPLAIN_LINES[step] ?? (step.startsWith("c:") ? "Choose the answer that fits best. If you're not sure, you can say so." : q);
 }
 
+// Why each step is asked ("why do you ask?"). On the review list (W-why-*).
+export const WHY_SAFETY = {
+  check: "Some problems need help straight away. I'm checking so that an emergency is never missed.",
+  warning: "I'm asking because this can be a warning sign that needs urgent care.",
+  urgency: "I'm asking because this can affect how urgently someone should be assessed.",
+  routine: "I'm asking because it helps decide what kind of care may be appropriate.",
+  summary: "This goes into the summary for the doctor. It helps them, and it doesn't change my advice.",
+};
+const WHY_DEFAULT = "It helps prepare a useful summary for a healthcare professional.";
+export const WHY_LINES: Record<string, string> = {
+  concern: "So I understand what is worrying you, and ask questions that fit.",
+  "concern-more": "So I understand what is worrying you, and ask questions that fit.",
+  complaint: "So the questions I ask fit the problem.",
+  describe: "How it feels helps me ask the right questions, and notice anything that may be urgent.",
+  body: "Where it is helps decide which service may be right, and the doctor will want to know.",
+  duration: "How long a problem has lasted can change how soon someone should be checked.",
+  who: "So I ask the questions the right way, and the summary is about the right person.",
+  age: "Some problems need more care at certain ages — for example in babies and older people.",
+  sex: "Some questions only apply to women, for example about pregnancy.",
+  special: "Pregnancy, a recent birth, or a weaker immune system can change how soon someone should be seen.",
+  progression: "Whether it is getting better or worse helps decide how soon to be seen.",
+  severity: "How much it affects you helps decide how soon someone should check it.",
+  medicines: "The doctor needs to know what is already being taken, so nothing clashes. I won't suggest any medicine.",
+  allergies: "So the doctor can avoid anything that has caused a bad reaction before.",
+  conditions: "Long-term conditions can change what care is safest.",
+  recheck: "Two of your answers did not match. I'd rather ask than guess, so your summary is right.",
+};
 // Why a question matters — short, honest, never the internal scoring.
 export function whyLine(turn: Turn): string {
   const step = turn.step;
-  if (step.startsWith("confirm:") || step === "check") return "Some problems need help straight away. I'm checking so that an emergency is never missed.";
+  if (step.startsWith("confirm:") || step === "check") return WHY_SAFETY.check;
   if (step.startsWith("q:")) {
     const id = step.slice(2);
     const q = questionsFor({ who: "self", age: "adult", special: [], complaint: "other" }).find((x) => x.id === id) ?? complaints.flatMap((c) => c.questions).find((x) => x.id === id);
-    if (q && "emergency" in q.yes) return "I'm asking because this can be a warning sign that needs urgent care.";
-    if (q && "level" in q.yes && (q.yes.level === "ORANGE" || q.yes.now)) return "I'm asking because this can affect how urgently someone should be assessed.";
-    return "I'm asking because it helps decide what kind of care may be appropriate.";
+    if (q && "emergency" in q.yes) return WHY_SAFETY.warning;
+    if (q && "level" in q.yes && (q.yes.level === "ORANGE" || q.yes.now)) return WHY_SAFETY.urgency;
+    return WHY_SAFETY.routine;
   }
-  if (step.startsWith("c:")) return "This goes into the summary for the doctor. It helps them, and it doesn't change my advice.";
-  const lines: Record<string, string> = {
-    concern: "So I understand what is worrying you, and ask questions that fit.",
-    "concern-more": "So I understand what is worrying you, and ask questions that fit.",
-    complaint: "So the questions I ask fit the problem.",
-    describe: "How it feels helps me ask the right questions, and notice anything that may be urgent.",
-    body: "Where it is helps decide which service may be right, and the doctor will want to know.",
-    duration: "How long a problem has lasted can change how soon someone should be checked.",
-    who: "So I ask the questions the right way, and the summary is about the right person.",
-    age: "Some problems need more care at certain ages — for example in babies and older people.",
-    sex: "Some questions only apply to women, for example about pregnancy.",
-    special: "Pregnancy, a recent birth, or a weaker immune system can change how soon someone should be seen.",
-    progression: "Whether it is getting better or worse helps decide how soon to be seen.",
-    severity: "How much it affects you helps decide how soon someone should check it.",
-    medicines: "The doctor needs to know what is already being taken, so nothing clashes. I won't suggest any medicine.",
-    allergies: "So the doctor can avoid anything that has caused a bad reaction before.",
-    conditions: "Long-term conditions can change what care is safest.",
-    recheck: "Two of your answers did not match. I'd rather ask than guess, so your summary is right.",
-  };
-  return lines[step] ?? "It helps prepare a useful summary for a healthcare professional.";
+  if (step.startsWith("c:")) return WHY_SAFETY.summary;
+
+  return WHY_LINES[step] ?? WHY_DEFAULT;
 }
 
 // Three different kinds of difficulty — none of them is a reason to send the
@@ -1519,21 +1532,11 @@ function educated(s: ConsultState, answer: EducationAnswer, depth: "short" | "no
   return { kind: "education", answer, state: { ...s, lastEducation: answer.id }, depth };
 }
 
-export const KNOWLEDGE_LINE = "I don't have verified information about that in my health guide yet, and I don't want to guess about medical information.";
+export const KNOWLEDGE_LINE = KNOWLEDGE_LIMIT;
 // Kept for older callers; the same honest knowledge limitation.
 export const UNKNOWN_LINE = `${KNOWLEDGE_LINE} Let's carry on with your consultation.`;
-const PROFESSIONAL_ANSWER: Record<ProfessionalTopic, string> = {
-  prescription:
-    "I can't suggest or prescribe medicines or doses — that needs a doctor or pharmacist who can check what is right for you. I've added your question to your summary so you can ask them.",
-  diagnosis:
-    "I can't tell you what it is — only a doctor, with an examination and sometimes tests, can do that. What I can do is help decide how soon you should be seen, and prepare your summary. I've added your question to it.",
-  test: "Whether a test is needed is a decision for a doctor or health worker. I've added your question to your summary so you can ask them.",
-  serious:
-    "I can't tell how serious it is yet — that is what these questions help with. At the end I'll tell you how soon to be seen, and why.",
-};
-
-export const PROFESSIONAL_LINE =
-  "Of course. Speaking with a real doctor or health worker is always your choice. I can prepare a summary of what you've told me so far to take with you. You can see the ways to reach one now, or we can carry on so the summary is more complete.";
+const PROFESSIONAL_ANSWER: Record<ProfessionalTopic, string> = BOUNDARY_ANSWERS;
+export const PROFESSIONAL_LINE = PROFESSIONAL_REQUEST;
 
 const MISSING_LINE: Record<string, string> = {
   body: "I need to know where the problem is before I can guide you further. Can you show me on the picture, or tell me the part of the body?",

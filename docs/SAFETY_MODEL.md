@@ -53,7 +53,7 @@ me describe it (body map, side, feeling, timing, pattern) — and keeps going.
 
 ## What is tested
 
-`tests/safety/` (Vitest, 524 tests) — among them:
+`tests/safety/` (Vitest, 525 tests) — among them:
 
 | File | Covers |
 | --- | --- |
@@ -66,7 +66,7 @@ me describe it (body map, side, feeling, timing, pattern) — and keeps going.
 | `simulations.test.ts` | 400 seeded simulated consultations; invariants at every step (found and fixed four safety bugs) |
 | `patient-memory.test.ts`, `director.test.ts` | Contradictions, negation, other problems, provenance; behaviour rules (emergency never delayed) |
 | `lipsync-lines.test.ts` | Every spoken line: every word moves the mouth (numbers too), the mouth rests without an end event, stops at once; the emergency line names 108 / 112 |
-| `review-registry.test.ts` | Review list current; no missing sources; nothing verified without sign-off |
+| `review-registry.test.ts` | Review list current; no missing sources; nothing verified without sign-off; every sentence the doctor says about urgency, emergencies, medicines, tests or diagnosis is on the review list (the doctor's limits, the "what do you mean?" and "why do you ask?" lines included) |
 
 Browser tests (`tests/e2e/`, Playwright, phone and desktop): emergency
 interruption, Reception, text-only, no-3D, no-voice, Data Saver, offline,
