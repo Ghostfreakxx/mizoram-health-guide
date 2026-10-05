@@ -12,10 +12,10 @@ BLOCKED · NEEDS CLINICIAN REVIEW · NEEDS GOVERNMENT DATA · DEFERRED
 
 | Capability | Status | Notes |
 | --- | --- | --- |
-| Safety engine (red flags, triage, fail-safe) | WORKING BUT NEEDS REVIEW · NEEDS CLINICIAN REVIEW | Deterministic; 511 unit tests incl. regression corpus and 400 simulated consultations. 0 of 263 clinical items reviewed |
+| Safety engine (red flags, triage, fail-safe) | WORKING BUT NEEDS REVIEW · NEEDS CLINICIAN REVIEW | Deterministic; 524 unit tests incl. regression corpus and 760 simulated consultations. 0 of 265 clinical items reviewed |
 | Digital Reception | WORKING BUT NEEDS REVIEW | Free text → safety check → understood → consultation; "I can't explain it" entry |
 | Virtual Doctor (consultation engine) | WORKING BUT NEEDS REVIEW | Memory with provenance, corrections, contradiction checks, multiple problems, clarification ladder, education from library, honest professional answers |
-| Virtual Doctor (3D / 2D / text presentation) | WORKING BUT NEEDS REVIEW | One engine, three tiers, automatic fallback; gaze, expressions, lip sync |
+| Virtual Doctor (3D / 2D / text presentation) | WORKING BUT NEEDS REVIEW | One engine, three tiers, automatic fallback; gaze, expressions, lip sync (checked on every spoken line); phone keyboard and rotation tested |
 | Help me describe it | WORKING BUT NEEDS REVIEW | Body map (front/back), side, feeling, timing, pattern, triggers |
 | Emergency Mode | WORKING BUT NEEDS REVIEW · NEEDS CLINICIAN REVIEW | Interrupts everything; guidance text needs review |
 | Virtual departments (17 info pages, 6 rooms) | WORKING BUT NEEDS REVIEW · NEEDS CLINICIAN REVIEW | |
@@ -37,7 +37,7 @@ BLOCKED · NEEDS CLINICIAN REVIEW · NEEDS GOVERNMENT DATA · DEFERRED
 
 ## Blocked on people outside the code team
 
-1. Clinical review of 263 items (`docs/CLINICAL_REVIEW.md`).
+1. Clinical review of 265 items (`docs/CLINICAL_REVIEW.md`).
 2. Verification of 10 government-data items and 60 source records.
 3. Privacy / legal approval for any pilot.
 4. Mizo translation and phrase list.

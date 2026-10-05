@@ -21,7 +21,7 @@ review notes (for example `TQ-cough-blood`).
 
 | Total | Verified | Needs clinician review | Needs government verification | Deprecated |
 | ---: | ---: | ---: | ---: | ---: |
-| 273 | 0 | 263 | 10 | 0 |
+| 275 | 0 | 265 | 10 | 0 |
 
 ## Emergency red flags (16)
 
@@ -232,7 +232,7 @@ review notes (for example `TQ-cough-blood`).
 | `P-IMMUNO` | A weak immune system needs extra care | When: Weak immune system. Effect: raises urgency to at least See a health worker within a few days. Policy rules can only raise urgency, never lower it. | Sepsis — NHS (UK National Health Service) (not yet checked) | NEEDS CLINICIAN REVIEW | app/lib/safety/triage.ts (POLICY_RULES) |
 | `P-MISSING` | Not enough information to recommend self-care | When: Result would be self-care but duration, severity or course is unknown. Effect: raises urgency to at least See a health worker within a few days. Policy rules can only raise urgency, never lower it. | AI Hospital safety policy: uncertainty principle — AI Hospital (internal design policy) (not yet checked) | NEEDS CLINICIAN REVIEW | app/lib/safety/triage.ts (POLICY_RULES) |
 
-## Result wording (6)
+## Result wording (8)
 
 | ID | Item | Rule | Source | Status | Defined in |
 | --- | --- | --- | --- | --- | --- |
@@ -240,6 +240,8 @@ review notes (for example `TQ-cough-blood`).
 | `W-level-ORANGE` | Result wording: Urgent — be seen today | Urgent medical assessment / Based on the information you provided, seeking urgent medical assessment is recommended today. Go to a hospital or health centre today. / Based on the information you provided, seeking urgent medical assessment is recommended now. Go to a hospital or health centre as soon as possible — do not wait. | No source recorded | NEEDS CLINICIAN REVIEW | app/lib/safety/language.ts |
 | `W-level-YELLOW` | Result wording: See a health worker within a few days | See a doctor soon / Based on the information you provided, a consultation with a doctor is recommended within the next few days. An online consultation may be a good first step. | No source recorded | NEEDS CLINICIAN REVIEW | app/lib/safety/language.ts |
 | `W-level-GREEN` | Result wording: Self-care with warning signs | Usually suitable for self-care / Based on the information you provided, this is usually suitable for self-care at home. Watch for the warning signs below, and see a doctor if things change. | No source recorded | NEEDS CLINICIAN REVIEW | app/lib/safety/language.ts |
+| `W-emergency-spoken` | Spoken by the virtual doctor when an emergency is found | These symptoms may need emergency medical attention. Call 108 or 112 now, or go to the nearest hospital emergency department. | No source recorded | NEEDS CLINICIAN REVIEW | app/lib/safety/language.ts |
+| `W-failsafe` | Shown if the check cannot be completed (software error) | We could not complete the check. If you feel very unwell or think this may be an emergency, call 108 or 112 now. Otherwise, please see a doctor or health worker today. | No source recorded | NEEDS CLINICIAN REVIEW | app/lib/safety/language.ts |
 | `W-safety-net` | Safety-net advice shown with every non-emergency result | You get worse, or new symptoms appear / You are not getting better after 3 days / You are worried for any reason | No source recorded | NEEDS CLINICIAN REVIEW | app/lib/safety/language.ts |
 | `W-age-groups` | Age groups used for triage | Baby under 2 months / 2 months to 4 years / 5 to 17 years / 18 to 59 years / 60 years or older | Integrated Management of Childhood Illness (IMCI) chart booklet — World Health Organization (not yet checked) | NEEDS CLINICIAN REVIEW | app/lib/safety/triage.ts |
 

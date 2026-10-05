@@ -395,7 +395,8 @@ patients (routine, confused, contradictory, correction-heavy,
 multi-problem, educational, emergency) with invariants at every step;
 `tests/e2e/doctor.spec.ts` covers the final demonstration scenario,
 interruptions, display switching mid-visit, a 20+ turn session,
-contradictions, review mode and voice failure.
+contradictions, review mode, voice failure, rotation, the phone keyboard
+(both browser behaviours) and the 3D model failing to download mid-visit.
 
 ### Communication style and session behaviour
 
@@ -406,11 +407,33 @@ contradictions, review mode and voice failure.
   unchanged). All tested (`tests/safety/personalised.test.ts`).
 - **After the summary**, "Start a new consultation" begins a fresh visit
   (for another problem or someone else); My Visit keeps the last summary.
-- **Phones**: when the on-screen keyboard opens, the doctor area shrinks so
-  the question and answer box stay in view.
+- **Phones**: when the on-screen keyboard opens (detected for both the
+  current "visual viewport" behaviour and older Android browsers that shrink
+  the whole window; never for pinch-zoom), the doctor area shrinks, the
+  question is written out in compact type just above the answer box (and
+  repeated above the box on choice questions), the control bar stops
+  floating and the chart tab steps aside. Tested: the question and the box
+  both fit above a 320 px keyboard on every question checked. Closing is
+  re-checked a moment after focus leaves the box, so a tap on Send is never
+  lost to a layout jump (a bug the test caught).
+- **Rotation** mid-visit keeps the layout within the screen (no sideways
+  scroll), the question reachable and the memory intact (tested).
 - **Background tab**: the doctor stops talking (unsaid words go into the
   conversation), the microphone closes and 3D rendering pauses; nothing
   replays by itself on return.
+
+### Lip sync on every spoken line
+
+`tests/safety/lipsync-lines.test.ts` collects every line the director gives
+to the voice (consultations in every room, replies, the result, the
+emergency) and checks: every word moves the mouth, shapes stay in range, the
+mouth rests by itself even if the voice never reports its end, and stopping
+at any moment closes it at once. This found that numbers and symbols had no
+mouth shapes ("108", "39°C"); they are now voiced digit by digit for the
+mouth. It also found that the spoken emergency line did not name a number to
+call: it now says "Call 108 or 112 now, or go to the nearest hospital
+emergency department" (the Emergency result's wording, unchanged; review
+item `W-emergency-spoken`).
 
 ### Long-session measurement
 

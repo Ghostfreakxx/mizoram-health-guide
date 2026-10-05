@@ -17,7 +17,7 @@ import { getDepartment } from "../ai-hospital/data/departments";
 import { DESCRIBE_OPTIONS, type ProfessionalTopic, type Uncertain, feelingWord, isVagueConcern, metaIntent, normalizeWords, plainMeanings, plainTerms, professionalQuestion, soundsDistressed, uncertainty } from "./consultHelp";
 import { type EducationAnswer, allEducation, findEducation, isGeneralQuestion, isQuestion } from "./education";
 import { askedTerm } from "./knowledge/glossary";
-import { LEVEL_TEXT } from "./safety/language";
+import { EMERGENCY_SPOKEN, LEVEL_TEXT } from "./safety/language";
 import { detectRedFlags } from "./safety/detect";
 import { receive } from "./safety/reception";
 import { type RedFlagId, getRedFlag, redFlags } from "./safety/redFlags";
@@ -167,7 +167,7 @@ const REGION_COMPLAINT: Record<string, string> = {
 
 export const MAX_TEXT = 300;
 
-export const EMERGENCY_LINE = "These symptoms may need emergency medical attention. Please seek emergency care now.";
+export const EMERGENCY_LINE = EMERGENCY_SPOKEN;
 export const HANDOFF_LINE =
   "I've prepared a summary of what you told me. You can take this with you when you speak with a healthcare professional.";
 export const UNCLEAR_LINE = "Sorry, I didn't quite catch that. Could you choose one of the answers below, or say it another way?";

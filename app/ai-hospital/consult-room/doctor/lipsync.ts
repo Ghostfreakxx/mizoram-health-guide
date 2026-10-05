@@ -47,8 +47,27 @@ const SHAPES: [RegExp, Viseme | null][] = [
 
 export type Segment = { v: Viseme; weight: number };
 
+const DIGITS = ["zero", "one", "two", "three", "four", "five", "six", "seven", "eight", "nine"];
+
+// What the voice says for a written word: digits and symbols are spoken as
+// words, so the mouth moves for them too ("Call 108 or 112 now" — the most
+// important words in an emergency). Digit by digit is an approximation of
+// how a voice reads a number; the timing is corrected by the engine's word
+// events when it sends them.
+export function spokenForm(word: string): string {
+  return word
+    .replace(/\d/g, (d) => ` ${DIGITS[+d]} `)
+    .replace(/°/g, " degrees ")
+    .replace(/%/g, " percent ")
+    .replace(/&/g, " and ");
+}
+
 // Splits a word into mouth-shape segments with relative durations.
 export function segments(word: string): Segment[] {
+  return spokenForm(word).split(/\s+/).flatMap(letterSegments);
+}
+
+function letterSegments(word: string): Segment[] {
   let w = word.toLowerCase().replace(/[^a-z]/g, "");
   if (w.length > 3 && w.endsWith("e") && !/[aeiou]e$/.test(w)) w = w.slice(0, -1); // silent final e
   const out: Segment[] = [];
@@ -97,7 +116,7 @@ export function visemeAt(word: string, elapsed: number, duration: number, next: 
   return REST;
 }
 
-const lettersOf = (w: string) => w.replace(/[^a-z]/gi, "").length;
+const lettersOf = (w: string) => spokenForm(w).replace(/[^a-z]/gi, "").length;
 const pauseAfter = (w: string) => (/[.!?]$/.test(w) ? 0.32 : /[,;:]$/.test(w) ? 0.16 : 0.03);
 const firstShape = (w: string | undefined) => (w ? segments(w)[0]?.v ?? REST : REST);
 const lastShape = (w: string) => {

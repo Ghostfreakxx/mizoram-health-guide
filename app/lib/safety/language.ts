@@ -39,6 +39,13 @@ export const LEVEL_TEXT: Record<
   },
 };
 
+// What the doctor SAYS ALOUD when an emergency is found (Emergency Mode shows
+// the full guidance on screen). It names the numbers to call, because someone
+// listening may not be able to read the screen. The call to action is the
+// Emergency result's wording, unchanged.
+export const EMERGENCY_SPOKEN =
+  "These symptoms may need emergency medical attention. Call 108 or 112 now, or go to the nearest hospital emergency department.";
+
 export const FAILSAFE_MESSAGE =
   "We could not complete the check. If you feel very unwell or think this may be an emergency, call 108 or 112 now. Otherwise, please see a doctor or health worker today.";
 

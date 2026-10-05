@@ -12,7 +12,7 @@ import {
   startConsultation,
   toAnswers,
 } from "../../app/lib/consultation";
-import { violatesLanguagePolicy } from "../../app/lib/safety/language";
+import { LEVEL_TEXT, violatesLanguagePolicy } from "../../app/lib/safety/language";
 import { complaints, triage } from "../../app/lib/safety/triage";
 
 const start = () => startConsultation("General Medicine");
@@ -88,6 +88,12 @@ describe("the safety engine stays authoritative", () => {
     expect(t.input.kind).toBe("emergency");
     expect(t.say).toBe(EMERGENCY_LINE);
     expect(t.mood).toBe("serious");
+  });
+
+  it("the spoken emergency line names the numbers to call (someone listening may not read the screen)", () => {
+    expect(EMERGENCY_LINE).toMatch(/\b108\b/);
+    expect(EMERGENCY_LINE).toMatch(/\b112\b/);
+    expect(EMERGENCY_LINE).toContain(LEVEL_TEXT.RED.message.slice(LEVEL_TEXT.RED.message.indexOf("Call 108")));
   });
 
   it("negated danger words are asked about directly, never assumed safe", () => {

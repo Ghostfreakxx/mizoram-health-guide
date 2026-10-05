@@ -19,7 +19,7 @@ import { GLOSSARY } from "../knowledge/glossary";
 import { PASSAGES } from "../knowledge";
 import { allEducation } from "../education";
 import { getSource } from "../sources";
-import { LEVEL_TEXT, SAFETY_NET } from "../safety/language";
+import { EMERGENCY_SPOKEN, FAILSAFE_MESSAGE, LEVEL_TEXT, SAFETY_NET } from "../safety/language";
 import { redFlags } from "../safety/redFlags";
 import { AGE_GROUPS, POLICY_RULES, type Context, complaints, populationQuestions } from "../safety/triage";
 
@@ -202,6 +202,26 @@ export function reviewRegistry(): ReviewItem[] {
       }),
     );
   }
+  out.push(
+    item({
+      id: "W-emergency-spoken",
+      kind: "wording",
+      title: "Spoken by the virtual doctor when an emergency is found",
+      rule: EMERGENCY_SPOKEN,
+      sourceIds: [],
+      reviewer: "clinician",
+      definedIn: "app/lib/safety/language.ts",
+    }),
+    item({
+      id: "W-failsafe",
+      kind: "wording",
+      title: "Shown if the check cannot be completed (software error)",
+      rule: FAILSAFE_MESSAGE,
+      sourceIds: [],
+      reviewer: "clinician",
+      definedIn: "app/lib/safety/language.ts",
+    }),
+  );
   out.push(
     item({
       id: "W-safety-net",

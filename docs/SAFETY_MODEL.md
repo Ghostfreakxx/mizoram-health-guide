@@ -38,7 +38,8 @@ holds banned patterns; tests run every engine line through them.
    statement is never read as "yes" to an unrelated question on screen.
 8. **Emergency Mode** interrupts everything: questioning stops, speech stops,
    108 / 112 and what to do while waiting are shown first. It cannot be
-   overridden by later answers.
+   overridden by later answers. The doctor also **says** "Call 108 or 112
+   now" aloud — someone listening may not be able to read the screen.
 
 ## Conversational difficulty ≠ clinical urgency
 
@@ -52,7 +53,7 @@ me describe it (body map, side, feeling, timing, pattern) — and keeps going.
 
 ## What is tested
 
-`tests/safety/` (Vitest, 511 tests) — among them:
+`tests/safety/` (Vitest, 524 tests) — among them:
 
 | File | Covers |
 | --- | --- |
@@ -64,11 +65,13 @@ me describe it (body map, side, feeling, timing, pattern) — and keeps going.
 | `demo.test.ts`, `acceptance.test.ts` | Every demo scenario through the real engine; the acceptance journeys |
 | `simulations.test.ts` | 400 seeded simulated consultations; invariants at every step (found and fixed four safety bugs) |
 | `patient-memory.test.ts`, `director.test.ts` | Contradictions, negation, other problems, provenance; behaviour rules (emergency never delayed) |
+| `lipsync-lines.test.ts` | Every spoken line: every word moves the mouth (numbers too), the mouth rests without an end event, stops at once; the emergency line names 108 / 112 |
 | `review-registry.test.ts` | Review list current; no missing sources; nothing verified without sign-off |
 
 Browser tests (`tests/e2e/`, Playwright, phone and desktop): emergency
 interruption, Reception, text-only, no-3D, no-voice, Data Saver, offline,
-My Visit, demo mode, accessibility (axe) on every page.
+My Visit, demo mode, accessibility (axe) on every page, phone rotation and
+keyboard, and the 3D model failing to download mid-visit.
 
 ## Known limits (honest)
 
