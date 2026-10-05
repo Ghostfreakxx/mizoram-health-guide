@@ -30,7 +30,13 @@ holds banned patterns; tests run every engine line through them.
    answers never lead to self-care. "Not sure" about a danger sign → urgent.
 5. **Fail-safe**: any error → "see a health worker today; 108/112 if very
    unwell".
-6. **Emergency Mode** interrupts everything: questioning stops, speech stops,
+6. **No earlier answer can hide a clear red flag.** An earlier "no" to an
+   unclear mention never suppresses a later explicit one. If the patient left
+   Emergency Mode ("this is not an emergency"), the same flag mentioned again
+   is asked about directly — never ignored.
+7. **Contradictions are asked, not guessed** (`recheck`), and a new
+   statement is never read as "yes" to an unrelated question on screen.
+8. **Emergency Mode** interrupts everything: questioning stops, speech stops,
    108 / 112 and what to do while waiting are shown first. It cannot be
    overridden by later answers.
 
@@ -46,7 +52,7 @@ me describe it (body map, side, feeling, timing, pattern) — and keeps going.
 
 ## What is tested
 
-`tests/safety/` (Vitest, 484 tests) — among them:
+`tests/safety/` (Vitest, 511 tests) — among them:
 
 | File | Covers |
 | --- | --- |
@@ -56,6 +62,8 @@ me describe it (body map, side, feeling, timing, pattern) — and keeps going.
 | `conversation.test.ts`, `consult.test.ts` | Memory, no repeated questions, missing stays missing |
 | `triage.test.ts`, `detect.test.ts`, `integrity.test.ts` | Engine invariants, every source exists, language policy |
 | `demo.test.ts`, `acceptance.test.ts` | Every demo scenario through the real engine; the acceptance journeys |
+| `simulations.test.ts` | 400 seeded simulated consultations; invariants at every step (found and fixed four safety bugs) |
+| `patient-memory.test.ts`, `director.test.ts` | Contradictions, negation, other problems, provenance; behaviour rules (emergency never delayed) |
 | `review-registry.test.ts` | Review list current; no missing sources; nothing verified without sign-off |
 
 Browser tests (`tests/e2e/`, Playwright, phone and desktop): emergency

@@ -342,3 +342,57 @@ bones. The 2D and text tiers stay as they are.
 the consultation, negated danger words are asked about, the result is always
 the triage engine's result, the panel shows only supplied information, the
 guide never smiles in an emergency, and reduced motion keeps the head still.
+
+## Virtual Doctor 2.0 — character system
+
+One engine, three presentations (3D / simple picture / text), shared by
+every department room (`consult-room/rooms.ts` configures greeting, focus
+problems, equipment and attire; nothing else differs).
+
+```
+patient words / taps
+  → converse()            lib/consultation.ts   safety first, then corrections, meaning, "why",
+                                                 "I already told you", answers, education, clarification
+  → ConsultState          one visit memory: facts with provenance, corrections, other concerns,
+                          denials ("no fever"), open contradiction (recheck), what was explained
+  → nextTurn()            the next useful question (reviewed question sets only)
+  → basisOf()             lib/consultBasis.ts   rule IDs + sources + purpose for every turn
+  → planTurn/planReply    consult-room/doctor/director.ts   what the doctor does (lines, states,
+                          pauses; emergencies never delayed)
+  → DoctorState           doctor/state.ts       one table: performance, effects (voice, Talk, captions)
+  → performAt()           doctor/perform.ts     face, gaze (gaze.ts), body (body.ts), blinks
+  → speech + lip sync     voice.ts, doctor/lipsync.ts (on-device voices only; captions always)
+```
+
+Memory that changes behaviour:
+
+- Known facts are not asked again; the doctor says once that she remembers.
+- Corrections replace the stored fact and are acknowledged ("I've changed
+  that to the left side").
+- **Contradictions are asked about** (`recheck`): an earlier "no" vs later
+  words, or "no fever" vs a later reading — never silently overwritten,
+  never silently ignored. A resolved "yes" is re-checked for emergencies.
+- **Negations are respected**: "a cough but no fever" never records a fever.
+- **More than one problem**: the questions follow the main one; others are
+  noted, said back, and put in the summary as "not assessed".
+- Every chart fact has a provenance: confirmed / from the patient's words /
+  uncertain / not provided.
+
+Character behaviour: the `showing` state glances at the body map while
+presenting it; the `review` gaze glances at the chart after an answer;
+voice failure falls back to captions with a one-time notice; the loading
+screen offers "Continue in lightweight mode".
+
+Review and debugging:
+
+- `?review` — **clinical review mode**: the current step, why it is asked,
+  rule IDs with review status, sources, and recorded facts with provenance.
+- `?debug` — developer panel (state, gaze, speech, fps, memory). Development
+  builds only; it is not in the production bundle (tested).
+
+Testing: `tests/safety/simulations.test.ts` runs 400 seeded simulated
+patients (routine, confused, contradictory, correction-heavy,
+multi-problem, educational, emergency) with invariants at every step;
+`tests/e2e/doctor.spec.ts` covers the final demonstration scenario,
+interruptions, display switching mid-visit, a 20+ turn session,
+contradictions, review mode and voice failure.

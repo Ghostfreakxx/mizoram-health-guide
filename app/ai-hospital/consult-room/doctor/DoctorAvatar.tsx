@@ -160,7 +160,9 @@ function makeMaterial(name: string, old: THREE.MeshStandardMaterial, detail: boo
         depthWrite: false,
       });
     case "hair":
-      return new THREE.MeshPhysicalMaterial({ vertexColors: true, map: old.map, roughness: 0.62, sheen: 0.6, sheenColor: new THREE.Color("#6b5a4e"), sheenRoughness: 0.35, specularIntensity: 0.3 });
+      // Low, dark sheen: a strong sheen lights the thin hairline edge at grazing
+      // angles and reads as a pale "cap" rim around the forehead.
+      return new THREE.MeshPhysicalMaterial({ vertexColors: true, map: old.map, roughness: 0.7, sheen: 0.25, sheenColor: new THREE.Color("#3a2e27"), sheenRoughness: 0.5, specularIntensity: 0.22 });
     case "coat": {
       const m = new THREE.MeshPhysicalMaterial({ vertexColors: true, roughness: 0.88, sheen: 0.5, sheenColor: new THREE.Color("#ffffff"), sheenRoughness: 0.8 });
       if (attire.coatColor) m.color = new THREE.Color(attire.coatColor);

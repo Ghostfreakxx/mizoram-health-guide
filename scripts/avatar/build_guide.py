@@ -584,8 +584,14 @@ def main(cache: Path, out: Path) -> None:
     # hair colour, so the edge is not a hard cut-out line.
     sk = parts[0]
     fh = f_hair[sk.src]
-    roots = np.clip(1 - fh / 0.14, 0, 1) * (fh >= 0) * (V[sk.src][:, 1] > eye_y)
-    sk.color = sk.color * (1 - roots[:, None] * 0.45) + hexrgb("#4a3a30") * roots[:, None] * 0.45
+    # Wider, softer fade so the edge is a gradient of fine hairs, not a line.
+    roots = np.clip(1 - fh / 0.24, 0, 1) ** 1.6 * (fh >= 0) * (V[sk.src][:, 1] > eye_y)
+    sk.color = sk.color * (1 - roots[:, None] * 0.6) + hexrgb("#3e3029") * roots[:, None] * 0.6
+    # Skin UNDER the hair: near the hairline the hair shell is very thin and the
+    # skin shows through as a pale strip (a "cap" look). Scalp under hair is
+    # dark, so it takes the hair-root colour, fading in over a short distance.
+    under = np.clip(-fh / 0.06, 0, 1) * (fh < 0) * (V[sk.src][:, 1] > eye_y)
+    sk.color = sk.color * (1 - under[:, None] * 0.88) + hexrgb("#2a201a") * under[:, None] * 0.88
     bun_c = head_c + np.array([0.0, -0.4, -0.86])
     th, ph = np.meshgrid(np.linspace(0, np.pi, 16), np.linspace(0, 2 * np.pi, 26, endpoint=False), indexing="ij")
     bp = np.stack([np.sin(th) * np.cos(ph) * 0.44, np.cos(th) * 0.38, np.sin(th) * np.sin(ph) * 0.34], -1).reshape(-1, 3) + bun_c
