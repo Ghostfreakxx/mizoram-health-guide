@@ -118,6 +118,10 @@ test("a long consultation (20+ turns) with detours stays coherent and the summar
   // The summary remembers the other problem and says it was not assessed.
   await expect(page.getByText(/Also mentioned \(not assessed/).first()).toBeVisible();
   await expect(chart(page)).toContainText("back pain");
+  // A new consultation (for the other problem) starts fresh; My Visit keeps the summary.
+  await page.getByRole("button", { name: "↺ Start a new consultation" }).click();
+  await expect(page.getByRole("heading", { name: "📋 Patient-prepared visit summary" })).toHaveCount(0);
+  await expect(page.getByRole("textbox", { name: "Your answer" })).toBeVisible();
   expect(errors).toEqual([]);
 });
 
@@ -158,4 +162,20 @@ test("voice can't play: the doctor carries on in text and says so once", async (
   await expect(page.getByText(/Voice isn't available right now/)).toBeVisible();
   await sayIt(page, "I have a headache");
   await expect(chart(page)).toContainText("I have a headache");
+});
+
+test("background tab: the doctor stops talking, nothing is lost, and the visit carries on", async ({ page }) => {
+  const errors = await begin(page, "2d");
+  await sayIt(page, "I've been coughing for three weeks");
+  const setVis = (v: "hidden" | "visible") =>
+    page.evaluate((state) => {
+      Object.defineProperty(document, "visibilityState", { configurable: true, get: () => state });
+      document.dispatchEvent(new Event("visibilitychange"));
+    }, v);
+  await setVis("hidden");
+  await setVis("visible");
+  await page.getByRole("button", { name: "None of these — continue" }).click();
+  await expect(page.getByRole("button", { name: "18 to 59 years" })).toBeVisible();
+  await expect(chart(page)).toContainText("I've been coughing for three weeks");
+  expect(errors).toEqual([]);
 });

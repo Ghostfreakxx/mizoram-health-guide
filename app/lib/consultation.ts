@@ -15,7 +15,7 @@
 
 import { getDepartment } from "../ai-hospital/data/departments";
 import { DESCRIBE_OPTIONS, type ProfessionalTopic, type Uncertain, feelingWord, isVagueConcern, metaIntent, normalizeWords, plainMeanings, plainTerms, professionalQuestion, soundsDistressed, uncertainty } from "./consultHelp";
-import { type EducationAnswer, findEducation, isGeneralQuestion, isQuestion } from "./education";
+import { type EducationAnswer, allEducation, findEducation, isGeneralQuestion, isQuestion } from "./education";
 import { askedTerm } from "./knowledge/glossary";
 import { LEVEL_TEXT } from "./safety/language";
 import { detectRedFlags } from "./safety/detect";
@@ -141,6 +141,7 @@ export type ConsultState = {
   // A new statement that contradicts an earlier answer — asked about, never
   // silently overwritten or silently ignored.
   recheck?: { key: string; earlier: string; now: string };
+  lastEducation?: string; // the health-information answer just given ("tell me more")
 };
 
 export type Side = "left" | "right" | "both" | "middle";
@@ -1498,13 +1499,25 @@ export type Outcome =
   | { kind: "why"; line: string }
   | { kind: "repeat" }
   | { kind: "term"; line: string; state: ConsultState } // "What does allergy mean?"
-  | { kind: "education"; answer: EducationAnswer }
+  // depth: "short" (one sentence), "normal", or "more" (everything verified on it)
+  | { kind: "education"; answer: EducationAnswer; state: ConsultState; depth: "short" | "normal" | "more" }
   | { kind: "corrected"; state: ConsultState; line: string } // "I said left, not right"
   | { kind: "noted"; state: ConsultState; line: string } // "I also have back pain" — kept for the summary
   | { kind: "professional"; line: string } // the patient asks for a real doctor
-  | { kind: "control"; action: "slower" | "faster"; line: string } // "speak slower"
+  | { kind: "control"; action: "slower" | "faster" | "brief" | "detailed"; line: string; state: ConsultState } // "speak slower", "keep it short"
   | { kind: "needs-professional"; topic: ProfessionalTopic; state: ConsultState; line: string } // prescription, diagnosis, tests
   | { kind: "unclear"; state: ConsultState; line: string; difficulty: Difficulty };
+
+const MORE = /\b(tell me more|explain (it |that )?more|more (detail|details|information|info)|in more detail|elaborate|say more)\b/i;
+const SHORT = /\b(short(er)? answer|in short|briefly|keep it short|be brief|short version|summari[sz]e( it)?|just the main (point|thing))\b/i;
+function styleRequest(words: string): "more" | "short" | null {
+  if (MORE.test(words)) return "more";
+  if (SHORT.test(words)) return "short";
+  return null;
+}
+function educated(s: ConsultState, answer: EducationAnswer, depth: "short" | "normal" | "more" = "normal"): Outcome {
+  return { kind: "education", answer, state: { ...s, lastEducation: answer.id }, depth };
+}
 
 export const KNOWLEDGE_LINE = "I don't have verified information about that in my health guide yet, and I don't want to guess about medical information.";
 // Kept for older callers; the same honest knowledge limitation.
@@ -1669,11 +1682,20 @@ export function converse(s0: ConsultState, turn: Turn, text: string): Outcome {
   const term = askedTerm(normalizeWords(words));
   // A fuller verified answer wins over the one-line glossary meaning.
   const fuller = term && isGeneralQuestion(words) ? findEducation(words) : null;
-  if (fuller) return { kind: "education", answer: fuller };
+  if (fuller) return educated(s, fuller);
   if (term) {
     const again = s.explainedTerms.includes(term.id) ? "As I mentioned, " : "";
     const T = `${term.term.charAt(0).toUpperCase()}${term.term.slice(1)}`;
     return { kind: "term", line: `${again}${again ? `“${term.term}”` : `“${T}”`} means ${term.meaning}.`, state: { ...s, explainedTerms: [...new Set([...s.explainedTerms, term.id])] } };
+  }
+
+  // Communication style — how the doctor talks, never what is medically said.
+  const style = styleRequest(words);
+  if (style) {
+    const last = s.lastEducation ? allEducation().find((e) => e.id === s.lastEducation) : undefined;
+    if (last && (style === "more" || style === "short")) return educated(s, last, style);
+    if (style === "short") return { kind: "control", action: "brief", line: "Okay — I'll keep it short.", state: { ...s, style: { ...s.style, short: 2 } } };
+    if (style === "more") return { kind: "control", action: "detailed", line: "Of course — I'll explain more as we go.", state: { ...s, style: { ...s.style, short: 0, explained: s.style.explained + 1 } } };
   }
 
   let meta = metaIntent(words);
@@ -1681,8 +1703,8 @@ export function converse(s0: ConsultState, turn: Turn, text: string): Outcome {
   if (meta === "explain" && (turn.step === "concern" || turn.step === "concern-more" || turn.step === "describe") && !/\b(what do you mean|understand|what does)\b/i.test(words)) meta = null;
   if (meta === "why") return { kind: "why", line: whyLine(turn) };
   if (meta === "repeat") return { kind: "repeat" };
-  if (meta === "slower") return { kind: "control", action: "slower", line: "Of course. I'll speak more slowly." };
-  if (meta === "faster") return { kind: "control", action: "faster", line: "Okay. I'll speak at a normal pace." };
+  if (meta === "slower") return { kind: "control", action: "slower", line: "Of course. I'll speak more slowly.", state: s };
+  if (meta === "faster") return { kind: "control", action: "faster", line: "Okay. I'll speak at a normal pace.", state: s };
   if (meta === "rephrase") {
     return { kind: "explain", state: { ...s, style: { ...s.style, explained: s.style.explained + 1 } }, line: `Sure — let me ask that another way. ${explainLine(turn, s)}` };
   }
@@ -1695,14 +1717,14 @@ export function converse(s0: ConsultState, turn: Turn, text: string): Outcome {
   if (turn.step === "concern") {
     if (general) {
       const e = findEducation(words);
-      return e ? { kind: "education", answer: e } : { kind: "unclear", state: s, line: `${KNOWLEDGE_LINE} What brought you here today?`, difficulty: "knowledge" };
+      return e ? educated(s, e) : { kind: "unclear", state: s, line: `${KNOWLEDGE_LINE} What brought you here today?`, difficulty: "knowledge" };
     }
     return { kind: "answered", state: respond(shortAnswer(s, words), "concern", words) };
   }
 
   // A clear health question ("What is TB?") is answered from verified content.
   const edu = general ? findEducation(words) : null;
-  if (edu) return { kind: "education", answer: edu };
+  if (edu) return educated(s, edu);
 
   if (turn.step === "check" && /^(yes|yeah|yep|haan|aw)\b/i.test(words)) {
     return { kind: "explain", state: s, line: "Which one is happening? Please tap it, or tell me in a few words." };

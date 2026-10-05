@@ -64,11 +64,21 @@ export function planReply(o: Exclude<Outcome, { kind: "answered" | "repeat" }>, 
       return quick([{ text: o.line, state: "reassuring" }, { text: q(current), state: "asking" }]);
     case "professional":
       return quick([{ text: o.line, state: "reassuring" }]);
-    case "education":
+    case "education": {
+      // Same verified words; only how much is said changes.
+      const first = o.answer.text[0] ?? "";
+      const body =
+        o.depth === "short"
+          ? (first.match(/^[^.!?]+[.!?]/)?.[0] ?? first)
+          : o.depth === "more"
+            ? o.answer.text.join(" ")
+            : first;
+      const lead = o.depth === "more" ? "Here is more of the general health information." : o.depth === "short" ? "In short:" : "Here is some general health information. It is not an assessment of you.";
       return quick([
-        { text: `Here is some general health information. It is not an assessment of you. ${o.answer.text[0]}`, state: "educating" },
+        { text: `${lead} ${body}`, state: "educating" },
         { text: `Now, back to your consultation. ${q(current)}`, state: "asking" },
       ]);
+    }
     case "explain":
     case "why":
     case "term":

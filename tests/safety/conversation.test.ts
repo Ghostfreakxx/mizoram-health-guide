@@ -258,7 +258,14 @@ describe("health education — verified, separate, honest", () => {
   it("education never changes the consultation", () => {
     const s = talk(["I have a cough"]).s;
     const o = converse(s, nextTurn(s), "What is TB?");
-    expect("state" in o).toBe(false);
+    expect(o.kind).toBe("education");
+    // Only "which answer was given" is remembered (for "tell me more"); nothing clinical changes.
+    if (o.kind === "education") {
+      expect(o.state.lastEducation).toBe(o.answer.id);
+      expect(nextTurn(o.state)).toEqual(nextTurn(s));
+      expect(o.state.answers).toEqual(s.answers);
+      expect(chartOf(o.state)).toEqual(chartOf(s));
+    }
   });
 });
 

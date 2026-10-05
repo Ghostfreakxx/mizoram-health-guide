@@ -221,6 +221,7 @@ export default function ConsultationRoom({ room }: { room: RoomStyle }) {
   const [education, setEducation] = useState<EducationAnswer | null>(null);
   const [wantsProfessional, setWantsProfessional] = useState(false);
   const [sheetOpen, setSheetOpen] = useState(false); // chart bottom sheet (phones/tablets)
+  const [keyboardOpen, setKeyboardOpen] = useState(false); // on-screen keyboard (phones): the doctor area shrinks
   const [heard, setHeard] = useState<string | null>(null); // uncertain speech awaiting confirmation
   const [tempUnit, setTempUnit] = useState<"C" | "F">("C");
   const [tempValue, setTempValue] = useState("");
@@ -274,6 +275,16 @@ export default function ConsultationRoom({ room }: { room: RoomStyle }) {
       t.forEach(clearTimeout);
       s.forEach(clearTimeout);
     };
+  }, []);
+
+  // Phones: when the on-screen keyboard opens, the doctor area shrinks so the
+  // question and the answer box stay in view (the doctor stays visible).
+  useEffect(() => {
+    const vv = window.visualViewport;
+    if (!vv) return;
+    const check = () => setKeyboardOpen(window.innerHeight - vv.height > 150);
+    vv.addEventListener("resize", check);
+    return () => vv.removeEventListener("resize", check);
   }, []);
 
   // ---------------- Quality ----------------
@@ -385,6 +396,23 @@ export default function ConsultationRoom({ room }: { room: RoomStyle }) {
     if (rest.length) setLog((g) => [...g, ...rest.map((l) => ({ who: "guide" as const, text: l.text }))]);
     setDoctor(a.after);
   }, [setDoctor, cancelSay]);
+
+  // Background tab: the doctor stops talking (nothing is lost — the rest goes
+  // into the conversation), the microphone closes, and 3D rendering pauses.
+  // On return nothing replays by itself; Repeat says the question again.
+  const [hidden, setHidden] = useState(false);
+  useEffect(() => {
+    const onVis = () => {
+      const h = document.visibilityState === "hidden";
+      setHidden(h);
+      if (h) {
+        stopSpeaking();
+        stopMic.current?.();
+      }
+    };
+    document.addEventListener("visibilitychange", onVis);
+    return () => document.removeEventListener("visibilitychange", onVis);
+  }, [stopSpeaking]);
 
   // Before the consultation: INITIALIZING while the room loads (the doctor is
   // finishing notes at the chart), then IDLE, waiting for the patient.
@@ -500,7 +528,7 @@ export default function ConsultationRoom({ room }: { room: RoomStyle }) {
     if (o.kind === "explain") track({ type: "clarification", kind: "question-explained" });
     if (o.kind === "term") track({ type: "clarification", kind: "word-explained" });
     if (o.kind === "unclear") track({ type: "clarification", kind: "unclear" });
-    if (o.kind === "control") setSlowerTo(o.action === "slower");
+    if (o.kind === "control" && (o.action === "slower" || o.action === "faster")) setSlowerTo(o.action === "slower");
     if (o.kind === "professional") setWantsProfessional(true);
     if (o.kind === "education") setEducation(o.answer);
     if ("state" in o) replaceState(o.state);
@@ -751,7 +779,7 @@ export default function ConsultationRoom({ room }: { room: RoomStyle }) {
     return () => window.removeEventListener("pagehide", leave);
   }, []);
 
-  const doctor2d = <Doctor2D state={docRef} since={since} lips={lips} activity={activity} reducedMotion={reducedMotion} paused={paused} room={room} />;
+  const doctor2d = <Doctor2D state={docRef} since={since} lips={lips} activity={activity} reducedMotion={reducedMotion} paused={paused || hidden} room={room} />;
   const caption =
     begun && subtitles && subtitleText && !emergency ? (
       <p aria-hidden className={`bg-slate-900 px-4 py-3 text-center font-semibold leading-snug text-white ${bigText ? "text-xl" : "text-base sm:text-lg"}`}>
@@ -762,7 +790,7 @@ export default function ConsultationRoom({ room }: { room: RoomStyle }) {
   const stage =
     tier === "none" ? null : (
       <div className="overflow-hidden rounded-2xl border border-slate-300 shadow-sm">
-        <div className={`relative overflow-hidden bg-slate-100 ${emergency ? "aspect-[4/3] max-h-64 w-full lg:max-h-none" : "aspect-[3/4] max-h-[62vh] w-full sm:aspect-[16/10] lg:aspect-[16/9]"}`}>
+        <div className={`relative overflow-hidden bg-slate-100 ${emergency ? "aspect-[4/3] max-h-64 w-full lg:max-h-none" : keyboardOpen ? "aspect-[3/4] max-h-[24vh] w-full sm:aspect-[16/10] lg:aspect-[16/9] lg:max-h-none" : "aspect-[3/4] max-h-[62vh] w-full sm:aspect-[16/10] lg:aspect-[16/9]"}`}>
           <div className="h-full w-full" role="img" aria-label={`Virtual health guide in the ${room.greeting} consultation room. ${STATE_LABEL[doc]}.`}>
             {tier === null ? (
               <StageMessage text="Preparing the consultation room…" />
@@ -777,7 +805,7 @@ export default function ConsultationRoom({ room }: { room: RoomStyle }) {
                   lips={lips}
                   activity={activity}
                   reducedMotion={reducedMotion}
-                  paused={paused}
+                  paused={paused || hidden}
                   tier={tier}
                   room={room}
                   attire={room.attire}
@@ -1327,6 +1355,14 @@ export default function ConsultationRoom({ room }: { room: RoomStyle }) {
                   onEmergency={(flags) => setHistory((h) => [...h, { ...state, emergency: { flags, clear: { kind: "text" } } }])}
                 />
               </section>
+              <div className="no-print rounded-2xl border border-slate-200 bg-white p-4">
+                <p className="text-slate-700">
+                  {state.otherConcerns.length ? `You also mentioned ${state.otherConcerns.join(" and ")}. ` : ""}Another problem, or for someone else? Your summary stays in My Visit until you close this tab.
+                </p>
+                <button type="button" onClick={restart} className="mt-3 min-h-11 rounded-xl border-2 border-blue-900 px-4 py-2.5 font-semibold text-blue-900 hover:bg-blue-50">
+                  ↺ Start a new consultation
+                </button>
+              </div>
             </div>
           )}
         </div>

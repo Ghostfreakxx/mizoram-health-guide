@@ -396,3 +396,27 @@ multi-problem, educational, emergency) with invariants at every step;
 `tests/e2e/doctor.spec.ts` covers the final demonstration scenario,
 interruptions, display switching mid-visit, a 20+ turn session,
 contradictions, review mode and voice failure.
+
+### Communication style and session behaviour
+
+- **Personalised explanation** changes how the doctor talks, never what is
+  medically said: "tell me more" after a health answer says the rest of the
+  same verified passage; "short answer" gives its first sentence; "keep it
+  short" drops the extra hints from later questions (the questions are
+  unchanged). All tested (`tests/safety/personalised.test.ts`).
+- **After the summary**, "Start a new consultation" begins a fresh visit
+  (for another problem or someone else); My Visit keeps the last summary.
+- **Phones**: when the on-screen keyboard opens, the doctor area shrinks so
+  the question and answer box stay in view.
+- **Background tab**: the doctor stops talking (unsaid words go into the
+  conversation), the microphone closes and 3D rendering pauses; nothing
+  replays by itself on return.
+
+### Long-session measurement
+
+183 turns over seven consecutive consultations in one tab (3D, with
+interruptions, detours and restarts), JS heap after garbage collection:
+21.9 MB at start → 23.4 (1) → 24.2 → 24.6 → 25.0 → 25.1 → 25.4 → 25.6 MB (7).
+Growth slows each round (≈ 0.2–0.3 MB per consultation by the end); no
+errors. Frame rate here was measured on software rendering (no GPU) and is
+not meaningful for phones — measure on real devices.
