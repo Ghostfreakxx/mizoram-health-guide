@@ -54,6 +54,12 @@ Most often not understood: "uh huh".
 
 Most often not understood: "mostly yes", "it was there yesterday also", "exactly", "no improvement", "it happens yes", "kind of bad", "very very painful", "it bothers me a lot", "many weeks", "extreme", "going down now", "bearable".
 
+## Summary fidelity after messy visits
+
+1500 seeded visits (`tests/safety/fidelity.ts`). Each patient has a hidden truth and sometimes answers wrongly then corrects themselves in words ("sorry, I meant yes", "actually it started last week"), says "I don't know", asks why or what a word means, or mentions a second problem. Every summary row is then compared with the truth.
+
+**Mismatches: 0.**
+
 ## History — what this harness found
 
 | Found by | Problem | Effect | Fix |
@@ -63,6 +69,7 @@ Most often not understood: "mostly yes", "it was there yesterday also", "exactly
 | Training set | "more than two weeks" → 4 days to 2 weeks | Wrong duration (a TB-relevant cut-off) | "more than / less than" shift the boundary |
 | Held-out A | "not improving or worse" → Getting better | Wrong course of illness | Negated change is not a direction; "not getting better" is asked |
 | Held-out B | "I didn't check" recorded as **No** | 17 unsafe danger-sign recordings | Not checked / can't remember → Not sure |
+| Fidelity | "Sorry, I meant no" taken as the answer to the **next** question; the wrong answer stayed | 83 in 600 visits; denied symptoms listed as present; a corrected "yes" to a danger sign stayed "no" | Clear corrections change the last answer and say so; an ambiguous "actually no…" is asked about; a correction to "yes" is re-checked for an emergency |
 
 ## Limits
 

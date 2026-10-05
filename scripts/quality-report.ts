@@ -2,6 +2,7 @@
 //   npm run quality:report
 import { writeFileSync } from "node:fs";
 import { HELD_OUT_A, HELD_OUT_B, PHRASES, measure } from "../tests/safety/accuracy";
+import { play } from "../tests/safety/fidelity";
 
 const N = 400;
 const sets = [
@@ -42,6 +43,10 @@ md += `
 ## By step
 
 ${details.join("\n")}
+## Summary fidelity after messy visits
+
+\${FIDELITY}
+
 ## History — what this harness found
 
 | Found by | Problem | Effect | Fix |
@@ -51,6 +56,7 @@ ${details.join("\n")}
 | Training set | "more than two weeks" → 4 days to 2 weeks | Wrong duration (a TB-relevant cut-off) | "more than / less than" shift the boundary |
 | Held-out A | "not improving or worse" → Getting better | Wrong course of illness | Negated change is not a direction; "not getting better" is asked |
 | Held-out B | "I didn't check" recorded as **No** | 17 unsafe danger-sign recordings | Not checked / can't remember → Not sure |
+| Fidelity | "Sorry, I meant no" taken as the answer to the **next** question; the wrong answer stayed | 83 in 600 visits; denied symptoms listed as present; a corrected "yes" to a danger sign stayed "no" | Clear corrections change the last answer and say so; an ambiguous "actually no…" is asked about; a correction to "yes" is re-checked for an emergency |
 
 ## Limits
 
@@ -61,5 +67,11 @@ ${details.join("\n")}
   new held-out set — ideally from real phrasings collected with consent in a pilot.
 - Speech recognition errors are not modelled here (see the speech-confirmation step).
 `;
+const visits = 1500;
+const findings = Array.from({ length: visits }, (_, i) => play(i + 1)).flat();
+md = md.replace(
+  "${FIDELITY}",
+  `${visits} seeded visits (\`tests/safety/fidelity.ts\`). Each patient has a hidden truth and sometimes answers wrongly then corrects themselves in words ("sorry, I meant yes", "actually it started last week"), says "I don't know", asks why or what a word means, or mentions a second problem. Every summary row is then compared with the truth.\n\n**Mismatches: ${findings.length}.**${findings.length ? "\n\n" + findings.slice(0, 10).map((f) => `- seed ${f.seed}: ${f.problem}`).join("\n") : ""}`,
+);
 writeFileSync("docs/quality/CONVERSATION_ACCURACY.md", md);
 console.log("Wrote docs/quality/CONVERSATION_ACCURACY.md");

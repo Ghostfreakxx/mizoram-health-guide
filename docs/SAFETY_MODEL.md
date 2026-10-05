@@ -38,6 +38,10 @@ holds banned patterns; tests run every engine line through them.
    statement is never read as "yes" to an unrelated question on screen.
    "Not sure", "I didn't check" and "I can't remember" are never read as
    "no"; a hedged yes ("I think so") is read as yes — both err toward care.
+   A clear correction ("sorry, I meant yes") changes the last answer, says
+   what changed and is re-checked for an emergency; an ambiguous "actually
+   no…" is asked about. A correction is never taken as the answer to the
+   next question.
 8. **Emergency Mode** interrupts everything: questioning stops, speech stops,
    108 / 112 and what to do while waiting are shown first. It cannot be
    overridden by later answers. The doctor also **says** "Call 108 or 112
@@ -55,7 +59,7 @@ me describe it (body map, side, feeling, timing, pattern) — and keeps going.
 
 ## What is tested
 
-`tests/safety/` (Vitest, 533 tests) — among them:
+`tests/safety/` (Vitest, 538 tests) — among them:
 
 | File | Covers |
 | --- | --- |
@@ -68,6 +72,7 @@ me describe it (body map, side, feeling, timing, pattern) — and keeps going.
 | `simulations.test.ts` | 400 seeded simulated consultations; invariants at every step (found and fixed four safety bugs) |
 | `patient-memory.test.ts`, `director.test.ts` | Contradictions, negation, other problems, provenance; behaviour rules (emergency never delayed) |
 | `accuracy.test.ts` | What the patient meant vs what was recorded, over thousands of answers in varied wording, including a never-tuned held-out set: no wrong or unsafe recordings allowed (report: `docs/quality/CONVERSATION_ACCURACY.md`) |
+| `fidelity.test.ts` | 1,500 messy visits (corrections in words, "I don't know", detours, a second problem): every summary row matches what the patient finally meant; "sorry, I meant no" changes the last answer, never the next one; a correction to "yes" on a danger sign opens Emergency Mode |
 | `lipsync-lines.test.ts` | Every spoken line: every word moves the mouth (numbers too), the mouth rests without an end event, stops at once; the emergency line names 108 / 112 |
 | `review-registry.test.ts` | Review list current; no missing sources; nothing verified without sign-off; every sentence the doctor says about urgency, emergencies, medicines, tests or diagnosis is on the review list (the doctor's limits, the "what do you mean?" and "why do you ask?" lines included) |
 

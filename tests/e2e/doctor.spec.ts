@@ -284,3 +284,38 @@ test("the 3D doctor can't download mid-visit: the simple picture takes over and 
   await expect(chart(page)).toContainText("18 to 59 years");
   expect(errors).toEqual([]);
 });
+
+test("'sorry, I meant no' changes the last answer, says so, and does not answer the next question", async ({ page }) => {
+  const errors = await begin(page, "2d");
+  await sayIt(page, "I've been coughing for three weeks");
+  await page.getByRole("button", { name: "None of these — continue" }).click();
+  const heading = page.locator("#consult-question");
+  for (let i = 0; i < 25; i++) {
+    const q = (await heading.textContent()) ?? "";
+    const tap = async (name: string | RegExp) => {
+      const b = page.getByRole("button", { name, exact: typeof name === "string" });
+      if (!(await b.count())) return false;
+      await b.first().click();
+      await expect(heading).not.toHaveText(q);
+      return true;
+    };
+    if (/sweats|weight/i.test(q) && (await page.getByRole("button", { name: "Yes", exact: true }).count())) {
+      await tap("Yes");
+      const next = (await heading.textContent())!;
+      await sayIt(page, "sorry, I meant no");
+      await expect(page.getByText(/changed your last answer to “No”/).first()).toBeVisible();
+      await expect(heading).toHaveText(next);
+      await expect(chart(page)).toContainText(/Night sweats|weight loss/i);
+      expect(errors).toEqual([]);
+      return;
+    }
+    if (await tap("No")) continue;
+    if (await tap("18 to 59 years")) continue;
+    if (await tap("Female")) continue;
+    if (await tap("Myself")) continue;
+    if (await tap("None of these — continue")) continue;
+    if (await tap("Skip")) continue;
+    break;
+  }
+  throw new Error("did not reach the night-sweats question");
+});

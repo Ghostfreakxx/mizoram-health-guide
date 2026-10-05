@@ -138,9 +138,11 @@ export type ConsultState = {
   otherConcerns: string[];
   // Things the patient said they do NOT have, in words ("no fever").
   denied: string[];
+  // The yes/no answer just given, so "sorry, I meant yes" can change it.
+  lastAnswered?: { step: string; value: string };
   // A new statement that contradicts an earlier answer — asked about, never
   // silently overwritten or silently ignored.
-  recheck?: { key: string; earlier: string; now: string };
+  recheck?: { key: string; earlier: string; now: string; to?: Answer }; // `to`: the value to change to (default yes)
   lastEducation?: string; // the health-information answer just given ("tell me more")
 };
 
@@ -458,8 +460,8 @@ export function nextTurn(s: ConsultState): Turn {
       step: "recheck",
       say: fever
         ? `Earlier you said ${r.earlier}, but you've now said ${r.now}. Should I record that you have a measured fever?`
-        : `Earlier you said ${r.earlier} Just now you said ${r.now}. Should I change that answer to yes?`,
-      question: fever ? "Should I record that you have a measured fever?" : "Should I change that answer to yes?",
+        : `Earlier you said ${r.earlier} Just now you said ${r.now}. Should I change that answer to ${RECHECK_TO[r.to ?? "yes"]}?`,
+      question: fever ? "Should I record that you have a measured fever?" : `Should I change that answer to ${RECHECK_TO[r.to ?? "yes"]}?`,
       hint: "I want your summary to be right, so I'm checking rather than guessing.",
       input: { kind: "single", options: [{ id: "yes", label: "Yes, change it" }, { id: "no", label: "No, keep my earlier answer" }, { id: "unsure", label: "Not sure" }] },
       mood: "focused",
@@ -772,6 +774,7 @@ export function respond(s: ConsultState, step: string, value: string | string[])
     notes: next.notes === s.notes ? [] : next.notes,
     turns: s.turns + 1,
     mentioned: shown ? [...next.mentioned, shown] : next.mentioned,
+    lastAnswered: step.startsWith("q:") && typeof value === "string" ? { step, value } : undefined,
   };
 }
 
@@ -988,13 +991,13 @@ function respondCore(s: ConsultState, step: string, value: string | string[]): C
     if (ans === "no") {
       return { ...cleared, corrections: [...s.corrections, r.key === "fever" ? "Kept: no fever (a temperature reading was also mentioned)" : `Kept earlier answer (${qs.find((q) => q.id === r.key)?.negative ?? r.key})`] };
     }
-    const value: Answer = ans === "yes" ? "yes" : "unsure";
+    const value: Answer = ans === "yes" ? (r.to ?? "yes") : "unsure";
     let next: ConsultState = {
       ...cleared,
       denied: r.key === "fever" && ans === "yes" ? s.denied.filter((d) => d !== "fever") : s.denied,
       answers: { ...s.answers, ...Object.fromEntries(ids.map((id) => [id, value])) },
       prefilled: s.prefilled.filter((id) => !ids.includes(id)),
-      corrections: [...s.corrections, r.key === "fever" ? (ans === "yes" ? "Changed: has a measured fever" : "Not sure whether there is a fever") : `Changed answer: ${qs.find((q) => q.id === r.key)?.positive ?? r.key}${ans === "unsure" ? " — not sure" : ""}`],
+      corrections: [...s.corrections, r.key === "fever" ? (ans === "yes" ? "Changed: has a measured fever" : "Not sure whether there is a fever") : `Changed answer: ${qs.find((q) => q.id === r.key)?.positive ?? r.key} — ${VALUE_WORD[value].toLowerCase()}`],
     };
     if (r.key === "fever" && ans === "unsure") next = { ...next, unknown: { ...next.unknown, fever: "Not sure" } };
     for (const id of ids) {
@@ -1609,6 +1612,46 @@ function correction(s: ConsultState, text: string): { state: ConsultState; line:
   return null;
 }
 
+// Clear signs of changing the last answer. A bare "sorry, no" is a polite
+// answer to the question on screen, not a correction.
+const FIX_MARK = /\b(oops|i meant|i mean|that'?s wrong|that was wrong|my mistake|wrong answer|correction)\b|^(no )?(sorry|wait)\b.*\b(i meant|it'?s|it is|actually|change)\b/;
+const FIX_LEAD = /^(no |oh |um |uh )?(sorry|wait|oops|actually|i meant|i mean|that'?s wrong|that was wrong|my mistake|wrong answer|correction|it'?s|it is|no sorry)[\s,.;:!-]*/;
+const VALUE_WORD: Record<string, string> = { yes: "Yes", no: "No", unsure: "Not sure" };
+const RECHECK_TO: Record<Answer, string> = { yes: "yes", no: "no", unsure: "“not sure”" };
+
+function answerCorrection(s: ConsultState, turn: Turn, words: string): { state: ConsultState; line: string } | null {
+  const last = s.lastAnswered;
+  if (!last || last.step === turn.step || !last.step.startsWith("q:")) return null;
+  let t = clean(words);
+  // "Actually no" when the question now on screen is not a yes/no one can only
+  // be about the last answer.
+  const marked = FIX_MARK.test(t) || (/^actually\b/.test(t) && !turn.step.startsWith("q:") && !turn.step.startsWith("confirm:") && turn.step !== "recheck");
+  // "Actually no…" may change the last answer or answer this one: ask, never guess.
+  const ambiguous = !marked && /^actually\b/.test(t) && turn.step.startsWith("q:");
+  if (!marked && !ambiguous) return null;
+  for (let i = 0; i < 4 && FIX_LEAD.test(t); i++) t = t.replace(FIX_LEAD, "").trim();
+  const value = t ? (yesNo(t) as Answer | null) : null;
+  if (!value || value === last.value) return null;
+  const id = last.step.slice(2);
+  if (ambiguous) {
+    const asked = questionsFor(contextOf(s)).find((x) => x.id === id);
+    if (!asked) return null;
+    const before = last.value === "unsure" ? "you weren't sure" : last.value;
+    return { state: { ...s, recheck: { key: id, earlier: `${before} when I asked: “${asked.text}”`, now: `“${clip(words).slice(0, 80)}”`, to: value } }, line: "" };
+  }
+  const answers = { ...s.answers };
+  delete answers[id];
+  const cleared = { ...s, answers, prefilled: s.prefilled.filter((x) => x !== id) };
+  const next = respondCore(cleared, last.step, value);
+  if (next === cleared) return null;
+  const q = questionsFor(contextOf(s)).find((x) => x.id === id);
+  const what = q ? q.positive.charAt(0).toLowerCase() + q.positive.slice(1) : "the last question";
+  return {
+    state: { ...next, lastAnswered: { step: last.step, value }, corrections: [...s.corrections, `Answer changed to “${VALUE_WORD[value]}”: ${what}`] },
+    line: `Okay — I've changed your last answer to “${VALUE_WORD[value]}” for: ${what}.`,
+  };
+}
+
 const WANTS_PROFESSIONAL = /\b(real|human|actual|proper) (doctor|person|nurse)\b|\b(talk|speak) to (a |an )?(doctor|nurse|human|person|someone real)\b|\bsee a doctor (now|today)\b/i;
 
 const shortAnswer = (s: ConsultState, words: string): ConsultState => {
@@ -1684,6 +1727,10 @@ export function converse(s0: ConsultState, turn: Turn, text: string): Outcome {
     return { kind: "answered", state: absorb(base, words) };
   }
 
+  // "Sorry, I meant yes" just after a yes/no answer changes THAT answer — it
+  // is never taken as the answer to the question now on screen.
+  const changed = answerCorrection(s, turn, words);
+  if (changed) return changed.state.emergency || !changed.line ? { kind: "answered", state: changed.state } : { kind: "corrected", state: changed.state, line: changed.line };
   const fix = correction(s, words);
   if (fix) return { kind: "corrected", state: fix.state, line: fix.line };
   if (WANTS_PROFESSIONAL.test(words)) return { kind: "professional", line: PROFESSIONAL_LINE };
