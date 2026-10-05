@@ -5,7 +5,7 @@ that need someone outside the code team say who.
 
 ## Before any pilot (blocking)
 
-1. **Clinical review of every rule** — 244 items in `CLINICAL_REVIEW.md`
+1. **Clinical review of every rule** — 310 items in `CLINICAL_REVIEW.md`
    (red flags, triage questions, policy rules, wording, glossary, education).
    *Needs: Health Department clinicians.* Record sign-offs in `SIGN_OFFS`.
 2. **Verify local data** — helpline numbers, the three seeded facilities,
@@ -18,6 +18,30 @@ that need someone outside the code team say who.
    Mizo-English phrase list for red-flag detection.
 5. **Usability testing** with patients, ASHAs and health workers in Aizawl
    and at least one rural district, on low-end Android phones.
+
+## Current milestone: VD3 — Virtual Doctor intelligence and character quality
+
+No new features. One reference doctor (General Medicine), made exceptionally
+good and tested hard; the other rooms inherit the same engine through
+configuration (`consult-room/rooms.ts`). Four areas only:
+
+- **Conversation depth** — accuracy (what was meant vs what was recorded,
+  `docs/quality/CONVERSATION_ACCURACY.md`), ambiguity, corrections,
+  interruptions, several problems, "I don't know", unusual wording,
+  contradictions, long visits. Held-out phrase sets keep the numbers honest.
+- **Character quality** — gaze, micro-expressions, blending, lip sync,
+  posture, pauses, environment awareness, department-specific behaviour.
+- **Clinical traceability** — every safety and routing behaviour, and every
+  sentence about urgency, medicines or diagnosis, explainable, source-linked,
+  on the review list and tested.
+- **Real-world resilience** — weak internet, cheap phones, microphone /
+  WebGL / API failure, offline, accessibility.
+
+Done so far: the accuracy harness (found and fixed 3 unsafe misreadings:
+"I'm not certain" and "I didn't check" recorded as "no", "I think so" as
+"not sure"); spoken-line traceability (45 safety lines added to the review
+list); lip sync on every spoken line (numbers were silent); phone keyboard
+and rotation.
 
 ## Next engineering work
 

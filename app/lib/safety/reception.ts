@@ -53,15 +53,19 @@ const NUM: Record<string, number> = {
 };
 
 function durationFrom(t: string): { duration: Duration; text: string } | undefined {
-  if (/\b(today|this morning|tonight|just now|an hour|few hours|hours ago|since morning)\b/.test(t)) {
+  if (/\b(today|this morning|this afternoon|this evening|tonight|just now|an hour|few hours|hours ago|since morning)\b/.test(t)) {
     return { duration: "today", text: "today" };
   }
   if (/\b(since yesterday|yesterday|last night)\b/.test(t)) return { duration: "1-3-days", text: "since yesterday" };
-  const m = t.match(/\b(\d+|a|an|one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve|couple|few|several)( of)? (days?|weeks?|months?|years?)\b/);
+  if (/\b(last week)\b/.test(t)) return { duration: "4-14-days", text: "since last week" };
+  if (/\b(last month|last year|for months|for years|many months|long time)\b/.test(t)) return { duration: "over-2-weeks", text: "for a long time" };
+  const m = t.match(/\b(more than |over |longer than |at least |less than |under )?(\d+|a|an|one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve|couple|few|several)( of)? (days?|weeks?|months?|years?)\b/);
   if (!m) return undefined;
-  const n = /^\d+$/.test(m[1]) ? parseInt(m[1], 10) : NUM[m[1]];
-  const unit = m[3].replace(/s$/, "");
-  const days = n * (unit === "day" ? 1 : unit === "week" ? 7 : unit === "month" ? 30 : 365);
+  const n = /^\d+$/.test(m[2]) ? parseInt(m[2], 10) : NUM[m[2]];
+  const unit = m[4].replace(/s$/, "");
+  // "more than two weeks" is past the boundary; "less than a week" is before it.
+  const shift = !m[1] ? 0 : /^(less|under)/.test(m[1]) ? -0.5 : 0.5;
+  const days = n * (unit === "day" ? 1 : unit === "week" ? 7 : unit === "month" ? 30 : 365) + shift;
   const duration: Duration = days < 1 ? "today" : days <= 3 ? "1-3-days" : days <= 14 ? "4-14-days" : "over-2-weeks";
   return { duration, text: m[0] };
 }

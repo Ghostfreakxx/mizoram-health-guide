@@ -36,6 +36,8 @@ holds banned patterns; tests run every engine line through them.
    is asked about directly — never ignored.
 7. **Contradictions are asked, not guessed** (`recheck`), and a new
    statement is never read as "yes" to an unrelated question on screen.
+   "Not sure", "I didn't check" and "I can't remember" are never read as
+   "no"; a hedged yes ("I think so") is read as yes — both err toward care.
 8. **Emergency Mode** interrupts everything: questioning stops, speech stops,
    108 / 112 and what to do while waiting are shown first. It cannot be
    overridden by later answers. The doctor also **says** "Call 108 or 112
@@ -53,7 +55,7 @@ me describe it (body map, side, feeling, timing, pattern) — and keeps going.
 
 ## What is tested
 
-`tests/safety/` (Vitest, 525 tests) — among them:
+`tests/safety/` (Vitest, 533 tests) — among them:
 
 | File | Covers |
 | --- | --- |
@@ -65,6 +67,7 @@ me describe it (body map, side, feeling, timing, pattern) — and keeps going.
 | `demo.test.ts`, `acceptance.test.ts` | Every demo scenario through the real engine; the acceptance journeys |
 | `simulations.test.ts` | 400 seeded simulated consultations; invariants at every step (found and fixed four safety bugs) |
 | `patient-memory.test.ts`, `director.test.ts` | Contradictions, negation, other problems, provenance; behaviour rules (emergency never delayed) |
+| `accuracy.test.ts` | What the patient meant vs what was recorded, over thousands of answers in varied wording, including a never-tuned held-out set: no wrong or unsafe recordings allowed (report: `docs/quality/CONVERSATION_ACCURACY.md`) |
 | `lipsync-lines.test.ts` | Every spoken line: every word moves the mouth (numbers too), the mouth rests without an end event, stops at once; the emergency line names 108 / 112 |
 | `review-registry.test.ts` | Review list current; no missing sources; nothing verified without sign-off; every sentence the doctor says about urgency, emergencies, medicines, tests or diagnosis is on the review list (the doctor's limits, the "what do you mean?" and "why do you ask?" lines included) |
 

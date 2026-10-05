@@ -1251,11 +1251,17 @@ export function rememberFromWords(text: string, who?: "self" | "other", relation
 
 // ---------------- Understanding typed or spoken answers ----------------
 
-const YES = /^(yes|yeah|yep|yup|haan|ha|aw|correct|right|i do|i have|i am|it is|it does|there is|sure|ok yes)\b/;
-const NO = /^(no|nope|nah|not really|never|none|nothing|i don'?t|i do not|i haven'?t|i have not|it isn'?t|it is not|there isn'?t|not at all)\b/;
-const UNSURE = /\b(not sure|unsure|don'?t know|do not know|maybe|perhaps|i think so|possibly|no idea|can'?t say)\b/;
+const YES = /^(yes|yeah|yep|yup|ya|yah|haan|ha|aw|correct|true|right|that'?s right|that'?s correct|absolutely|definitely|of course|uh huh|i do|i have|i am|it is|it does|there is|sure|ok yes|(a bit|a little|sometimes|slightly) yes)\b/;
+const NO = /^(no|nope|nah|negative|not really|never|none|nothing|i don'?t|i do not|i haven'?t|i have not|it isn'?t|it is not|there isn'?t|not at all)\b/;
+const UNSURE = /\b(not sure|unsure|not certain|uncertain|not too sure|don'?t know|do not know|dunno|idk|maybe|perhaps|possibly|no idea|no clue|can'?t say|cannot say|can'?t tell|hard to say|difficult to say|might be|could be|didn'?t check|did not check|haven'?t checked|have not checked|not checked|didn'?t measure|can'?t remember|cannot remember|don'?t remember|do not remember|forgot|forget)\b/;
+// ("I didn't check" / "I can't remember" is not a "no": a danger sign nobody checked stays unknown.)
+// A hedged yes ("I think so", "probably") is a yes: on a danger-sign question
+// that errs toward care, and it is what the words mean.
+const HEDGED_YES = /^(i think so|i guess so|i believe so|probably|probably yes|i think yes|yes i think)\b/;
 
-const clean = (t: string) => normalizeWords(t).replace(/[^a-z0-9' ]+/g, " ").replace(/\s+/g, " ").trim();
+// Stretched words typed for emphasis ("noooo", "yesss", "yaaa") are the plain word.
+const unstretch = (t: string) => t.replace(/\bn+o{2,}\b/g, "no").replace(/\by+e+s{2,}\b|\bye{2,}s+\b/g, "yes").replace(/\bya{2,}h?\b/g, "ya");
+const clean = (t: string) => unstretch(normalizeWords(t).replace(/[^a-z0-9' ]+/g, " ").replace(/\s+/g, " ").trim());
 
 const NEGATION = /\b(no|not|never|none|nothing|nope|nah)\b|n't\b/;
 
@@ -1271,9 +1277,10 @@ function yesNo(t: string): string | null {
     const rest = t.replace(OPENER, "").trim().split(" ").filter(Boolean);
     if (rest.some((w) => !FILLER.has(w))) return null;
   }
+  if (HEDGED_YES.test(t)) return "yes";
   if (UNSURE.test(t)) return "unsure";
   if (NO.test(t)) return "no";
-  if (YES.test(t) && NEGATION.test(t)) return /^(yes|yeah|yep|yup|haan|ha|aw|sure)\b/.test(t) ? null : "no"; // "yes but not much" → ask; "I have no fever" → no
+  if (YES.test(t) && NEGATION.test(t)) return /^(yes|yeah|yep|yup|ya|yah|haan|ha|aw|sure|true)\b/.test(t) ? null : "no"; // "yes but not much" → ask; "I have no fever" → no
   if (YES.test(t)) return "yes";
   if (NEGATION.test(t)) return "no"; // "I have no fever"
   return null;
@@ -1326,7 +1333,7 @@ export function interpretText(turn: Turn, text: string): string | string[] | nul
   if (step === "describe") return `words:${text.trim()}`;
   if (step === "concern-more") return `words:${text.trim()}`;
   if (step === "c:temp") {
-    if (/\b(not measured|didn'?t measure|no thermometer|not checked)\b/.test(t)) return "not-measured";
+    if (/\b(not measured|didn'?t (measure|check)|did not (measure|check)|haven'?t (measured|checked)|no thermometer|not checked|don'?t have a thermometer)\b/.test(t)) return "not-measured";
     return /\d/.test(t) && temperatureOption(t) ? `temp:${t}` : null;
   }
   if (step === "severity") {
@@ -1356,15 +1363,20 @@ export function interpretText(turn: Turn, text: string): string | string[] | nul
     return d ?? null;
   }
   if (step === "progression") {
+    // Negated change ("not improving or worse", "not getting better") is not a direction.
+    const notBetter = /\b(not|isn'?t|no|nor|neither) (getting |really )?(better|improv\w*)\b/.test(t);
+    const notWorse = /\b(not|isn'?t|no|nor|neither|or) (getting |any )?worse\b/.test(t);
+    if (notBetter && notWorse) return "same";
+    if (notBetter || notWorse) return /\b(same|no change|unchanged)\b/.test(t) ? "same" : null;
     if (/\b(better|improv\w*|less)\b/.test(t)) return "better";
     if (/\b(worse|worsen\w*|more|increas\w*)\b/.test(t)) return "worse";
-    if (/\b(same|no change|unchanged|similar|not changed)\b/.test(t)) return "same";
+    if (/\b(same|no change|unchanged|similar|not changed|not changing|no different|staying)\b/.test(t)) return "same";
     return null;
   }
   if (step === "severity") {
-    if (/\b(severe|very bad|terrible|unbearable|can'?t do anything|cannot do anything|worst)\b/.test(t)) return "severe";
-    if (/\b(moderate|quite bad|fairly bad|hard to)\b/.test(t)) return "moderate";
-    if (/\b(mild|slight|a little|not bad|manageable|okay|ok)\b/.test(t)) return "mild";
+    if (/\b(severe|very bad|terrible|unbearable|can'?t do anything|cannot do anything|worst|really really bad|can hardly|hardly (do|get|move|walk|work)|can'?t (even )?get (up|out of bed)|bedridden)\b/.test(t)) return "severe";
+    if (/\b(moderate|medium|quite bad|fairly bad|hard to|difficult to)\b/.test(t)) return "moderate";
+    if (/\b(mild|slight|a little|not bad|not too bad|not so bad|manageable|okay|ok|can still)\b/.test(t)) return "mild";
     return null;
   }
   if (inp.kind === "single" || inp.kind === "body") {
