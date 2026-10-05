@@ -35,6 +35,7 @@ type Props = {
   onBack: () => void;
   canBack: boolean;
   aboveSheet?: boolean; // phones: sit just above the chart bottom sheet
+  typing?: boolean; // phones, keyboard open: stay in place so the question stays in view
 };
 
 // Phones: a compact 3×2 grid of large-enough (44 px) targets; larger screens:
@@ -47,7 +48,7 @@ export default function ConversationControls(p: Props) {
     <div
       role="group"
       aria-label="Talk with the doctor"
-      className={`sticky ${p.aboveSheet === false ? "bottom-0" : "bottom-14 lg:bottom-0"} z-20 -mx-4 space-y-1.5 border-t border-slate-200 bg-white/95 px-3 py-2 sm:space-y-2 sm:px-4 sm:py-3 shadow-[0_-4px_12px_rgba(15,23,42,0.08)] backdrop-blur sm:static sm:mx-0 sm:rounded-2xl sm:border sm:shadow-sm`}
+      className={`${p.typing ? "static" : "sticky"} ${p.aboveSheet === false ? "bottom-0" : "bottom-14 lg:bottom-0"} z-20 -mx-4 space-y-1.5 border-t border-slate-200 bg-white/95 px-3 py-2 sm:space-y-2 sm:px-4 sm:py-3 shadow-[0_-4px_12px_rgba(15,23,42,0.08)] backdrop-blur sm:static sm:mx-0 sm:rounded-2xl sm:border sm:shadow-sm`}
     >
       <div className="flex items-center justify-between gap-2">
         <p role="status" aria-live="polite" className="flex items-center gap-2 text-sm font-semibold text-slate-800">

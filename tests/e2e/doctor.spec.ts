@@ -179,3 +179,108 @@ test("background tab: the doctor stops talking, nothing is lost, and the visit c
   await expect(chart(page)).toContainText("I've been coughing for three weeks");
   expect(errors).toEqual([]);
 });
+
+const noSideScroll = (page: Page) => page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1);
+
+test("rotating the phone mid-visit: layout fits, the question stays reachable, memory survives", async ({ page }) => {
+  const errors = await begin(page, "2d");
+  const portrait = page.viewportSize()!;
+  const landscape = { width: portrait.height, height: portrait.width };
+  await sayIt(page, "I've been coughing for three weeks");
+  for (const size of [landscape, portrait, landscape, portrait]) {
+    await page.setViewportSize(size);
+    expect(await noSideScroll(page)).toBe(true);
+    const next = page.getByRole("button", { name: "None of these — continue" });
+    await next.scrollIntoViewIfNeeded();
+    await expect(next).toBeVisible();
+  }
+  await page.getByRole("button", { name: "None of these — continue" }).click();
+  await page.setViewportSize(landscape);
+  await page.getByRole("button", { name: "18 to 59 years" }).click();
+  await page.setViewportSize(portrait);
+  await expect(chart(page)).toContainText("I've been coughing for three weeks");
+  await expect(chart(page)).toContainText("18 to 59 years");
+  expect(errors).toEqual([]);
+});
+
+for (const mode of ["visual viewport (current browsers)", "whole window (older Android browsers)"] as const) {
+  test(`phone keyboard open, ${mode}: the question and the answer box are both above the keyboard`, async ({ page }, info) => {
+    test.skip(info.project.name !== "phone", "the on-screen keyboard only exists on phones");
+    const KB = 320;
+    const older = mode.startsWith("whole");
+    // test double: a keyboard that shortens the visual viewport only (current
+    // browsers), or the whole window (older Android browsers)
+    await page.addInitScript(() => {
+      const vv = window.visualViewport!;
+      const w = window as unknown as { __kb: number };
+      w.__kb = 0;
+      Object.defineProperty(vv, "height", { configurable: true, get: () => window.innerHeight - w.__kb });
+    });
+    const errors = await begin(page, "2d");
+    const full = page.viewportSize()!;
+    const stage = page.getByRole("img", { name: /Virtual health guide/ });
+    const keyboard = async (open: boolean) => {
+      if (older) await page.setViewportSize({ width: full.width, height: open ? full.height - KB : full.height });
+      else
+        await page.evaluate((h) => {
+          (window as unknown as { __kb: number }).__kb = h;
+          window.visualViewport!.dispatchEvent(new Event("resize"));
+        }, open ? KB : 0);
+    };
+    const visible = full.height - KB; // what is left above the keyboard
+    // What the phone does on focus: brings the answer box just above the keyboard.
+    const focusLikeAPhone = async () => {
+      await box(page).focus();
+      await page.evaluate((v) => {
+        const r = document.activeElement!.getBoundingClientRect();
+        window.scrollBy(0, r.bottom - v + 8);
+      }, visible);
+    };
+    const question = page.locator("#consult-question");
+    // The question must be readable while typing: written out in full (the
+    // heading, or its repeat just above the box on choice questions).
+    const check = async () => {
+      await focusLikeAPhone();
+      const b = (await box(page).boundingBox())!;
+      expect(b.y + b.height).toBeLessThanOrEqual(visible);
+      const shown = page.locator("#consult-question, [data-question-repeat]");
+      const said = (await question.textContent())!;
+      let readable = false;
+      for (const el of await shown.all()) {
+        const r = await el.boundingBox();
+        if (r && r.height > 20 && r.y >= 0 && r.y + r.height <= visible && (await el.textContent()) === said) readable = true;
+      }
+      expect(readable).toBe(true);
+    };
+    const tallStage = (await stage.boundingBox())!.height;
+    expect(tallStage).toBeGreaterThan(full.height * 0.3);
+    await box(page).focus(); // the keyboard opens for a text box
+    await keyboard(true);
+    await expect.poll(async () => (await stage.boundingBox())!.height).toBeLessThan(tallStage * 0.6);
+    await expect(question).toHaveText(/What brought you here today/);
+    await check();
+    await sayIt(page, "I've been coughing for three weeks");
+    await expect(question).toHaveText(/is any of these happening/i);
+    // A typed answer on a later question.
+    await page.getByRole("button", { name: "None of these — continue" }).click();
+    await check();
+    await keyboard(false);
+    await expect.poll(async () => (await stage.boundingBox())!.height).toBeGreaterThan(full.height * 0.3);
+    await expect(chart(page)).toContainText("I've been coughing for three weeks");
+    expect(errors).toEqual([]);
+  });
+}
+
+test("the 3D doctor can't download mid-visit: the simple picture takes over and nothing is lost", async ({ page }) => {
+  // test double: the network drops every request for the 3D models
+  await page.route("**/models/**", (r) => r.abort("failed"));
+  const errors = await begin(page, "2d");
+  await sayIt(page, "I've been coughing for three weeks");
+  await page.getByRole("button", { name: "None of these — continue" }).click();
+  await page.getByLabel("Display").selectOption("high");
+  await expect(page.getByRole("status").filter({ hasText: /could not (load|start)|Showing the simple picture/ })).toBeVisible({ timeout: 20_000 });
+  await page.getByRole("button", { name: "18 to 59 years" }).click();
+  await expect(chart(page)).toContainText("I've been coughing for three weeks");
+  await expect(chart(page)).toContainText("18 to 59 years");
+  expect(errors).toEqual([]);
+});

@@ -277,14 +277,47 @@ export default function ConsultationRoom({ room }: { room: RoomStyle }) {
     };
   }, []);
 
-  // Phones: when the on-screen keyboard opens, the doctor area shrinks so the
-  // question and the answer box stay in view (the doctor stays visible).
+  // Phones: when the on-screen keyboard opens, the doctor area shrinks, the
+  // question is written just above the answer box and the control bar stops
+  // floating, so the question and the answer box stay in view together.
+  // Newer browsers shrink only the visual viewport; older Android browsers
+  // shrink the whole window, so the tallest height seen in this orientation
+  // is remembered. Only while a text box has focus, so pinch-zoom or a
+  // shorter desktop window is not mistaken for a keyboard.
   useEffect(() => {
     const vv = window.visualViewport;
     if (!vv) return;
-    const check = () => setKeyboardOpen(window.innerHeight - vv.height > 150);
+    let width = window.innerWidth;
+    let tall = window.innerHeight;
+    const inBox = () => {
+      const el = document.activeElement;
+      return el instanceof HTMLTextAreaElement || (el instanceof HTMLInputElement && el.type !== "checkbox" && el.type !== "radio");
+    };
+    const check = () => {
+      if (window.innerWidth !== width) {
+        width = window.innerWidth; // rotated: start again for this orientation
+        tall = window.innerHeight;
+      }
+      tall = Math.max(tall, window.innerHeight);
+      setKeyboardOpen(inBox() && tall - vv.height * vv.scale > 150);
+    };
+    // Focus moving to a button is checked a moment later: re-laying out
+    // mid-tap would move the button being pressed (and lose the tap).
+    let later: ReturnType<typeof setTimeout> | undefined;
+    const focusMoved = () => {
+      clearTimeout(later);
+      if (inBox()) check();
+      else later = setTimeout(check, 300);
+    };
     vv.addEventListener("resize", check);
-    return () => vv.removeEventListener("resize", check);
+    document.addEventListener("focusin", focusMoved);
+    document.addEventListener("focusout", focusMoved);
+    return () => {
+      clearTimeout(later);
+      vv.removeEventListener("resize", check);
+      document.removeEventListener("focusin", focusMoved);
+      document.removeEventListener("focusout", focusMoved);
+    };
   }, []);
 
   // ---------------- Quality ----------------
@@ -734,7 +767,7 @@ export default function ConsultationRoom({ room }: { room: RoomStyle }) {
   const canAnswer = started && !emergency && !done;
   const journey: JourneyStep = !begun || turn.step === "concern" ? "Consultation" : emergency ? "Triage" : done ? (doc === "complete" ? "Real doctor" : "Visit summary") : "Questions";
   const subtitleText = log.filter((l) => l.who === "guide").at(-1)?.text ?? "";
-  const showHeading = tier === "none" || !subtitles || emergency;
+  const showHeading = tier === "none" || !subtitles || emergency || keyboardOpen;
   const textSize = bigText ? "text-xl" : "text-lg";
   const status: MicStatus = listening ? "listening" : speaking ? "speaking" : doc === "processing" ? "processing" : "ready";
   const preparing = begun && !started && is3d;
@@ -925,6 +958,7 @@ export default function ConsultationRoom({ room }: { room: RoomStyle }) {
       onBack={back}
       canBack={started && history.length > 1 && !done}
       aboveSheet={!emergency}
+      typing={keyboardOpen}
     />
   ) : null;
 
@@ -972,6 +1006,13 @@ export default function ConsultationRoom({ room }: { room: RoomStyle }) {
         else if (inp.kind === "text" && inp.optional) answer("");
       }}
     >
+      {/* Phones, keyboard open: the choices push the question off screen, so it
+          is repeated (visually only) just above the box being typed in. */}
+      {kind === "other" && keyboardOpen && started && (
+        <p aria-hidden data-question-repeat className="rounded-lg bg-slate-100 px-3 py-2 text-sm font-semibold text-blue-950">
+          {turn.say}
+        </p>
+      )}
       <label htmlFor="consult-text" className={kind === "main" ? "sr-only" : "block text-base font-semibold text-slate-800"}>
         {kind === "main" ? "Your answer" : "Or answer in your own words"}
       </label>
@@ -1238,7 +1279,7 @@ export default function ConsultationRoom({ room }: { room: RoomStyle }) {
   const chartPanel = (
     <aside
       aria-label="Patient chart"
-      className="h-fit rounded-2xl border border-slate-300 bg-white p-4 shadow-sm lg:sticky lg:top-4 max-lg:fixed max-lg:inset-x-0 max-lg:bottom-0 max-lg:z-30 max-lg:rounded-b-none max-lg:border-x-0 max-lg:border-b-0 max-lg:p-0 max-lg:shadow-[0_-8px_24px_rgba(15,23,42,0.18)]"
+      className={`h-fit rounded-2xl border border-slate-300 bg-white p-4 shadow-sm lg:sticky lg:top-4 ${keyboardOpen && !sheetOpen ? "max-lg:hidden" : ""} max-lg:fixed max-lg:inset-x-0 max-lg:bottom-0 max-lg:z-30 max-lg:rounded-b-none max-lg:border-x-0 max-lg:border-b-0 max-lg:p-0 max-lg:shadow-[0_-8px_24px_rgba(15,23,42,0.18)]`}
     >
       <button
         type="button"
@@ -1311,7 +1352,7 @@ export default function ConsultationRoom({ room }: { room: RoomStyle }) {
                   </ol>
                 </details>
               )}
-              <h2 id="consult-question" aria-live="polite" className={showHeading || !started ? `${bigText ? "text-3xl" : "text-2xl"} font-bold text-blue-950` : "sr-only"}>
+              <h2 id="consult-question" aria-live="polite" className={showHeading || !started ? `${keyboardOpen ? (bigText ? "text-xl" : "text-lg leading-snug") : bigText ? "text-3xl" : "text-2xl"} font-bold text-blue-950` : "sr-only"}>
                 {started ? turn.say : `${room.greeting} consultation room`}
               </h2>
               {note && (
@@ -1319,7 +1360,7 @@ export default function ConsultationRoom({ room }: { room: RoomStyle }) {
                   {note}
                 </p>
               )}
-              {started && turn.hint && <p className={`${textSize} text-slate-600`}>{turn.hint}</p>}
+              {started && turn.hint && <p className={`${keyboardOpen ? "text-sm" : textSize} text-slate-600`}>{turn.hint}</p>}
               {heardPanel}
               {professionalCard}
               {educationCard}
