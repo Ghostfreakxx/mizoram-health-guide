@@ -15,6 +15,7 @@ import { escalationFor } from "../../app/lib/escalation";
 import { violatesLanguagePolicy } from "../../app/lib/safety/language";
 import { questionsFor } from "../../app/lib/safety/triage";
 import { contextOf } from "../../app/lib/consultation";
+import { ROOMS } from "../../app/ai-hospital/consult-room/rooms";
 
 function rng(seed: number) {
   let t = seed >>> 0;
@@ -64,10 +65,10 @@ const WORDS: Record<string, string[]> = {
 
 type Kind = "button" | "words" | "difficult" | "side" | "emergency";
 
-function simulate(seed: number) {
+function simulate(seed: number, room?: { greeting: string; intro: string; focus: string[] }) {
   const r = rng(seed);
   const emergencyAt = r() < 0.18 ? 2 + Math.floor(r() * 10) : -1;
-  let s = startConsultation("General Medicine");
+  let s = room ? startConsultation(room.greeting, room.intro, room.focus) : startConsultation("General Medicine");
   const said: string[] = [];
   const fail = (msg: string) => `seed ${seed} after ${JSON.stringify(said)}: ${msg}`;
   let turnCount = 0;
@@ -182,5 +183,17 @@ describe("simulated consultations", () => {
     expect(outcomes.result, JSON.stringify(outcomes)).toBeGreaterThan(N * 0.25);
     expect(outcomes.emergency, JSON.stringify(outcomes)).toBeGreaterThan(N * 0.15);
     expect(maxTurns).toBeLessThan(160);
+  });
+
+  it("every department room (same engine, different configuration) keeps the same invariants", () => {
+    for (const [slug, room] of Object.entries(ROOMS)) {
+      let done = 0;
+      for (let seed = 1000; seed < 1060; seed++) {
+        const { outcome } = simulate(seed, room);
+        expect(outcome, `${slug} seed ${seed}`).not.toBe("running");
+        done++;
+      }
+      expect(done, slug).toBe(60);
+    }
   });
 });
