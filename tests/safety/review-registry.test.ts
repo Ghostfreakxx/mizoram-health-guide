@@ -2,7 +2,7 @@ import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import { reviewCsv, reviewMarkdown } from "../../app/lib/review/export";
 import { SIGN_OFFS, reviewRegistry, reviewSummary } from "../../app/lib/review/registry";
-import { complaints, POLICY_RULES } from "../../app/lib/safety/triage";
+import { complaints, POLICY_RULES, populationQuestions } from "../../app/lib/safety/triage";
 import { redFlags } from "../../app/lib/safety/redFlags";
 
 describe("clinical review registry", () => {
@@ -18,6 +18,7 @@ describe("clinical review registry", () => {
     expect(new Set(ids).size).toBe(ids.length);
     for (const f of redFlags) expect(ids).toContain(`RF-${f.id}`);
     for (const c of complaints) for (const q of c.questions) expect(ids).toContain(`TQ-${q.id}`);
+    for (const q of populationQuestions) expect(ids).toContain(`TQ-${q.id}`);
     for (const r of Object.values(POLICY_RULES)) expect(ids).toContain(r.id);
   });
 
@@ -44,6 +45,29 @@ describe("curated health answers", () => {
     for (const id of EDUCATION_IDS) {
       const q = new RegExp(`id: "${id}", question: "([^"]+)"`).exec(src)![1];
       expect(findEducation(q)?.id, q).toBe(id);
+    }
+  });
+});
+
+describe("every question the doctor asks can be traced", () => {
+  it("each turn of many consultations maps to rule IDs that exist in the review list", async () => {
+    const { basisOf } = await import("../../app/lib/consultBasis");
+    const { nextTurn, respond, startConsultation, converse } = await import("../../app/lib/consultation");
+    const ids = new Set(reviewRegistry().map((i) => i.id));
+    for (const opening of ["I've been coughing for three weeks", "fever since yesterday", "my child has diarrhoea", "I'm pregnant and my feet are swollen", "my back hurts", "I can't explain it", "chest pain"]) {
+      let s = startConsultation("General Medicine");
+      const o = converse(s, nextTurn(s), opening);
+      if ("state" in o) s = o.state;
+      for (let i = 0; i < 60; i++) {
+        const t = nextTurn(s);
+        const b = basisOf(s, t);
+        for (const r of b.ruleIds) expect(ids.has(r), `${opening} / ${t.step} → ${r}`).toBe(true);
+        if (b.kind === "safety" || b.kind === "triage-question") expect(b.sourceIds.length, t.step).toBeGreaterThan(0);
+        if (["result", "emergency"].includes(t.step)) break;
+        const opts = "options" in t.input ? t.input.options.map((x) => x.id) : [];
+        const v = t.step === "check" ? "none" : t.input.kind === "multi" ? [] : t.input.kind === "text" ? "" : opts.includes("no") ? "no" : opts[0];
+        s = respond(s, t.step, v);
+      }
     }
   });
 });

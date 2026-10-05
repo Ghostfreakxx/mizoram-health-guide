@@ -380,6 +380,8 @@ export default function DoctorAvatar(props: DoctorAvatarProps) {
       chart: new THREE.Vector3(...LAYOUT.chart.position),
       down: new THREE.Vector3(0.05, LAYOUT.deskY, -0.6),
       away: new THREE.Vector3(0.75, 1.25, -0.4),
+      // Toward the patient's screen, lower down: where the body map appears.
+      visual: new THREE.Vector3(-0.12, 0.92, 0.05),
     }),
     [],
   );
@@ -455,7 +457,7 @@ export default function DoctorAvatar(props: DoctorAvatarProps) {
     // Face: expression (slow), blink (instant), mouth (from the voice).
     const lip = props.lips.current?.visemeAt(now);
     const speaking = rhythm.speaking;
-    const lookDown = f.gaze.target === "down" || f.gaze.target === "chart" ? 0.18 : 0; // lids follow a downward look
+    const lookDown = f.gaze.target === "down" || f.gaze.target === "chart" ? 0.18 : f.gaze.target === "visual" ? 0.1 : 0; // lids follow a downward look
     const target2: Record<string, number> = {
       eyeBlink_L: Math.min(1, f.blink + lookDown),
       eyeBlink_R: Math.min(1, f.blink + lookDown),

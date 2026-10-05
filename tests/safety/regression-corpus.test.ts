@@ -219,3 +219,52 @@ describe("missing stays missing; nothing clinical is invented", () => {
     }
   });
 });
+
+// ---------------------------------------------------------------------------
+// 6. Bugs found by the conversation simulator (tests/safety/simulations.test.ts).
+describe("found by simulation — never again", () => {
+  const to = (s: ConsultState, step: RegExp) => {
+    for (let i = 0; i < 60 && !step.test(nextTurn(s).step); i++) {
+      const t = nextTurn(s);
+      const opts = "options" in t.input ? t.input.options.map((o) => o.id) : [];
+      s = respond(s, t.step, t.step === "check" ? "none" : t.step === "who" ? "self" : t.input.kind === "multi" ? [] : t.input.kind === "text" ? "" : opts.includes("no") ? "no" : opts[0]);
+    }
+    return s;
+  };
+
+  it("new information is not a 'yes' to the question on screen ('there is blood when I cough' at the headache question)", () => {
+    const s = to(say(start(), "I have a headache since two days").s, /^q:head-worst$/);
+    expect(nextTurn(s).step).toBe("q:head-worst");
+    expect(nextTurn(say(s, "there is blood when I cough").s).step).not.toBe("emergency");
+    expect(nextTurn(say(s, "I have a fever").s).step).not.toBe("emergency");
+    // A plain short yes still counts.
+    expect(nextTurn(say(s, "yes it is").s).step).toBe("emergency");
+  });
+
+  it("an earlier 'no' to an unclear mention never hides a later clear red flag", () => {
+    let s = say(start(), "here on my right").s;
+    s = respond(s, "body", "head|right");
+    s = respond(s, "describe", "words:vision trouble");
+    expect(nextTurn(s).step).toBe("confirm:stroke");
+    s = respond(s, "confirm:stroke", "no");
+    expect(nextTurn(say(s, "her face is drooping on one side").s).step).toBe("emergency");
+  });
+
+  it("after 'this is not an emergency', the same red flag mentioned again is asked about — never ignored", () => {
+    let s = say(start(), "I had chest pain this morning").s;
+    expect(nextTurn(s).step).toBe("emergency");
+    s = respond(s, "emergency", "exit");
+    const again = say(s, "the chest pain is back").s;
+    expect(nextTurn(again).step).toBe("confirm:chest_pain");
+  });
+
+  it("'I already told you' never reuses a bare 'yes' given to a different question", () => {
+    let s = say(start(), "my baby has diarrhoea").s;
+    s = say(s, "yes").s; // a yes to something else
+    s = to(s, /^q:c5-drink$/);
+    if (nextTurn(s).step === "q:c5-drink") {
+      const r = converse(s, nextTurn(s), "I already told you");
+      expect("state" in r ? nextTurn(r.state).step : "q:c5-drink").not.toBe("emergency");
+    }
+  });
+});

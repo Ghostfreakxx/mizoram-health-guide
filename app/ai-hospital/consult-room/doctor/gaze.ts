@@ -5,7 +5,8 @@
 import type { GazePolicy } from "./state";
 import { hash } from "./random";
 
-export type GazeTarget = "patient" | "chart" | "down" | "away";
+// "visual": the on-screen tool the doctor is showing (the body map).
+export type GazeTarget = "patient" | "chart" | "down" | "away" | "visual";
 export type Gaze = { target: GazeTarget; sx: number; sy: number };
 
 // Repeating conversational pattern: look at the patient for 3.5–6 s, then
@@ -26,6 +27,9 @@ function conversational(dt: number, seed: number): GazeTarget {
 // phrase begins; on some phrases a brief look away while "finding the words";
 // when explaining, a glance at the chart (the information being explained).
 function whileSpeaking(policy: GazePolicy, phrase: number, phraseAge: number, seed: number): GazeTarget {
+  // Showing the body map: look at the patient, glance at the picture while
+  // pointing it out, then back to the patient for the question.
+  if (policy === "showing") return phrase === 0 && phraseAge > 0.7 && phraseAge < 1.7 ? "visual" : "patient";
   if (phraseAge < 0.6) return "patient";
   const r = hash(phrase * 29 + 7 + seed);
   if (policy === "explaining" && r < 0.34 && phraseAge < 1.5) return "chart";
@@ -42,7 +46,7 @@ export function gazeAt(
   const dt = Math.max(0, t - since);
   const seed = opts.seed ?? 0;
   let target: GazeTarget = "patient";
-  if (opts.speaking && (policy === "conversational" || policy === "explaining" || policy === "steady")) {
+  if (opts.speaking && (policy === "conversational" || policy === "explaining" || policy === "steady" || policy === "showing")) {
     target = whileSpeaking(policy, opts.phrase ?? 0, opts.phraseAge ?? 0, seed);
     return { target, ...micro(t, opts.reducedMotion, seed) };
   }
@@ -58,6 +62,10 @@ export function gazeAt(
       break;
     case "explaining":
       target = conversational(dt, seed);
+      break;
+    case "showing":
+      // Not speaking (muted): the same glance at the picture, then the patient.
+      target = dt > 0.6 && dt < 1.6 ? "visual" : dt >= 1.6 ? conversational(dt - 1.6, seed) : "patient";
       break;
     case "preparing":
       // Finishing notes at the chart before the patient arrives.

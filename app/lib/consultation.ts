@@ -79,7 +79,8 @@ export type ConsultState = {
   focus: string[]; // complaint ids this department shows first
   concernText?: string;
   pendingFlags: RedFlagId[]; // mentioned in free text; need a yes/no
-  dismissedFlags: RedFlagId[];
+  dismissedFlags: RedFlagId[]; // asked directly and answered "no"
+  exitedFlags: RedFlagId[]; // the patient left Emergency Mode for these ("this is not an emergency")
   checkDone: boolean;
   who?: "self" | "other";
   relation?: string;
@@ -132,6 +133,14 @@ export type ConsultState = {
   said: string[]; // everything the patient typed or said, in order (this visit only)
   explainedTerms: string[]; // words already explained (not offered again)
   doctorQuestions: string[]; // questions only a professional can answer, saved for them
+  // Other problems the patient mentioned ("…but I also have back pain"). Kept
+  // in their words for the summary; the questions focus on the main concern.
+  otherConcerns: string[];
+  // Things the patient said they do NOT have, in words ("no fever").
+  denied: string[];
+  // A new statement that contradicts an earlier answer — asked about, never
+  // silently overwritten or silently ignored.
+  recheck?: { key: string; earlier: string; now: string };
 };
 
 export type Side = "left" | "right" | "both" | "middle";
@@ -173,6 +182,7 @@ export function startConsultation(department: string, intro = defaultIntro(depar
     focus,
     pendingFlags: [],
     dismissedFlags: [],
+    exitedFlags: [],
     checkDone: false,
     special: [],
     specialDone: false,
@@ -202,6 +212,8 @@ export function startConsultation(department: string, intro = defaultIntro(depar
     said: [],
     explainedTerms: [],
     doctorQuestions: [],
+    otherConcerns: [],
+    denied: [],
   };
 }
 
@@ -292,7 +304,7 @@ function memoryLine(s: ConsultState, step: string): { key: string; line: string 
 // Turn text = [memory line] [short acknowledgement] question [plain meaning].
 function compose(s: ConsultState, t: Turn, opts: { ack?: boolean; simple?: string } = {}): Turn {
   const parts: string[] = [];
-  const note = s.notes[0] ?? memoryLine(s, t.step)?.line;
+  const note = s.notes.length ? s.notes.slice(0, 2).join(" ") : memoryLine(s, t.step)?.line;
   if (note) parts.push(note);
   else if (opts.ack && s.turns > 0 && s.turns % 2 === 1) parts.push(ACKS[Math.floor(s.turns / 2) % ACKS.length]);
   parts.push(t.say);
@@ -436,6 +448,22 @@ export function nextTurn(s: ConsultState): Turn {
       mood: "focused",
       unsure: true,
     }, { simple: getRedFlag(pending).label });
+  }
+  // Something new contradicts an earlier answer: ask which is right.
+  if (s.recheck) {
+    const r = s.recheck;
+    const fever = r.key === "fever";
+    return {
+      step: "recheck",
+      say: fever
+        ? `Earlier you said ${r.earlier}, but you've now said ${r.now}. Should I record that you have a measured fever?`
+        : `Earlier you said ${r.earlier} Just now you said ${r.now}. Should I change that answer to yes?`,
+      question: fever ? "Should I record that you have a measured fever?" : "Should I change that answer to yes?",
+      hint: "I want your summary to be right, so I'm checking rather than guessing.",
+      input: { kind: "single", options: [{ id: "yes", label: "Yes, change it" }, { id: "no", label: "No, keep my earlier answer" }, { id: "unsure", label: "Not sure" }] },
+      mood: "focused",
+      unsure: true,
+    };
   }
   // "I can't explain it", "It hurts here": first, where in the body.
   const needsWhere = (s.helpDescribe || s.whereFirst) && !s.bodyDone;
@@ -677,7 +705,8 @@ export function recap(s: ConsultState): string {
   if (s.progression === "worse") bits.push("and is getting worse");
   else if (s.progression === "better") bits.push("and is getting better");
   const neg = s.complaint ? questionsFor(contextOf(s)).find((q) => "emergency" in q.yes && s.answers[q.id] === "no" && !s.prefilled.includes(q.id)) : undefined;
-  return `${bits.join(", ")}.${neg ? ` You said: ${neg.negative.charAt(0).toLowerCase()}${neg.negative.slice(1)}.` : ""}`;
+  const others = s.otherConcerns.length ? ` You also mentioned ${s.otherConcerns.join(" and ")}: my advice is about the main problem, so please tell the health worker about that too.` : "";
+  return `${bits.join(", ")}.${neg ? ` You said: ${neg.negative.charAt(0).toLowerCase()}${neg.negative.slice(1)}.` : ""}${others}`;
 }
 
 const clip = (t: string) => t.trim().slice(0, MAX_TEXT);
@@ -719,9 +748,13 @@ function withTextFlags(s: ConsultState, text: string): ConsultState {
   const a = detectRedFlags(text);
   const b = detectRedFlags(normalizeWords(text));
   const d = { confirmed: [...new Set([...a.confirmed, ...b.confirmed])], needsConfirmation: [...new Set([...a.needsConfirmation, ...b.needsConfirmation])] };
-  const confirmed = d.confirmed.filter((f) => !s.dismissedFlags.includes(f));
+  // A clear red flag ALWAYS opens Emergency Mode — an earlier "no" to an
+  // unclear mention never hides it. Only a flag the patient has just left
+  // Emergency Mode for is asked about directly again (never ignored).
+  const confirmed = d.confirmed.filter((f) => !s.exitedFlags.includes(f));
   if (confirmed.length) return { ...s, emergency: { flags: confirmed, clear: { kind: "text" } } };
-  const pending = d.needsConfirmation.filter((f) => !s.dismissedFlags.includes(f) && !s.pendingFlags.includes(f) && !confirmed.includes(f));
+  const askAgain = d.confirmed.filter((f) => s.exitedFlags.includes(f));
+  const pending = [...new Set([...askAgain, ...d.needsConfirmation.filter((f) => !s.dismissedFlags.includes(f))])].filter((f) => !s.pendingFlags.includes(f));
   return pending.length ? { ...s, pendingFlags: [...s.pendingFlags, ...pending] } : s;
 }
 
@@ -754,7 +787,7 @@ const ALREADY_YES: [string, RegExp][] = [
   ["fever-headache", /\b(severe|bad|terrible|very bad) headache\b/],
   ["fever-chills", /\b(chills|shivering|shivers|rigors)\b/],
   ["fever-vomit", /\b(vomiting (again and again|a lot|repeatedly|everything)|keep (throwing up|vomiting))\b/],
-  ["cough-blood", /\bcough\w* (up )?blood\b|\bblood in (my |the )?(phlegm|sputum|spit)\b/],
+  ["cough-blood", /\bcough\w* (up )?blood\b|\bblood in (my |the )?(phlegm|sputum|spit)\b|\bblood\b[^|]{0,30}\bcough\w*|\bcough\w*[^|]{0,30}\bblood\b/],
   ["cough-fever", /\bcough\w*\b.*\bfever\b|\bfever\b.*\bcough\w*\b/],
   ["cough-wheeze", /\bwheez\w*\b/],
   ["cough-sweats", /\b(night sweats?|losing weight|lost weight)\b/],
@@ -763,19 +796,106 @@ const ALREADY_YES: [string, RegExp][] = [
   ["stomach-yellow", /\b(yellow (eyes|skin)|jaundice)\b/],
 ];
 
+// "I have a cough but no fever": the negated part is removed before looking
+// for symptoms, so a "no" is never turned into a "yes".
+const NEGATED = /\b(no|not|never|without|nor|don'?t (?:have|get)|doesn'?t (?:have|get)|haven'?t (?:had|got)|hasn'?t (?:had|got)|didn'?t (?:have|get))\b((?:\s+(?:a|an|any|much|really|the|high))*\s+[a-z']+)/g;
+export function stripNegated(t: string): string {
+  return t.replace(NEGATED, " | ");
+}
+
 export function yesFromWords(text: string): string[] {
-  const t = normalizeWords(text);
+  const t = stripNegated(normalizeWords(text));
   return ALREADY_YES.filter(([, re]) => re.test(t)).map(([id]) => id);
 }
 
+// Fever in the patient's words: "I have a fever", or a measured reading
+// ("my temperature was 39", "101 F"). Readings below 38 °C are not a fever.
+const DENIES_FEVER = /\b(no|not|never|without|don'?t have|doesn'?t have|haven'?t had|hasn'?t had|didn'?t have)\s+(a\s+|any\s+|high\s+)?(fever|temperature)\b/;
+const READING = /\b(\d{2,3}(?:[.,]\d)?)\s*(?:°\s*[cf]\b|[cf]\b|degrees?(?:\s*(?:c|f|celsius|fahrenheit))?\b|deg\b)|\b(?:temperature|temp|fever)\s+(?:was|is|of|at|reached|went up to)\s+(\d{2,3}(?:[.,]\d)?)/;
+export function feverFromWords(text: string): { said: boolean; reading?: { text: string; celsius: number } } | null {
+  const t = normalizeWords(text);
+  const m = t.match(READING);
+  let reading: { text: string; celsius: number } | undefined;
+  if (m) {
+    const raw = m[1] ?? m[2];
+    const unit = /f\b|fahrenheit/.test(m[0]) ? " F" : "";
+    const opt = temperatureOption(`${raw}${unit}`);
+    const v = parseFloat(raw.replace(",", "."));
+    const celsius = unit || v > 50 ? Math.round(((v - 32) * 5) / 9 * 10) / 10 : v;
+    if (opt) reading = { text: opt.text, celsius };
+  }
+  const said = /\b(fever\w*|high temperature)\b/.test(stripNegated(t)) && !DENIES_FEVER.test(t);
+  if (!said && !(reading && reading.celsius >= 38)) return reading ? { said: false, reading } : null;
+  return { said, reading };
+}
+
+// What the patient says can add facts along the way. A new "yes" for a
+// question not yet asked is kept (it can only add care). A new statement that
+// contradicts an earlier answer is ASKED about (`recheck`) — never silently
+// overwritten, never silently ignored.
 function withWordAnswers(s: ConsultState, text: string): ConsultState {
-  const ids = yesFromWords(text).filter((id) => !(id in s.answers));
-  if (!ids.length) return s;
-  return { ...s, answers: { ...s.answers, ...Object.fromEntries(ids.map((id) => [id, "yes" as Answer])) }, prefilled: [...new Set([...s.prefilled, ...ids])] };
+  let next = s;
+  const t = normalizeWords(text);
+  if (DENIES_FEVER.test(t) && !next.denied.includes("fever")) next = { ...next, denied: [...next.denied, "fever"] };
+  const qs = questionsFor(contextOf(next));
+  const ids = new Set(yesFromWords(text));
+  const fever = feverFromWords(text);
+  const feverNow = !!fever && (fever.said || (fever.reading?.celsius ?? 0) >= 38);
+  if (fever?.reading && !next.temperature) next = { ...next, temperature: fever.reading.text, remembered: [...next.remembered, "temperature"] };
+  if (feverNow) for (const q of qs) if (/-fever$/.test(q.id)) ids.add(q.id);
+  // "I don't have a fever" … later "my temperature was 39".
+  if (feverNow && next.denied.includes("fever") && !DENIES_FEVER.test(t) && !next.recheck) {
+    next = { ...next, recheck: { key: "fever", earlier: "you didn't have a fever", now: fever?.reading ? `your temperature was ${fever.reading.text}` : "you have a fever" } };
+  }
+  const fresh: string[] = [];
+  for (const id of ids) {
+    const before = next.answers[id];
+    if (before === undefined) fresh.push(id);
+    else if (before === "no" && !next.recheck) {
+      const q = qs.find((x) => x.id === id);
+      if (q) next = { ...next, recheck: { key: id, earlier: `no when I asked: “${q.text}”`, now: `“${clip(text).slice(0, 80)}”` } };
+    }
+  }
+  // While a fever contradiction is open, fever answers wait for the patient.
+  const add = next.recheck?.key === "fever" ? fresh.filter((id) => !/-fever$/.test(id)) : fresh;
+  if (!add.length) return next;
+  return { ...next, answers: { ...next.answers, ...Object.fromEntries(add.map((id) => [id, "yes" as Answer])) }, prefilled: [...new Set([...next.prefilled, ...add])] };
+}
+
+// "…but I also have back pain": a second problem, kept in the patient's words.
+const ALSO = /\b(also|as well|another (problem|thing|issue)|plus|on top of that|besides that)\b/;
+const LEAD_IN = /^(?:(?:and|but|i|i've|i'm|im|i am|i also|also|have|has|got|get|getting|having|there is|there's|as well|plus|on top of that|besides that|another problem is|another thing is)\s+)+/;
+function problemIn(t: string): string | undefined {
+  const p = stripNegated(t);
+  return suggestFrom(p, receive(p).complaintIds)[0];
+}
+export function splitConcerns(text: string): { main: string; other: string; otherProblem: string } | null {
+  const t = normalizeWords(text).replace(/[.!]+\s*$/, "");
+  const tooEnd = /\s+too$/.exec(t); // "I have back pain too"
+  const m = tooEnd ?? ALSO.exec(t);
+  if (!m) return null;
+  const before = tooEnd ? "" : t.slice(0, m.index).replace(/\b(but|and)\s*$/, "").trim();
+  const after = tooEnd ? t.slice(0, m.index).trim() : t.slice(m.index).trim();
+  const otherProblem = problemIn(after);
+  if (!otherProblem) return null;
+  const words = after.replace(LEAD_IN, "").replace(/^(also|as well)\s+/, "").replace(/[.!]+$/, "").trim();
+  return { main: before, other: words || after, otherProblem };
+}
+
+// A second problem mentioned during the consultation. Returns null when the
+// words are not about a different problem.
+function addOtherConcern(s: ConsultState, text: string): { state: ConsultState; line: string } | null {
+  const split = splitConcerns(text);
+  if (!split || split.otherProblem === s.complaint) return null;
+  if (s.otherConcerns.some((c) => c.toLowerCase() === split.other.toLowerCase())) return null;
+  const state = { ...s, otherConcerns: [...s.otherConcerns, split.other] };
+  return { state, line: `I've noted ${split.other} as well. It will be in your summary so a health worker can look at it too. Let's finish with ${s.complaint ? (NOUN[s.complaint] ?? "the main problem") : "the main problem"} first.` };
 }
 
 function absorb(s: ConsultState, text: string): ConsultState {
   let next = withWordAnswers(s, text);
+  const other = addOtherConcern(next, text);
+  if (other) next = { ...other.state, notes: [...next.notes, other.line.replace(/ Let's finish.*$/, "")] };
   const notes: string[] = [];
   if (!s.duration && !s.unknown.duration) {
     const d = receive(normalizeWords(text)).duration;
@@ -806,7 +926,7 @@ function respondCore(s: ConsultState, step: string, value: string | string[]): C
       return { ...s, answers, emergency: null };
     }
     if (e.clear.kind === "check") return { ...s, checkDone: false, emergency: null };
-    return { ...s, dismissedFlags: [...s.dismissedFlags, ...e.flags], emergency: null };
+    return { ...s, dismissedFlags: [...s.dismissedFlags, ...e.flags], exitedFlags: [...new Set([...s.exitedFlags, ...e.flags])], emergency: null };
   }
   // While in an emergency, nothing else can change the outcome.
   if (s.emergency) return s;
@@ -817,11 +937,12 @@ function respondCore(s: ConsultState, step: string, value: string | string[]): C
     const more = clip(one.startsWith("words:") ? one.slice(6) : one);
     if (!more) return s;
     const r = receive(normalizeWords(more));
+    const positive = stripNegated(normalizeWords(more));
     const next: ConsultState = {
       ...s,
       concernMore: true,
       concernText: clip(`${s.concernText ?? ""} — ${more}`),
-      suggested: suggestFrom(normalizeWords(more), r.complaintIds),
+      suggested: suggestFrom(positive, receive(positive).complaintIds),
       duration: s.duration ?? r.duration,
       answers: { ...r.prefill, ...s.answers },
       prefilled: [...new Set([...s.prefilled, ...Object.keys(r.prefill)])],
@@ -855,6 +976,34 @@ function respondCore(s: ConsultState, step: string, value: string | string[]): C
     return fresh.length ? { ...direct, pendingFlags: [...direct.pendingFlags, ...fresh] } : direct;
   }
 
+  if (step === "recheck") {
+    const r = s.recheck;
+    const ans = unsure ? "unsure" : one;
+    if (!r || !["yes", "no", "unsure"].includes(ans)) return s;
+    const cleared: ConsultState = { ...s, recheck: undefined };
+    const qs = questionsFor(contextOf(s));
+    // The fever question(s) this applies to, and a single question otherwise.
+    const ids = r.key === "fever" ? qs.filter((q) => /-fever$/.test(q.id)).map((q) => q.id) : [r.key];
+    if (ans === "no") {
+      return { ...cleared, corrections: [...s.corrections, r.key === "fever" ? "Kept: no fever (a temperature reading was also mentioned)" : `Kept earlier answer (${qs.find((q) => q.id === r.key)?.negative ?? r.key})`] };
+    }
+    const value: Answer = ans === "yes" ? "yes" : "unsure";
+    let next: ConsultState = {
+      ...cleared,
+      denied: r.key === "fever" && ans === "yes" ? s.denied.filter((d) => d !== "fever") : s.denied,
+      answers: { ...s.answers, ...Object.fromEntries(ids.map((id) => [id, value])) },
+      prefilled: s.prefilled.filter((id) => !ids.includes(id)),
+      corrections: [...s.corrections, r.key === "fever" ? (ans === "yes" ? "Changed: has a measured fever" : "Not sure whether there is a fever") : `Changed answer: ${qs.find((q) => q.id === r.key)?.positive ?? r.key}${ans === "unsure" ? " — not sure" : ""}`],
+    };
+    if (r.key === "fever" && ans === "unsure") next = { ...next, unknown: { ...next.unknown, fever: "Not sure" } };
+    for (const id of ids) {
+      const q = qs.find((x) => x.id === id);
+      const flag = q ? emergencyFrom(q, value) : null;
+      if (flag) return { ...next, emergency: { flags: [flag], clear: { kind: "answer", id } } };
+    }
+    return next;
+  }
+
   if (step === "help-describe") return { ...s }; // already switched on by startHelpDescribe
   if (step === "simple-pain") {
     if (unsure) return { ...s, unknown: { ...s.unknown, simplePain: unsure } };
@@ -879,7 +1028,17 @@ function respondCore(s: ConsultState, step: string, value: string | string[]): C
     const text = clip(one);
     if (!text) return s;
     const r = receive(normalizeWords(text));
+    // "I don't have a fever" must not suggest fever as the problem.
+    const positive = stripNegated(normalizeWords(text));
+    const rc = receive(positive);
     const mem = rememberFromWords(text, r.who, r.relation, r.ageHint);
+    // "My main problem is cough, but I also have back pain": the questions
+    // follow the main problem; the other is kept for the summary. Safety
+    // checks still read every word.
+    const split = splitConcerns(text);
+    const mainProblem = split && split.main ? problemIn(split.main) : undefined;
+    const two = !!split && !!mainProblem && mainProblem !== split.otherProblem;
+    const main = two ? receive(split!.main) : r;
     const next: ConsultState = {
       ...s,
       ...mem.fields,
@@ -887,10 +1046,12 @@ function respondCore(s: ConsultState, step: string, value: string | string[]): C
       concernText: text,
       relation: r.relation,
       special: [...new Set([...s.special, ...r.special])],
-      suggested: suggestFrom(normalizeWords(text), r.complaintIds),
-      duration: r.duration,
-      answers: { ...r.prefill, ...s.answers },
-      prefilled: Object.keys(r.prefill),
+      suggested: two ? [mainProblem!] : suggestFrom(positive, rc.complaintIds),
+      duration: two ? main.duration : r.duration,
+      answers: { ...main.prefill, ...s.answers },
+      prefilled: Object.keys(main.prefill),
+      otherConcerns: two ? [split!.other] : s.otherConcerns,
+      notes: two ? [`I've noted ${split!.other} as well — it will be in your summary. Let's start with ${NOUN[mainProblem!] ?? "the main problem"}.`] : s.notes,
     };
     // "It hurts here", "on the right": where comes first (never guessed).
     // "I can't explain it": the patient gets help to describe it.
@@ -906,7 +1067,7 @@ function respondCore(s: ConsultState, step: string, value: string | string[]): C
     }
     const kept = r.duration ? { ...next, remembered: [...next.remembered, "duration"] } : next;
     const distressed = soundsDistressed(text)
-      ? { ...kept, style: { ...kept.style, distressed: true }, notes: ["I can hear this is hard. I'll keep my questions short."] }
+      ? { ...kept, style: { ...kept.style, distressed: true }, notes: ["I can hear this is hard. I'll keep my questions short.", ...kept.notes] }
       : kept;
     return withTextFlags(withWordAnswers(withComplaint(distressed), text), text);
   }
@@ -1097,7 +1258,18 @@ const clean = (t: string) => normalizeWords(t).replace(/[^a-z0-9' ]+/g, " ").rep
 
 const NEGATION = /\b(no|not|never|none|nothing|nope|nah)\b|n't\b/;
 
+// Statement openers ("there is…", "I have…", "it is…") mean yes only in a
+// short reply. "There is blood when I cough", said to an unrelated question,
+// is new information — never a "yes" to the question on screen.
+const OPENER = /^(i do|i have|i am|it is|it does|there is|correct|right)\b/;
+
+const FILLER = new Set(["yes", "yeah", "so", "it", "that", "one", "some", "a", "bit", "little", "sometimes", "really", "i", "think", "do", "is", "does", "am", "have", "there"]);
+
 function yesNo(t: string): string | null {
+  if (OPENER.test(t) && !/^(yes|yeah|yep|yup|haan|ha|aw)\b/.test(t) && !NEGATION.test(t)) {
+    const rest = t.replace(OPENER, "").trim().split(" ").filter(Boolean);
+    if (rest.some((w) => !FILLER.has(w))) return null;
+  }
   if (UNSURE.test(t)) return "unsure";
   if (NO.test(t)) return "no";
   if (YES.test(t) && NEGATION.test(t)) return /^(yes|yeah|yep|yup|haan|ha|aw|sure)\b/.test(t) ? null : "no"; // "yes but not much" → ask; "I have no fever" → no
@@ -1114,7 +1286,7 @@ export function interpretText(turn: Turn, text: string): string | string[] | nul
   const inp = turn.input;
   if (inp.kind === "text") return text;
   const step = turn.step;
-  if (step.startsWith("q:") || step.startsWith("confirm:")) return yesNo(t);
+  if (step.startsWith("q:") || step.startsWith("confirm:") || step === "recheck") return yesNo(t);
   if (step === "check") return NO.test(t) || /\b(none|nothing|no)\b/.test(t) ? "none" : null;
   if (step === "who") {
     if (/\b(me|myself|i am|i'm|for me|self|mine)\b/.test(t) && !FEMALE.test(t) && !MALE.test(t)) return "self";
@@ -1278,6 +1450,7 @@ export function explainLine(turn: Turn, s: ConsultState): string {
     allergies: "Has any medicine, food or anything else ever caused a bad reaction — like a rash, swelling, or difficulty breathing?",
     conditions: "Has a doctor or health worker ever told you that you have a long-term illness — such as diabetes, high blood pressure, asthma or TB?",
     "c:temp": "If you checked the temperature with a thermometer, tell me the number. If not, choose “Not measured”.",
+    recheck: "You told me two different things. I want to write down the right one. Choose “Yes” to change your earlier answer, “No” to keep it, or “Not sure”.",
   };
   return lines[step] ?? (step.startsWith("c:") ? "Choose the answer that fits best. If you're not sure, you can say so." : q);
 }
@@ -1310,6 +1483,7 @@ export function whyLine(turn: Turn): string {
     medicines: "The doctor needs to know what is already being taken, so nothing clashes. I won't suggest any medicine.",
     allergies: "So the doctor can avoid anything that has caused a bad reaction before.",
     conditions: "Long-term conditions can change what care is safest.",
+    recheck: "Two of your answers did not match. I'd rather ask than guess, so your summary is right.",
   };
   return lines[step] ?? "It helps prepare a useful summary for a healthcare professional.";
 }
@@ -1326,6 +1500,7 @@ export type Outcome =
   | { kind: "term"; line: string; state: ConsultState } // "What does allergy mean?"
   | { kind: "education"; answer: EducationAnswer }
   | { kind: "corrected"; state: ConsultState; line: string } // "I said left, not right"
+  | { kind: "noted"; state: ConsultState; line: string } // "I also have back pain" — kept for the summary
   | { kind: "professional"; line: string } // the patient asks for a real doctor
   | { kind: "control"; action: "slower" | "faster"; line: string } // "speak slower"
   | { kind: "needs-professional"; topic: ProfessionalTopic; state: ConsultState; line: string } // prescription, diagnosis, tests
@@ -1423,7 +1598,18 @@ function recall(s: ConsultState, turn: Turn): Outcome {
     const names = s.suggested.slice(0, 3).map((id) => getComplaint(id)?.label.toLowerCase().replace(/,.*$/, "").replace(/ or .*$/, "")).filter(Boolean);
     return { kind: "explain", state: s, line: `Sorry — you did. You mentioned ${names.join(" and ")}. Which one is bothering you most? Tap it below.` };
   }
+  // A bare "yes"/"no" was the answer to a DIFFERENT question — never reused.
+  // For a warning-sign question, only words that describe that sign count.
+  const bare = (w: string) => w.trim().split(/\s+/).length <= 3 && /^(yes|yeah|yep|yup|no|nope|nah|not sure|maybe|ok|okay|sure|i don'?t know|idk|i think so)\b/i.test(w.trim());
   for (const earlier of [...s.said.slice(0, -1)].reverse()) {
+    if (bare(earlier)) continue;
+    if (turn.step.startsWith("q:")) {
+      if (!yesFromWords(earlier).includes(turn.step.slice(2))) continue;
+      const next = respond(s, turn.step, "yes");
+      if (next !== s) return { kind: "answered", state: { ...next, notes: [`Sorry — you did tell me: “${earlier}”. I've noted it.`] } };
+      continue;
+    }
+    if (turn.step.startsWith("confirm:") || turn.step === "recheck") continue;
     const value = interpretText(turn, earlier);
     if (value === null || (turn.input.kind === "text" && turn.step !== "concern")) continue;
     const next = respond(s, turn.step, value);
@@ -1538,13 +1724,20 @@ export function converse(s0: ConsultState, turn: Turn, text: string): Outcome {
     if (next !== base) return { kind: "answered", state: understood(absorb(next, words)) };
   }
 
+  // "I also have back pain": a second problem — noted, not misunderstood.
+  const other = addOtherConcern(withWordAnswers(s, words), words);
+  if (other) return { kind: "noted", state: other.state, line: `${other.line} ${turn.question ?? turn.say}` };
+
   // A question that is not an answer, and not in the verified knowledge.
   if (general || isQuestion(words)) {
     return { kind: "unclear", state: s, line: `${KNOWLEDGE_LINE} Let's carry on. ${turn.question ?? turn.say}`, difficulty: "knowledge" };
   }
 
-  // Not understood — but facts mentioned on the way are still remembered.
-  return { kind: "unclear", ...clarify(absorb(s, words), turn) };
+  // Not an answer — but facts mentioned on the way are still remembered. If
+  // they contradict an earlier answer, the doctor asks about that at once.
+  const absorbed = absorb(s, words);
+  if (absorbed.recheck && !s.recheck) return { kind: "answered", state: absorbed };
+  return { kind: "unclear", ...clarify(absorbed, turn) };
 }
 
 export type TextResult = { state: ConsultState; understood: boolean };
@@ -1561,7 +1754,18 @@ export function respondText(s: ConsultState, turn: Turn, text: string): TextResu
 
 export const NOT_PROVIDED = "Not provided";
 
-export type ChartRow = { label: string; value: string; provided: boolean };
+// Where a fact came from. Only "confirmed" and "from-words" are the patient's
+// own statements; nothing is ever recorded as a fact by guessing.
+export type FactStatus = "confirmed" | "from-words" | "uncertain" | "not-provided";
+export type ChartRow = { label: string; value: string; provided: boolean; status: FactStatus };
+
+const UNCERTAIN_VALUES = /^(not sure|not remembered|could not describe|not sure about)\b|not asked/i;
+function statusOf(value: string, provided: boolean): FactStatus {
+  if (!provided) return "not-provided";
+  if (UNCERTAIN_VALUES.test(value)) return "uncertain";
+  if (/\((from what you said|patient's words)\)/.test(value)) return "from-words";
+  return "confirmed";
+}
 export type Chart = {
   reported: ChartRow[]; // REPORTED BY PATIENT
   safety: ChartRow[]; // answers to safety (danger-sign) questions
@@ -1572,14 +1776,15 @@ const label = <T extends { id: string; label: string }>(list: readonly T[], id?:
 
 export function chartOf(s: ConsultState): Chart {
   // Missing → "Not provided"; a valid "not sure / forgot" answer is recorded as such.
+  const make = (l: string, value: string, provided: boolean): ChartRow => ({ label: l, value, provided, status: statusOf(value, provided) });
   const row = (l: string, v?: string, key?: string): ChartRow =>
     v && v.trim()
-      ? { label: l, value: v.trim(), provided: true }
+      ? make(l, v.trim(), true)
       : key && s.unknown[key]
-        ? { label: l, value: s.unknown[key], provided: true }
+        ? make(l, s.unknown[key], true)
         : key && s.style.distressed && SHORTENED.includes(key) && nextTurn(s).input.kind === "result"
-          ? { label: l, value: "Not asked (kept the consultation short) — please ask", provided: false }
-          : { label: l, value: NOT_PROVIDED, provided: false };
+          ? make(l, "Not asked (kept the consultation short) — please ask", false)
+          : make(l, NOT_PROVIDED, false);
   const ctx = contextOf(s);
   const qs = s.complaint ? questionsFor(ctx) : [];
   const said = (a: Answer, emergencyOnly: boolean) =>
@@ -1620,10 +1825,15 @@ export function chartOf(s: ConsultState): Chart {
   );
   const unsure = qs.filter((q) => s.answers[q.id] === "unsure" && !s.prefilled.includes(q.id));
   if (unsure.length) reported.push(row("Not sure about", unsure.map((q) => q.positive).join("; ")));
-  for (const c of s.complaint ? choicesFor(ctx) : []) {
-    const v = c.id === "temp" && s.temperature ? `${s.temperature} (measured by patient)` : s.unknown[`c:${c.id}`] ?? label(c.options, s.choices[c.id]);
+  const choices = s.complaint ? choicesFor(ctx) : [];
+  for (const c of choices) {
+    const v = c.id === "temp" && s.temperature ? `${s.temperature} (measured by patient${s.remembered.includes("temperature") ? ", from what you said" : ""})` : s.unknown[`c:${c.id}`] ?? label(c.options, s.choices[c.id]);
     if (v) reported.push(row(c.summaryLabel, v));
   }
+  // A reading the patient mentioned, where no temperature question is asked.
+  if (s.temperature && !choices.some((c) => c.id === "temp")) reported.push(row("Temperature", `${s.temperature} (measured by patient${s.remembered.includes("temperature") ? ", from what you said" : ""})`));
+  if (s.unknown.fever) reported.push(row("Fever", s.unknown.fever));
+  if (s.otherConcerns.length) reported.push(row("Other problems mentioned (not assessed)", `${s.otherConcerns.join("; ")} (patient's words)`));
   reported.push(
     row("Current medicines", s.medicines, "medicines"),
     row("Known allergies", s.allergies, "allergies"),

@@ -27,7 +27,9 @@ export const VOICE_CONSENT_TEXT =
 
 // ---------------- Output ----------------
 
-export type SpeakHandlers = { onStart?: () => void; onEnd?: () => void; onWord?: (charIndex: number) => void };
+// onFail: the voice could not play (no on-device voice, or a speech error).
+// Stopping on purpose ("interrupted", "canceled") is not a failure.
+export type SpeakHandlers = { onStart?: () => void; onEnd?: () => void; onWord?: (charIndex: number) => void; onFail?: () => void };
 
 export type SpeechOutput = {
   available: boolean;
@@ -66,6 +68,7 @@ export function browserSpeech(): SpeechOutput {
       voice ??= pickVoice(synth.getVoices());
       if (!voice) {
         // No on-device voice: show the words only, and carry on.
+        h?.onFail?.();
         h?.onEnd?.();
         return;
       }
@@ -76,7 +79,11 @@ export function browserSpeech(): SpeechOutput {
       u.pitch = 1;
       u.onstart = () => h?.onStart?.();
       u.onend = () => h?.onEnd?.();
-      u.onerror = () => h?.onEnd?.();
+      u.onerror = (e) => {
+        const reason = (e as SpeechSynthesisErrorEvent).error;
+        if (reason !== "interrupted" && reason !== "canceled") h?.onFail?.();
+        h?.onEnd?.();
+      };
       u.onboundary = (e) => {
         if (e.name === "word" || e.name === undefined) h?.onWord?.(e.charIndex);
       };

@@ -7,7 +7,6 @@ import { termsIn } from "../../lib/knowledge/glossary";
 import type { EducationAnswer } from "../../lib/education";
 import { hasConsent, loadPassport } from "../../lib/storage";
 import { DEMO_SCENARIOS, demoAnswer } from "../../lib/demoScenarios";
-import type { Level } from "../../lib/safety/triage";
 import { questionsFor } from "../../lib/safety/triage";
 import EmergencyMode from "../components/EmergencyMode";
 import ResultView, { type SummaryExtra } from "../components/ResultView";
@@ -21,6 +20,7 @@ import { type DoctorState, STATE_LABEL } from "./doctor/state";
 import Doctor2D from "./Doctor2D";
 import HandoffPanel from "./HandoffPanel";
 import { takePendingConcern } from "./handoff";
+import { planReply, planTurn } from "./doctor/director";
 import { reportFailure, track } from "../../lib/telemetry";
 import JourneyBar, { type JourneyStep } from "./JourneyBar";
 import PatientChart from "./PatientChart";
@@ -31,6 +31,10 @@ import { type SpeechOutput, VOICE_CONSENT_TEXT, browserSpeech, listen, needsSpee
 // The 3D room is only downloaded once a consultation room is opened (or
 // warmed up by preload.ts when the person points at a link to it).
 const Doctor3D = dynamic(() => import("./Doctor3D"), { ssr: false, loading: () => <StageMessage text="Preparing the consultation room…" /> });
+// Loaded only on request: clinical review mode (?review), and the developer
+// debug panel (?debug, development builds only — never shipped to patients).
+const ReviewPanel = dynamic(() => import("./ReviewPanel"), { ssr: false });
+const DebugPanel = process.env.NODE_ENV === "development" ? dynamic(() => import("./DebugPanel"), { ssr: false }) : null;
 
 function StageMessage({ text }: { text: string }) {
   return <div className="grid h-full place-items-center bg-slate-100 text-lg font-semibold text-slate-700">{text}</div>;
@@ -58,9 +62,6 @@ export const PRIVACY_LINE = "Your consultation information stays on this device 
 
 const NORMAL_RATE = 0.92;
 const SLOW_RATE = 0.78;
-// A short, natural pause while an answer is checked: longer answers take a
-// little longer to "read" (0.6–1.4 s). Never used for an emergency.
-const thinkMs = (words: string) => Math.min(1400, 600 + words.length * 10);
 
 function splitSentences(text: string): string[] {
   return (text.match(/[^.!?]+[.!?]+["”’)]*\s*|[^.!?]+$/g) ?? [text]).map((x) => x.trim()).filter(Boolean);
@@ -105,7 +106,6 @@ function answerLabel(t: Turn, value: string | string[]): string {
 
 // How the doctor delivers a result: concern for urgent care, calm reassurance
 // for self-care, plain explanation otherwise. The level comes from the engine.
-const resultState = (level: Level): DoctorState => (level === "RED" || level === "ORANGE" ? "concerned" : level === "GREEN" ? "reassuring" : "explaining");
 
 // What the 3D chart monitor in the room shows: what the patient has said so far.
 function chartLines(chart: ReturnType<typeof chartOf>): ChartLine[] {
@@ -135,6 +135,8 @@ function summaryExtra(s: ConsultState): SummaryExtra {
   const notes = [
     ...Object.entries(s.unknown).map(([k, v]) => `${UNKNOWN_LABEL[k] ?? k}: ${v.toLowerCase()}`),
     ...s.corrections.map((c) => `Corrected by the patient: ${c}`),
+    ...(s.otherConcerns.length ? [`Also mentioned (not assessed in this consultation — please ask): ${s.otherConcerns.join("; ")}`] : []),
+    ...(s.temperature && s.complaint !== "fever" ? [`Temperature measured by the patient: ${s.temperature}`] : []),
     ...(s.style.distressed && (!s.medicinesDone || !s.allergiesDone || !s.conditionsDone)
       ? ["Medicines, allergies and long-term conditions were not asked, to keep the consultation short — please ask."]
       : []),
@@ -170,6 +172,14 @@ export default function ConsultationRoom({ room }: { room: RoomStyle }) {
     setDocState(s);
   }, []);
   const lips = useRef<LipSync | null>(null);
+  // The voice could not play: carry on in captions, say so once.
+  const [voiceIssue, setVoiceIssue] = useState(false);
+  const voiceFailed = useCallback(() => {
+    setVoiceIssue((was) => {
+      if (!was) reportFailure("voice-output");
+      return true;
+    });
+  }, []);
   const [log, setLog] = useState<Line[]>([]);
   const [note, setNote] = useState("");
 
@@ -200,6 +210,8 @@ export default function ConsultationRoom({ room }: { room: RoomStyle }) {
   const [talk, setTalk] = useState<{ available: boolean; reason?: string }>({ available: false });
   const [demoMode, setDemoMode] = useState(false);
   const [demo, setDemo] = useState<string | null>(null);
+  const [reviewMode, setReviewMode] = useState(false);
+  const [debugMode, setDebugMode] = useState(false);
   const demoAsked = useRef(false);
   const demoHoldUntil = useRef(0);
   const counted = useRef({ started: false, ended: false, view: false }); // pilot counts, once per consultation
@@ -244,6 +256,8 @@ export default function ConsultationRoom({ room }: { room: RoomStyle }) {
     if (q.get("view") === "text") setDisplay("text");
     else if (q.get("view") === "simple") setDisplay("2d");
     setStartDescribe(q.get("start") === "describe");
+    setReviewMode(q.has("review"));
+    setDebugMode(q.has("debug") && process.env.NODE_ENV === "development");
     setFromReception(takePendingConcern());
     if (hasConsent()) {
       const p = loadPassport();
@@ -341,6 +355,7 @@ export default function ConsultationRoom({ room }: { room: RoomStyle }) {
                 onStart: () => lips.current?.begin(text, performance.now() / 1000, rate / NORMAL_RATE),
                 onWord: (ci) => lips.current?.word(ci, performance.now() / 1000),
                 onEnd: finish,
+                onFail: voiceFailed,
               },
               rate,
             );
@@ -355,7 +370,7 @@ export default function ConsultationRoom({ room }: { room: RoomStyle }) {
       if (opts.delay) wait(() => step(0), opts.delay);
       else step(0);
     },
-    [setDoctor, cancelSay],
+    [setDoctor, cancelSay, voiceFailed],
   );
 
   // Stops the doctor mid-sentence. Anything not yet said is still written
@@ -393,34 +408,18 @@ export default function ConsultationRoom({ room }: { room: RoomStyle }) {
     const key = `${history.length}:${turn.step}`;
     if (lastKey.current === key) return;
     lastKey.current = key;
-    /* eslint-disable react-hooks/set-state-in-effect -- the doctor reacts to each new engine turn (once per turn, guarded by lastKey) */
     setNote("");
-    if (turn.input.kind === "emergency") {
+    // What the doctor does is decided in one place (doctor/director.ts).
+    const plan = planTurn(turn, { first: turn.step === "concern" && history.length === 1, lastSaid: lastSaid.current, reducedMotion });
+    if (plan.interrupt) {
       // EMERGENCY: everything else stops; the line is said at once, no pause.
       clearTimers();
       stopMic.current?.();
-      const s = { lines: [{ text: turn.say, state: "emergency" as const }], after: "emergency" as const };
-      turnSpeech.current = s;
-      speak(s.lines, s.after);
-      topRef.current?.scrollIntoView({ block: "start" });
-    } else if (turn.input.kind === "result") {
-      const s = { lines: [{ text: turn.say, state: resultState(turn.input.level) }, ...(turn.then ? [{ text: turn.then, state: "handoff" as const }] : [])], after: "complete" as const };
-      turnSpeech.current = s;
-      setDoctor("processing");
-      speak(s.lines, s.after, { delay: thinkMs(lastSaid.current) });
-    } else if (turn.step === "concern" && history.length === 1) {
-      // The doctor notices the patient (a glance up from the chart), then speaks.
-      const s = { lines: [{ text: turn.say, state: "greeting" as const }], after: "listening" as const };
-      turnSpeech.current = s;
-      setDoctor("greeting");
-      speak(s.lines, s.after, { delay: reducedMotion ? 0 : 700 });
-    } else {
-      const s = { lines: [{ text: turn.say, state: "asking" as const }], after: "listening" as const };
-      turnSpeech.current = s;
-      setDoctor("processing");
-      speak(s.lines, s.after, { delay: thinkMs(lastSaid.current) });
     }
-    /* eslint-enable react-hooks/set-state-in-effect */
+    turnSpeech.current = { lines: plan.lines, after: plan.after };
+    if (plan.before) setDoctor(plan.before);
+    speak(plan.lines, plan.after, plan.delayMs ? { delay: plan.delayMs } : {});
+    if (plan.scrollTop) topRef.current?.scrollIntoView({ block: "start" });
   }, [started, turn, history.length, speak, setDoctor, clearTimers, reducedMotion]);
 
   const commit = useCallback(
@@ -497,47 +496,16 @@ export default function ConsultationRoom({ room }: { room: RoomStyle }) {
     setLog((g) => [...g, { who: "patient", text: w }]);
     setText("");
     if (o.kind === "repeat") return repeat();
-    if (o.kind === "explain") {
-      track({ type: "clarification", kind: "question-explained" });
-      replaceState(o.state);
-      return reply([{ text: o.line, state: "clarifying" }], o.line);
-    }
-    if (o.kind === "why") return reply([{ text: o.line, state: "clarifying" }], o.line);
-    if (o.kind === "term") {
-      track({ type: "clarification", kind: "word-explained" });
-      replaceState(o.state);
-      return reply([{ text: o.line, state: "clarifying" }], o.line);
-    }
-    if (o.kind === "needs-professional") {
-      replaceState(o.state);
-      return reply([{ text: o.line, state: "clarifying" }], o.line);
-    }
-    if (o.kind === "control") {
-      setSlowerTo(o.action === "slower");
-      return reply([{ text: o.line, state: "reassuring" }, { text: turn.question ?? turn.say, state: "asking" }], o.line);
-    }
-    if (o.kind === "corrected") {
-      replaceState(o.state);
-      return reply([{ text: o.line, state: "clarifying" }, { text: nextTurn(o.state).question ?? nextTurn(o.state).say, state: "asking" }], o.line);
-    }
-    if (o.kind === "professional") {
-      setWantsProfessional(true);
-      return reply([{ text: o.line, state: "reassuring" }], o.line);
-    }
-    if (o.kind === "education") {
-      setEducation(o.answer);
-      return reply(
-        [
-          { text: `Here is some general health information. It is not an assessment of you. ${o.answer.text[0]}`, state: "educating" },
-          { text: `Now, back to your consultation. ${turn.question ?? turn.say}`, state: "asking" },
-        ],
-        "",
-      );
-    }
-    // unclear: still keep anything worth remembering
-    track({ type: "clarification", kind: "unclear" });
-    replaceState(o.state);
-    reply([{ text: o.line, state: "clarifying" }], o.line);
+    // Side effects of each kind of reply; the words come from the director.
+    if (o.kind === "explain") track({ type: "clarification", kind: "question-explained" });
+    if (o.kind === "term") track({ type: "clarification", kind: "word-explained" });
+    if (o.kind === "unclear") track({ type: "clarification", kind: "unclear" });
+    if (o.kind === "control") setSlowerTo(o.action === "slower");
+    if (o.kind === "professional") setWantsProfessional(true);
+    if (o.kind === "education") setEducation(o.answer);
+    if ("state" in o) replaceState(o.state);
+    const plan = planReply(o, turn, "state" in o ? nextTurn(o.state) : turn);
+    reply(plan.lines, o.kind === "education" ? "" : o.line);
   };
 
   // Words typed at Reception are sent as the first answer, once, after the greeting.
@@ -845,6 +813,11 @@ export default function ConsultationRoom({ room }: { room: RoomStyle }) {
                   <div className="h-full rounded-full bg-blue-800 transition-[width] duration-300" style={{ width: `${avatarReady ? 100 : Math.max(4, pct)}%` }} />
                 </div>
                 <p className="mt-2 text-xs text-slate-600">You can type your answers as soon as the doctor speaks.</p>
+                {!avatarReady && (
+                  <button type="button" onClick={() => setDisplay("2d")} className="mt-3 min-h-11 w-full rounded-xl border-2 border-blue-900 px-4 py-2 font-semibold text-blue-900 hover:bg-blue-50">
+                    Continue in lightweight mode
+                  </button>
+                )}
               </div>
             </div>
           )}
@@ -1264,12 +1237,19 @@ export default function ConsultationRoom({ room }: { room: RoomStyle }) {
     <div ref={topRef} className={`space-y-4 ${emergency ? "" : "max-lg:pb-16"}`}>
       <JourneyBar current={journey} />
       {demoMode && !emergency && <DemoPanel active={demo} onPlay={playDemo} onReset={resetDemo} />}
+      {reviewMode && <ReviewPanel state={state} turn={turn} />}
+      {debugMode && DebugPanel && <DebugPanel state={state} turn={turn} doctor={doc} speaking={speaking} listening={listening} tier={String(tier)} voiceIssue={voiceIssue} />}
       {fromReception && !emergency && (
         <p className="rounded-xl bg-blue-50 px-4 py-2 text-blue-950">
           From Reception: <q>{fromReception}</q> — this will be your first answer.
         </p>
       )}
       {failed3d && <p role="status" className="rounded-xl bg-amber-50 px-4 py-2 text-sm font-semibold text-amber-900">{failed3d}</p>}
+      {voiceIssue && voiceOn && (
+        <p role="status" className="rounded-xl bg-amber-50 px-4 py-2 text-sm font-semibold text-amber-900">
+          Voice isn&apos;t available right now. The doctor&apos;s words are shown as text — you can keep going by reading and typing.
+        </p>
+      )}
       <div className={emergency ? "" : "grid gap-5 lg:grid-cols-[minmax(0,1fr)_360px]"}>
         <div className={emergency ? "grid gap-4 lg:grid-cols-[minmax(0,1fr)_360px] lg:items-start" : "space-y-4"}>
           {emergency && (

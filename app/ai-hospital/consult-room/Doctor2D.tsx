@@ -59,7 +59,7 @@ export default function Doctor2D({
       const v = lips.current?.visemeAt(t);
       const deg = 180 / Math.PI;
       const g = f.gaze.target;
-      const look = g === "chart" ? [-3.2, 1.6] : g === "down" ? [0, 2.4] : g === "away" ? [3, -0.6] : [f.gaze.sx * 70, f.gaze.sy * 70];
+      const look = g === "chart" ? [-3.2, 1.6] : g === "down" ? [0, 2.4] : g === "away" ? [3, -0.6] : g === "visual" ? [-1.4, 2.6] : [f.gaze.sx * 70, f.gaze.sy * 70];
       eyes.current?.setAttribute("transform", `translate(${look[0].toFixed(2)} ${look[1].toFixed(2)})`);
       const b = f.body;
       head.current?.setAttribute("transform", `translate(${(b.headYaw * 55).toFixed(2)} ${(b.headPitch * 38 + b.lean * 3).toFixed(2)}) rotate(${(b.headRoll * deg).toFixed(2)} 160 128)`);

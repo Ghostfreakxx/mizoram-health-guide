@@ -1,11 +1,18 @@
 "use client";
 
+import { useState } from "react";
 import type { Option } from "../../lib/consultation";
 
 // "Can you show me where?" — tap the body (front or back) or use the list.
 // Region and side are stored separately; the side is asked next, never
 // guessed from where on the picture the patient tapped (left/right is easy
 // to mirror). Structured input for the summary only; never a diagnosis.
+//
+// Picture taps are easy to get wrong on a small phone, so a tap highlights the
+// area (on both figures) and asks "Is that the right place?" before anything
+// is recorded. The labelled buttons (keyboard and screen readers) record
+// directly. After recording, the place can still be changed by saying so
+// ("No, it's my back") or with Back.
 
 type Region = { id: string; d: string };
 
@@ -30,16 +37,16 @@ const BACK: Region[] = [
   { id: "legs", d: "M76 250 L98 250 L96 390 L76 390 Z M102 250 L124 250 L124 390 L104 390 Z" },
 ];
 
-function Figure({ title, regions, options, onPick }: { title: string; regions: Region[]; options: Option[]; onPick: (id: string) => void }) {
+function Figure({ title, regions, options, selected, onTap }: { title: string; regions: Region[]; options: Option[]; selected: string | null; onTap: (id: string) => void }) {
   return (
     <figure className="text-center">
-      <svg viewBox="0 0 200 400" className="mx-auto h-56 w-auto sm:h-64" aria-hidden>
+      <svg viewBox="0 0 200 400" className="mx-auto h-56 w-auto touch-manipulation sm:h-64" aria-hidden>
         {regions.map((r) => (
           <path
             key={`${title}-${r.id}`}
             d={r.d}
-            onClick={() => onPick(r.id)}
-            className="cursor-pointer fill-slate-200 stroke-white transition-colors hover:fill-blue-300"
+            onClick={() => onTap(r.id)}
+            className={`cursor-pointer stroke-white transition-colors ${selected === r.id ? "fill-blue-600" : "fill-slate-200 hover:fill-blue-300"}`}
             strokeWidth={2}
           >
             <title>{options.find((o) => o.id === r.id)?.label}</title>
@@ -54,17 +61,41 @@ function Figure({ title, regions, options, onPick }: { title: string; regions: R
 export default function BodyMap({ options, onPick }: { options: Option[]; onPick: (id: string) => void }) {
   // Right-side (or left-side) areas after "on the right": a short list only.
   const sided = options.some((o) => o.id.includes("|"));
+  const [selected, setSelected] = useState<string | null>(null);
+  const label = options.find((o) => o.id === selected)?.label;
   return (
     <div className={sided ? "" : "grid gap-4 md:grid-cols-[minmax(0,320px)_1fr] md:items-start"}>
       {!sided && (
-        <div className="grid grid-cols-2 gap-2" aria-hidden>
-          <Figure title="Front" regions={FRONT} options={options} onPick={onPick} />
-          <Figure title="Back" regions={BACK} options={options} onPick={onPick} />
+        <div>
+          <div className="grid grid-cols-2 gap-2" aria-hidden>
+            <Figure title="Front" regions={FRONT} options={options} selected={selected} onTap={setSelected} />
+            <Figure title="Back" regions={BACK} options={options} selected={selected} onTap={setSelected} />
+          </div>
+          {selected && label && (
+            <div role="group" aria-label="Confirm the place" className="mt-2 rounded-xl border-2 border-blue-600 bg-blue-50 p-3 text-center">
+              <p className="font-semibold text-blue-950">
+                {label} — is that the right place?
+              </p>
+              <div className="mt-2 grid grid-cols-2 gap-2">
+                <button type="button" onClick={() => onPick(selected)} className="min-h-11 rounded-lg bg-blue-900 px-3 font-bold text-white">
+                  Yes, that&apos;s it
+                </button>
+                <button type="button" onClick={() => setSelected(null)} className="min-h-11 rounded-lg border-2 border-blue-900 bg-white px-3 font-semibold text-blue-900">
+                  Choose again
+                </button>
+              </div>
+            </div>
+          )}
         </div>
       )}
       <div className="grid gap-2 sm:grid-cols-2" role="group" aria-label="Body areas">
         {options.map((o) => (
-          <button key={o.id} type="button" onClick={() => onPick(o.id)} className="min-h-12 rounded-xl border-2 border-slate-300 bg-white px-4 py-2 text-left font-semibold text-slate-900 hover:border-blue-500 hover:bg-blue-50">
+          <button
+            key={o.id}
+            type="button"
+            onClick={() => onPick(o.id)}
+            className={`min-h-12 rounded-xl border-2 px-4 py-2 text-left font-semibold text-slate-900 hover:border-blue-500 hover:bg-blue-50 ${selected === o.id ? "border-blue-600 bg-blue-50" : "border-slate-300 bg-white"}`}
+          >
             {o.label}
           </button>
         ))}

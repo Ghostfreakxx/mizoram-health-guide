@@ -21,7 +21,7 @@ import { allEducation } from "../education";
 import { getSource } from "../sources";
 import { LEVEL_TEXT, SAFETY_NET } from "../safety/language";
 import { redFlags } from "../safety/redFlags";
-import { AGE_GROUPS, POLICY_RULES, complaints } from "../safety/triage";
+import { AGE_GROUPS, POLICY_RULES, type Context, complaints, populationQuestions } from "../safety/triage";
 
 export type ReviewStatus = "verified" | "needs-clinician-review" | "needs-government-verification" | "deprecated";
 
@@ -145,6 +145,34 @@ export function reviewRegistry(): ReviewItem[] {
         }),
       );
     }
+  }
+
+  // Danger-sign questions for particular groups (babies, young children,
+  // pregnancy, after birth, weak immunity), asked before the problem's own
+  // questions. Who they apply to is worked out from the live rule.
+  const GROUPS: [string, Context][] = [
+    ["babies under 2 months", { who: "other", age: "young-infant", special: [], complaint: "other" }],
+    ["children 2 months–4 years", { who: "other", age: "child-under-5", special: [], complaint: "other" }],
+    ["pregnant women", { who: "self", age: "adult", sex: "female", special: ["pregnant"], complaint: "other" }],
+    ["women who gave birth in the last 6 weeks", { who: "self", age: "adult", sex: "female", special: ["postpartum"], complaint: "other" }],
+    ["people with a weak immune system", { who: "self", age: "adult", special: ["immunocompromised"], complaint: "other" }],
+    ["everyone", { who: "self", age: "adult", special: [], complaint: "other" }],
+  ];
+  for (const q of populationQuestions) {
+    const who = GROUPS.filter(([, c]) => !q.showIf || q.showIf(c)).map(([g]) => g);
+    const asked = who.includes("everyone") ? "everyone" : who.join(", ") || "(see code)";
+    const unsure = q.unsure ?? ("emergency" in q.yes ? { level: "ORANGE", now: true } : q.yes);
+    out.push(
+      item({
+        id: `TQ-${q.id}`,
+        kind: "triage-question",
+        title: `Danger sign (${asked}): "${q.text}"`,
+        rule: `Asked for: ${asked}, before the problem's own questions. Yes → ${effectText(q.yes)}. Not sure → ${effectText(unsure)}. No → no change. Summary wording: "${q.positive}" / "${q.negative}".`,
+        sourceIds: q.sourceIds,
+        reviewer: "clinician",
+        definedIn: "app/lib/safety/triage.ts (populationQuestions)",
+      }),
+    );
   }
 
   for (const r of Object.values(POLICY_RULES)) {

@@ -11,7 +11,7 @@ const STATES = Object.keys(PERFORMANCE) as DoctorState[];
 describe("the doctor's state machine", () => {
   it("has the consultation states, each with a label and a performance", () => {
     expect(STATES.sort()).toEqual(
-      ["asking", "clarifying", "complete", "concerned", "educating", "emergency", "explaining", "greeting", "handoff", "idle", "initializing", "listening", "processing", "reassuring"].sort(),
+      ["asking", "clarifying", "complete", "concerned", "educating", "emergency", "explaining", "greeting", "handoff", "idle", "initializing", "listening", "processing", "reassuring", "showing"].sort(),
     );
     for (const s of STATES) expect(STATE_LABEL[s]).toBeTruthy();
   });

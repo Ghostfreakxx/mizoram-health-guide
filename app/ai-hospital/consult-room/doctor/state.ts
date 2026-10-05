@@ -10,6 +10,7 @@ export type DoctorState =
   | "listening" // the patient is answering (typing or speaking)
   | "processing" // an answer arrived; the engine is checking it
   | "asking" // saying the next approved question
+  | "showing" // asking while a visual tool (the body map) is on screen
   | "explaining" // saying the triage result
   | "reassuring" // a calm closing line
   | "concerned" // an urgent (not emergency) result
@@ -20,7 +21,7 @@ export type DoctorState =
   | "complete"; // finished, waiting quietly
 
 export type Expression = "neutral" | "welcoming" | "listening" | "thinking" | "reassuring" | "concerned" | "urgent" | "helpful";
-export type GazePolicy = "patient" | "notice" | "steady" | "review" | "conversational" | "explaining" | "preparing";
+export type GazePolicy = "patient" | "notice" | "steady" | "review" | "conversational" | "explaining" | "preparing" | "showing";
 
 export type Performance = {
   expression: Expression;
@@ -38,6 +39,7 @@ export const PERFORMANCE: Record<DoctorState, Performance> = {
   listening: { expression: "listening", gaze: "patient", gesture: 0, head: 0.3, lean: 0.45, nods: true },
   processing: { expression: "thinking", gaze: "review", gesture: 0, head: 0.4, lean: 0.35, nods: false },
   asking: { expression: "listening", gaze: "conversational", gesture: 0.35, head: 0.8, lean: 0.35, nods: false },
+  showing: { expression: "helpful", gaze: "showing", gesture: 0.45, head: 0.7, lean: 0.35, nods: false },
   explaining: { expression: "neutral", gaze: "explaining", gesture: 0.6, head: 0.9, lean: 0.3, nods: false },
   reassuring: { expression: "reassuring", gaze: "conversational", gesture: 0.45, head: 0.8, lean: 0.3, nods: false },
   concerned: { expression: "concerned", gaze: "steady", gesture: 0.35, head: 0.5, lean: 0.55, nods: false },
@@ -55,6 +57,7 @@ export const STATE_LABEL: Record<DoctorState, string> = {
   listening: "Listening",
   processing: "Checking your answer…",
   asking: "Doctor speaking",
+  showing: "Doctor speaking",
   explaining: "Doctor speaking",
   reassuring: "Doctor speaking",
   concerned: "Doctor speaking",
@@ -66,7 +69,7 @@ export const STATE_LABEL: Record<DoctorState, string> = {
 };
 
 export const isSpeakingState = (s: DoctorState) =>
-  s === "greeting" || s === "asking" || s === "explaining" || s === "reassuring" || s === "concerned" || s === "handoff" || s === "clarifying" || s === "educating";
+  s === "greeting" || s === "asking" || s === "showing" || s === "explaining" || s === "reassuring" || s === "concerned" || s === "handoff" || s === "clarifying" || s === "educating";
 
 // What every part of the consultation does in each state — one table, so the
 // screen, voice, microphone, captions and the doctor can never disagree.
@@ -84,6 +87,7 @@ export const EFFECTS: Record<DoctorState, Effects> = {
   listening: { routine: true, talk: true, caption: "listening", speaks: false },
   processing: { routine: true, talk: true, caption: "thinking", speaks: false },
   asking: { routine: true, talk: true, caption: "doctor", speaks: true },
+  showing: { routine: true, talk: true, caption: "doctor", speaks: true },
   clarifying: { routine: true, talk: true, caption: "doctor", speaks: true },
   educating: { routine: true, talk: true, caption: "doctor", speaks: true },
   explaining: { routine: false, talk: false, caption: "doctor", speaks: true },
