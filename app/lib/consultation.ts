@@ -1281,7 +1281,9 @@ const OPENER = /^(i do|i have|i am|it is|it does|there is|correct|right)\b/;
 
 const FILLER = new Set(["yes", "yeah", "so", "it", "that", "one", "some", "a", "bit", "little", "sometimes", "really", "i", "think", "do", "is", "does", "am", "have", "there"]);
 
-function yesNo(t: string): string | null {
+function yesNo(t0: string): string | null {
+  // Leading fillers ("actually yes", "well, no", "um not sure") carry no meaning.
+  const t = t0.replace(/^((actually|well|um+|uh+|hmm+|so|oh)\b[\s,]*)+/, "").trim() || t0;
   if (OPENER.test(t) && !/^(yes|yeah|yep|yup|haan|ha|aw)\b/.test(t) && !NEGATION.test(t)) {
     const rest = t.replace(OPENER, "").trim().split(" ").filter(Boolean);
     if (rest.some((w) => !FILLER.has(w))) return null;
@@ -1641,8 +1643,13 @@ function answerCorrection(s: ConsultState, turn: Turn, words: string): { state: 
   if (!value || value === last.value) return null;
   const id = last.step.slice(2);
   if (ambiguous) {
-    const asked = questionsFor(contextOf(s)).find((x) => x.id === id);
+    const qs = questionsFor(contextOf(s));
+    const asked = qs.find((x) => x.id === id);
     if (!asked) return null;
+    // Words that would raise urgency on the question now on screen answer it:
+    // a danger sign is never delayed by a check about an earlier answer.
+    const current = qs.find((x) => x.id === turn.step.slice(2));
+    if (current && value !== "no" && ("emergency" in current.yes || ("level" in current.yes && (current.yes.level === "ORANGE" || current.yes.level === "RED" || current.yes.now)))) return null;
     const before = last.value === "unsure" ? "you weren't sure" : last.value;
     return { state: { ...s, recheck: { key: id, earlier: `${before} when I asked: “${asked.text}”`, now: `“${clip(words).slice(0, 80)}”`, to: value } }, line: "" };
   }

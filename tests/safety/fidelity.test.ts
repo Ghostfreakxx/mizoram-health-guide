@@ -98,3 +98,28 @@ describe("a correction to 'yes' on a danger sign is acted on at once", () => {
     throw new Error("no emergency question reached");
   });
 });
+
+describe("found in the debugging pass (pinned)", () => {
+  it("'actually yes' on a danger-sign question answers that question — no detour to an earlier answer", () => {
+    let s = startConsultation("General Medicine");
+    s = say(s, "I've been coughing for a week").s;
+    for (let i = 0; i < 30; i++) {
+      const t = nextTurn(s);
+      if (!t.step.startsWith("q:")) {
+        const opts = "options" in t.input ? t.input.options.map((x) => x.id) : [];
+        s = respond(s, t.step, t.step === "check" ? "none" : t.input.kind === "multi" ? [] : opts.includes("adult") ? "adult" : opts[0]);
+        continue;
+      }
+      const q = questionsFor(contextOf(s)).find((x) => x.id === t.step.slice(2))!;
+      const danger = "emergency" in q.yes || ("level" in q.yes && (q.yes.level === "ORANGE" || q.yes.now));
+      if (danger && s.lastAnswered?.value === "no") {
+        const { s: after } = say(s, "actually yes");
+        expect(nextTurn(after).step).not.toBe("recheck");
+        expect(after.emergency || after.answers[q.id] === "yes").toBeTruthy();
+        return;
+      }
+      s = respond(s, t.step, "no");
+    }
+    throw new Error("no danger question after a 'no'");
+  });
+});

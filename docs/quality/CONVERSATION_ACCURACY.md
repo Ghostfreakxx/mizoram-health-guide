@@ -32,6 +32,8 @@ it in words; the recorded value is compared with the intent.
 | who | 32 | 100.0% | 0.0% | 0 |
 | c:temp | 37 | 100.0% | 0.0% | 0 |
 
+Most often not understood: "actually yes".
+
 ### Held-out set A
 
 | Step | Answers | Understood | Asked again | Wrong |

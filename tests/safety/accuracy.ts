@@ -16,8 +16,8 @@ import { questionsFor, complaints } from "../../app/lib/safety/triage";
 
 export const PHRASES: Record<string, Record<string, string[]>> = {
   yesno: {
-    yes: ["yes", "yeah", "yes it is", "ya", "yep", "yes I have that", "I think so", "yes, since morning", "yess", "yes doctor", "yes, a little", "it is there", "sure, yes", "correct", "true"],
-    no: ["no", "nope", "not really", "nah", "no I don't", "not at all", "no, nothing like that", "I don't think so", "never", "no no", "noo", "not that I know of", "no doctor", "none", "it's not there"],
+    yes: ["yes", "yeah", "yes it is", "ya", "yep", "yes I have that", "I think so", "yes, since morning", "yess", "yes doctor", "yes, a little", "it is there", "sure, yes", "correct", "true", "actually yes", "well, yes"],
+    no: ["no", "nope", "not really", "nah", "no I don't", "not at all", "no, nothing like that", "I don't think so", "never", "no no", "noo", "not that I know of", "no doctor", "none", "it's not there", "well, no", "um no"],
     unsure: ["not sure", "maybe", "I don't know", "dunno", "can't say", "I'm not certain", "hard to say", "possibly", "idk", "no idea"],
   },
   duration: {
