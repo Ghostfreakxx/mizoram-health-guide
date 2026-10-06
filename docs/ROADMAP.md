@@ -41,6 +41,7 @@ Done so far: the accuracy harness (found and fixed 3 unsafe misreadings:
 "I'm not certain" and "I didn't check" recorded as "no", "I think so" as
 "not sure"); summary fidelity in messy visits (found that "sorry, I meant
 no" answered the next question and left the wrong answer — fixed);
+the doctor's reactions to corrections, contradictions and "not sure";
 spoken-line traceability (45 safety lines added to the review
 list); lip sync on every spoken line (numbers were silent); phone keyboard
 and rotation.

@@ -45,7 +45,8 @@ export function planTurn(turn: Turn, ctx: { first: boolean; lastSaid: string; re
     // Noticing the patient (a glance up from the chart), then hello.
     return { lines: [{ text: turn.say, state: "greeting" }], after: "listening", delayMs: ctx.reducedMotion ? 0 : 700, before: "greeting", interrupt: false };
   }
-  const state: DoctorState = turn.input.kind === "body" ? "showing" : "asking";
+  // Two answers differ: the doctor checks calmly with the patient.
+  const state: DoctorState = turn.input.kind === "body" ? "showing" : turn.step === "recheck" ? "checking" : "asking";
   return { lines: [{ text: turn.say, state }], after: "listening", delayMs: thinkMs(ctx.lastSaid), before: "processing", interrupt: false };
 }
 
@@ -57,9 +58,9 @@ export function planReply(o: Exclude<Outcome, { kind: "answered" | "repeat" }>, 
   const quick = (lines: Spoken[]): Plan => ({ lines, after: "listening", delayMs: 0, before: "processing", interrupt: false });
   switch (o.kind) {
     case "corrected":
-      return quick([{ text: o.line, state: "clarifying" }, { text: q(next), state: next.input.kind === "body" ? "showing" : "asking" }]);
+      return quick([{ text: o.line, state: "acknowledging" }, { text: q(next), state: next.input.kind === "body" ? "showing" : "asking" }]);
     case "noted":
-      return quick([{ text: o.line, state: "reassuring" }]);
+      return quick([{ text: o.line, state: "acknowledging" }]);
     case "control":
       return quick([{ text: o.line, state: "reassuring" }, { text: q(current), state: "asking" }]);
     case "professional":

@@ -62,7 +62,7 @@ export function bodyAt(
     if (hash(w * 5 + seed) < (active ? 0.7 : 0.4) && into < 0.6) headPitch += Math.sin((into / 0.6) * Math.PI) * (active ? 0.045 : 0.035);
   }
   // An answer arrived: a small acknowledging nod before thinking.
-  if (opts.state === "processing" && m) {
+  if ((opts.state === "processing" || opts.state === "acknowledging") && m) {
     const x = opts.sinceState ?? 9;
     if (x < 0.5) headPitch += Math.sin((x / 0.5) * Math.PI) * 0.035;
   }

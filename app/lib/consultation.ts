@@ -307,7 +307,9 @@ function memoryLine(s: ConsultState, step: string): { key: string; line: string 
 // Turn text = [memory line] [short acknowledgement] question [plain meaning].
 function compose(s: ConsultState, t: Turn, opts: { ack?: boolean; simple?: string } = {}): Turn {
   const parts: string[] = [];
-  const note = s.notes.length ? s.notes.slice(0, 2).join(" ") : memoryLine(s, t.step)?.line;
+  // A line that already reassures ("That's okay. Let's make it easier…") needs no second one.
+  const notes = /^that'?s (okay|ok|fine)\b/i.test(t.say) ? s.notes.filter((n) => n !== UNSURE_OK) : s.notes;
+  const note = notes.length ? notes.slice(0, 2).join(" ") : memoryLine(s, t.step)?.line;
   if (note) parts.push(note);
   else if (opts.ack && s.turns > 0 && s.turns % 2 === 1) parts.push(ACKS[Math.floor(s.turns / 2) % ACKS.length]);
   parts.push(t.say);
@@ -769,11 +771,15 @@ export function respond(s: ConsultState, step: string, value: string | string[])
   if (next === s) return s;
   // A memory line is said once, on the very next question.
   const shown = !s.notes.length ? memoryLine(s, step)?.key : undefined;
+  // The first "not sure" of the visit: said once that it is a useful answer.
+  const unsureNow = (step.startsWith("q:") && value === "unsure") || (!!next.unknown[step] && !s.unknown[step]);
+  const reassure = unsureNow && !s.mentioned.includes("unsure-ok");
+  const notes = next.notes === s.notes ? [] : next.notes;
   return {
     ...next,
-    notes: next.notes === s.notes ? [] : next.notes,
+    notes: reassure ? [UNSURE_OK, ...notes] : notes,
     turns: s.turns + 1,
-    mentioned: shown ? [...next.mentioned, shown] : next.mentioned,
+    mentioned: [...next.mentioned, ...(shown ? [shown] : []), ...(reassure ? ["unsure-ok"] : [])],
     lastAnswered: step.startsWith("q:") && typeof value === "string" ? { step, value } : undefined,
   };
 }
@@ -1436,6 +1442,7 @@ export function startHelpDescribe(s: ConsultState): ConsultState {
 
 // ---------------- Helping the patient: explain, why, education ----------------
 
+export const UNSURE_OK = "That's okay — “not sure” is a useful answer. I've noted it.";
 export const AGE_HELP_LINE = "That's okay — an approximate age is fine. For example, is it a baby, a child, an adult, or someone over 60?";
 
 // How each step is re-said in everyday words ("what do you mean?"). Some

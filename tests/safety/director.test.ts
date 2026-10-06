@@ -66,7 +66,7 @@ describe("the director", () => {
     expect(corrected.kind).toBe("corrected");
     if (corrected.kind === "corrected") {
       const p = planReply(corrected, t, nextTurn(corrected.state));
-      expect(p.lines.map((l) => l.state)).toEqual(["clarifying", "asking"]);
+      expect(p.lines.map((l) => l.state)).toEqual(["acknowledging", "asking"]);
     }
     const edu = converse(here, nextTurn(here), "How does TB spread?");
     if (edu.kind === "education") expect(planReply(edu, t, t).lines.map((l) => l.state)).toEqual(["educating", "asking"]);
@@ -91,5 +91,61 @@ describe("environment awareness: the doctor glances at what she shows", () => {
     expect(isSpeakingState("showing")).toBe(true);
     expect(PERFORMANCE.showing.gaze).toBe("showing");
     expect(PERFORMANCE.emergency.gesture).toBe(0); // no distracting movement in an emergency
+  });
+});
+
+describe("reactions to corrections, contradictions and 'not sure'", () => {
+  const routineAt = () => {
+    let s = startConsultation("General Medicine");
+    const o = converse(s, nextTurn(s), "I've been coughing for a week");
+    s = "state" in o ? o.state : s;
+    for (let i = 0; i < 20; i++) {
+      const t = nextTurn(s);
+      if (t.step.startsWith("q:")) {
+        const next = respond(s, t.step, "yes");
+        if (!next.emergency && nextTurn(next).step.startsWith("q:")) return next;
+        s = respond(s, t.step, "no");
+        continue;
+      }
+      const opts = "options" in t.input ? t.input.options.map((x) => x.id) : [];
+      s = respond(s, t.step, t.step === "check" ? "none" : t.input.kind === "multi" ? [] : opts.includes("adult") ? "adult" : opts[0]);
+    }
+    throw new Error("no routine question");
+  };
+
+  it("a correction is acknowledged (nod, glance at the chart), then the question is asked", () => {
+    const s = routineAt();
+    const t = nextTurn(s);
+    const o = converse(s, t, "sorry, I meant no");
+    expect(o.kind).toBe("corrected");
+    const p = planReply(o as Parameters<typeof planReply>[0], t, nextTurn("state" in o ? o.state : s));
+    expect(p.lines[0].state).toBe("acknowledging");
+    expect(p.lines[1].state).toBe("asking");
+    expect(PERFORMANCE.acknowledging.gaze).toBe("review");
+    // the glance at the chart returns to the patient before the question
+    expect(gazeAt(10.85, "review", 10).target).toBe("patient");
+  });
+
+  it("a contradiction check is calm and steady: eye contact, never a concerned or urgent face", () => {
+    const s = routineAt();
+    const o = converse(s, nextTurn(s), "actually no, I don't");
+    const t = nextTurn("state" in o ? o.state : s);
+    expect(t.step).toBe("recheck");
+    expect(planTurn(t, ctx).lines[0].state).toBe("checking");
+    expect(PERFORMANCE.checking.expression).not.toMatch(/concerned|urgent/);
+    expect(PERFORMANCE.checking.gaze).toBe("patient");
+    expect(isSpeakingState("checking") && EFFECTS.checking.routine).toBe(true);
+  });
+
+  it("the first 'not sure' of a visit is reassured once — not after every one", () => {
+    let s = routineAt();
+    const said: string[] = [];
+    for (let i = 0; i < 4; i++) {
+      const t = nextTurn(s);
+      if (!t.step.startsWith("q:")) break;
+      s = respond(s, t.step, "unsure");
+      said.push(nextTurn(s).say);
+    }
+    expect(said.filter((x) => /“not sure” is a useful answer/.test(x)).length).toBe(1);
   });
 });

@@ -378,6 +378,18 @@ Memory that changes behaviour:
 - Every chart fact has a provenance: confirmed / from the patient's words /
   uncertain / not provided.
 
+Reactions to what the patient just did (VD3):
+
+- **Correction or an extra problem** → `acknowledging`: a small nod, a
+  glance at the chart as if writing it down, back to the patient before the
+  question; says exactly what changed.
+- **Two answers differ** → `checking`: steady eye contact, calm and helpful,
+  less head movement — checking with the patient, never doubting them; never
+  a concerned or urgent face.
+- **The first "not sure" of a visit** → said once: "That's okay — 'not sure'
+  is a useful answer. I've noted it." (not repeated, and dropped when the
+  next line already reassures).
+
 Character behaviour: the `showing` state glances at the body map while
 presenting it; the `review` gaze glances at the chart after an answer;
 voice failure falls back to captions with a one-time notice; the loading

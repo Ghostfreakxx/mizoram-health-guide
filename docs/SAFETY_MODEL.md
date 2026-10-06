@@ -59,7 +59,7 @@ me describe it (body map, side, feeling, timing, pattern) — and keeps going.
 
 ## What is tested
 
-`tests/safety/` (Vitest, 538 tests) — among them:
+`tests/safety/` (Vitest, 541 tests) — among them:
 
 | File | Covers |
 | --- | --- |
