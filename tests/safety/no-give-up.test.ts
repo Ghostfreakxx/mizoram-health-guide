@@ -133,7 +133,7 @@ describe("clarification engine", () => {
     const t = nextTurn(s);
     expect(t.step).toBe("body");
     expect(t.input.kind).toBe("body");
-    expect(t.say).toMatch(/Where do you feel it\?/);
+    expect(t.say).toMatch(/I'll help you describe it\. Please tap the area on the body where you feel it\./);
   });
 
   it("'It feels weird here' → where → chest → which side → what does it feel like (chest options)", () => {
@@ -204,7 +204,7 @@ describe("clarification engine", () => {
 describe("Help me describe it", () => {
   it("'I can't explain it.' → where → which area → what it feels like → when → pattern → better/worse", () => {
     let s = say(start(), "I can't explain it.").s;
-    expect(nextTurn(s).say).toBe("That's okay. I'll help you describe it. First, where in your body do you notice the problem?");
+    expect(nextTurn(s).say).toBe("That's okay. I'll help you describe it. First, where in your body do you notice the problem? Please tap the area on the body.");
     s = respond(s, "body", "lower-abdomen");
     expect(nextTurn(s).step).toBe("side");
     s = respond(s, "side", "right");

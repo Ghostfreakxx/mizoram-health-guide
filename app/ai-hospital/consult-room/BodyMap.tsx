@@ -40,7 +40,7 @@ const BACK: Region[] = [
 function Figure({ title, regions, options, selected, onTap }: { title: string; regions: Region[]; options: Option[]; selected: string | null; onTap: (id: string) => void }) {
   return (
     <figure className="text-center">
-      <svg viewBox="0 0 200 400" className="mx-auto h-56 w-auto touch-manipulation sm:h-64" aria-hidden>
+      <svg viewBox="0 0 200 400" className="mx-auto h-60 w-auto touch-manipulation" aria-hidden>
         {regions.map((r) => (
           <path
             key={`${title}-${r.id}`}
@@ -64,7 +64,7 @@ export default function BodyMap({ options, onPick }: { options: Option[]; onPick
   const [selected, setSelected] = useState<string | null>(null);
   const label = options.find((o) => o.id === selected)?.label;
   return (
-    <div className={sided ? "" : "grid gap-4 md:grid-cols-[minmax(0,320px)_1fr] md:items-start"}>
+    <div className="space-y-4">
       {!sided && (
         <div>
           <div className="grid grid-cols-2 gap-2" aria-hidden>
@@ -88,19 +88,19 @@ export default function BodyMap({ options, onPick }: { options: Option[]; onPick
           )}
         </div>
       )}
-      <div className="grid gap-2 sm:grid-cols-2" role="group" aria-label="Body areas">
+      <div className="grid grid-cols-2 gap-2" role="group" aria-label="Body areas">
         {options.map((o) => (
           <button
             key={o.id}
             type="button"
             onClick={() => onPick(o.id)}
-            className={`min-h-12 rounded-xl border-2 px-4 py-2 text-left font-semibold text-slate-900 hover:border-blue-500 hover:bg-blue-50 ${selected === o.id ? "border-blue-600 bg-blue-50" : "border-slate-300 bg-white"}`}
+            className={`min-h-12 rounded-xl border px-3 py-2 text-left text-[15px] font-semibold leading-tight text-slate-900 hover:border-blue-500 hover:bg-blue-50 ${selected === o.id ? "border-blue-600 bg-blue-50" : "border-slate-300 bg-white"}`}
           >
             {o.label}
           </button>
         ))}
         {!sided && (
-          <button type="button" onClick={() => onPick("skip")} className="min-h-12 rounded-xl border-2 border-dashed border-slate-300 px-4 py-2 text-left font-semibold text-slate-700">
+          <button type="button" onClick={() => onPick("skip")} className="min-h-12 rounded-xl border border-dashed border-slate-300 px-3 py-2 text-left text-[15px] font-semibold text-slate-700">
             Skip this question
           </button>
         )}

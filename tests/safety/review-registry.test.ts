@@ -79,7 +79,7 @@ describe("everything the doctor says about urgency, emergencies, medicines or di
     const SAFETY = /\b(108|112|emergency|urgent|urgently|immediately|prescribe|medicines?|doses?|diagnos\w*|tests?|serious)\b/i;
     // Not advice: the greeting (its department name and promise), the recap of
     // the patient's own words, and history questions about medicines taken.
-    const NOT_ADVICE = /^(I'm your virtual health guide for this [A-Z][\w &]+ consultation\.|If anything you tell me suggests an emergency, I'll tell you immediately\.|You told me about\b|Do you know what medicines|Does the patient have any allergies to medicines|Do you have any allergies to medicines)/;
+    const NOT_ADVICE = /^(I'm your virtual health guide for [A-Z][\w &]+\.|If anything you tell me suggests an emergency, I'll tell you immediately\.|You told me about\b|Do you know what medicines|Does the patient have any allergies to medicines|Do you have any allergies to medicines)/;
     const missing = new Set<string>();
     for (const line of spokenLines())
       for (const sentence of line.split(/(?<=[.!?])\s+/))

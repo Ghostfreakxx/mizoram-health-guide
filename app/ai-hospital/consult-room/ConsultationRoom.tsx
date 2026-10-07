@@ -1,8 +1,8 @@
 "use client";
 
 import dynamic from "next/dynamic";
-import { Component, type ReactNode, useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { type ConsultState, type Turn, BODY_AREAS, chartOf, converse, explainLine, nextTurn, respond, startConsultation, startHelpDescribe, toAnswers, whyLine } from "../../lib/consultation";
+import { Component, type ReactNode, useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
+import { type ConsultState, type Turn, BODY_AREAS, chartOf, converse, explainLine, nextTurn, reopen, respond, startConsultation, startHelpDescribe, toAnswers, whyLine } from "../../lib/consultation";
 import { termsIn } from "../../lib/knowledge/glossary";
 import type { EducationAnswer } from "../../lib/education";
 import { hasConsent, loadPassport } from "../../lib/storage";
@@ -13,7 +13,6 @@ import ResultView, { type SummaryExtra } from "../components/ResultView";
 import { BigChoice } from "../components/ui";
 import BodyMap from "./BodyMap";
 import { type Tier, chooseTier, readDevice, stepDown } from "./capability";
-import ConversationControls, { type MicStatus } from "./ConversationControls";
 import DemoPanel from "./DemoPanel";
 import { LipSync } from "./doctor/lipsync";
 import { type DoctorState, STATE_LABEL } from "./doctor/state";
@@ -22,8 +21,7 @@ import HandoffPanel from "./HandoffPanel";
 import { takePendingConcern } from "./handoff";
 import { planReply, planTurn } from "./doctor/director";
 import { reportFailure, track } from "../../lib/telemetry";
-import JourneyBar, { type JourneyStep } from "./JourneyBar";
-import PatientChart from "./PatientChart";
+import MyVisit, { EDIT_STEP } from "./MyVisit";
 import type { ChartLine } from "./Room3D";
 import type { RoomStyle } from "./rooms";
 import { type SpeechOutput, VOICE_CONSENT_TEXT, browserSpeech, listen, needsSpeechConfirmation, voiceInputSetting } from "./voice";
@@ -81,6 +79,21 @@ function Toggle({ on, onClick, children }: { on: boolean; onClick: () => void; c
     </button>
   );
 }
+
+// Desktop / large tablet landscape: the full-bleed scene with floating panels.
+// Phones and portrait tablets: the doctor on top, the conversation below.
+const WIDE = "(min-width: 1024px)";
+const subscribeWide = (cb: () => void) => {
+  const m = window.matchMedia(WIDE);
+  m.addEventListener("change", cb);
+  window.addEventListener("resize", cb);
+  return () => {
+    m.removeEventListener("change", cb);
+    window.removeEventListener("resize", cb);
+  };
+};
+const useWide = () => useSyncExternalStore(subscribeWide, () => window.matchMedia(WIDE).matches, () => false);
+const useViewWidth = () => useSyncExternalStore(subscribeWide, () => window.innerWidth, () => 1280);
 
 // Steps where the patient is still describing the problem.
 const SYMPTOM_STEPS = new Set(["concern", "concern-more", "complaint", "describe", "body", "side", "simple-pain"]);
@@ -152,7 +165,9 @@ function summaryExtra(s: ConsultState): SummaryExtra {
   };
 }
 
-export default function ConsultationRoom({ room }: { room: RoomStyle }) {
+export type DepartmentInfo = { name: string; icon: string; href: string };
+
+export default function ConsultationRoom({ room, department }: { room: RoomStyle; department: DepartmentInfo }) {
   const fresh = useCallback(() => startConsultation(room.greeting, room.intro, room.focus), [room]);
   const [history, setHistory] = useState<ConsultState[]>(() => [fresh()]);
   const state = history[history.length - 1];
@@ -188,7 +203,6 @@ export default function ConsultationRoom({ room }: { room: RoomStyle }) {
   const voiceRef = useRef(true);
   const [slower, setSlower] = useState(false);
   const rateRef = useRef(NORMAL_RATE);
-  const [subtitles, setSubtitles] = useState(true);
   const [bigText, setBigText] = useState(false);
   const [paused, setPaused] = useState(false);
   const [reducedMotion, setReducedMotion] = useState(false);
@@ -220,7 +234,17 @@ export default function ConsultationRoom({ room }: { room: RoomStyle }) {
   const [startDescribe, setStartDescribe] = useState(false); // "I can't explain it" from Reception
   const [education, setEducation] = useState<EducationAnswer | null>(null);
   const [wantsProfessional, setWantsProfessional] = useState(false);
-  const [sheetOpen, setSheetOpen] = useState(false); // chart bottom sheet (phones/tablets)
+  const [sheetOpen, setSheetOpen] = useState(false); // My Visit bottom sheet (phones/tablets)
+  const wide = useWide();
+  const viewW = useViewWidth();
+  const [visitOpen, setVisitOpen] = useState(true); // My Visit panel (desktop)
+  const [settingsOpen, setSettingsOpen] = useState(false);
+  const [seenNotices, setSeenNotices] = useState<string[]>([]); // notices already shown for a few seconds
+  const [bodyDismissed, setBodyDismissed] = useState(false); // phones: "say it in words instead"
+  const dockRef = useRef<HTMLElement>(null);
+  const [dockH, setDockH] = useState(260);
+  const [shellH, setShellH] = useState(0); // phones, keyboard open: fit the room above the keyboard
+  const [shellTop, setShellTop] = useState(0);
   const [keyboardOpen, setKeyboardOpen] = useState(false); // on-screen keyboard (phones): the doctor area shrinks
   const [heard, setHeard] = useState<string | null>(null); // uncertain speech awaiting confirmation
   const [tempUnit, setTempUnit] = useState<"C" | "F">("C");
@@ -254,8 +278,10 @@ export default function ConsultationRoom({ room }: { room: RoomStyle }) {
     // display (text / simple picture) and "help me describe it".
     const q = new URLSearchParams(window.location.search);
     setDemoMode(q.has("demo"));
-    if (q.get("view") === "text") setDisplay("text");
-    else if (q.get("view") === "simple") setDisplay("2d");
+    const view = q.get("view");
+    if (view === "text") setDisplay("text");
+    else if (view === "simple") setDisplay("2d");
+    else if (view === "high" || view === "medium" || view === "low") setDisplay(view);
     setStartDescribe(q.get("start") === "describe");
     setReviewMode(q.has("review"));
     setDebugMode(q.has("debug") && process.env.NODE_ENV === "development");
@@ -299,7 +325,12 @@ export default function ConsultationRoom({ room }: { room: RoomStyle }) {
         tall = window.innerHeight;
       }
       tall = Math.max(tall, window.innerHeight);
-      setKeyboardOpen(inBox() && tall - vv.height * vv.scale > 150);
+      const open = inBox() && tall - vv.height * vv.scale > 150;
+      setKeyboardOpen(open);
+      // The room is fixed to the screen: while the keyboard is open it is
+      // fitted to the part of the screen above the keyboard.
+      setShellH(open ? Math.round(vv.height) : 0);
+      setShellTop(open ? Math.round(vv.offsetTop) : 0);
     };
     // Focus moving to a button is checked a moment later: re-laying out
     // mid-tap would move the button being pressed (and lose the tap).
@@ -310,14 +341,37 @@ export default function ConsultationRoom({ room }: { room: RoomStyle }) {
       else later = setTimeout(check, 300);
     };
     vv.addEventListener("resize", check);
+    vv.addEventListener("scroll", check);
     document.addEventListener("focusin", focusMoved);
     document.addEventListener("focusout", focusMoved);
     return () => {
       clearTimeout(later);
       vv.removeEventListener("resize", check);
+      vv.removeEventListener("scroll", check);
       document.removeEventListener("focusin", focusMoved);
       document.removeEventListener("focusout", focusMoved);
     };
+  }, []);
+
+  // The dock's height decides where the camera frames the doctor (desktop).
+  useEffect(() => {
+    const el = dockRef.current;
+    if (!el || typeof ResizeObserver === "undefined") return;
+    const ro = new ResizeObserver(() => setDockH(Math.round(el.getBoundingClientRect().height)));
+    ro.observe(el);
+    return () => ro.disconnect();
+  });
+  // A notice is shown for 8 seconds, then retired (Settings still shows the display used).
+  useEffect(() => {
+    const keys = [failed3d ?? "", voiceIssue ? "voice" : ""].filter((k) => k && !seenNotices.includes(k));
+    if (!keys.length) return;
+    const t = setTimeout(() => setSeenNotices((n) => [...n, ...keys]), 8000);
+    return () => clearTimeout(t);
+  }, [failed3d, voiceIssue, seenNotices]);
+  // My Visit starts open where there is room for it beside the doctor.
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- screen size is known only after mount
+    setVisitOpen(window.innerWidth >= 1280);
   }, []);
 
   // ---------------- Quality ----------------
@@ -333,7 +387,7 @@ export default function ConsultationRoom({ room }: { room: RoomStyle }) {
             ? "fallback"
             : display === "auto"
               ? (slowTier ?? detected)
-              : display;
+              : (slowTier ?? display); // a chosen level can still step down if the device can't hold it
   const is3d = tier === "high" || tier === "medium" || tier === "low";
 
   // ---------------- Speaking ----------------
@@ -699,11 +753,6 @@ export default function ConsultationRoom({ room }: { room: RoomStyle }) {
     const a = active.current;
     if (a && speaking) speak(a.lines.slice(Math.max(0, a.logged - 1)), a.after, { quietFirst: true });
   };
-  const typeInstead = () => {
-    stopSpeaking();
-    stopMic.current?.();
-    answerBox.current?.focus();
-  };
   const startListening = async () => {
     stopSpeaking();
     setDoctor("listening");
@@ -765,12 +814,8 @@ export default function ConsultationRoom({ room }: { room: RoomStyle }) {
   const emergency = inp.kind === "emergency";
   const done = inp.kind === "result";
   const canAnswer = started && !emergency && !done;
-  const journey: JourneyStep = !begun || turn.step === "concern" ? "Consultation" : emergency ? "Triage" : done ? (doc === "complete" ? "Real doctor" : "Visit summary") : "Questions";
   const subtitleText = log.filter((l) => l.who === "guide").at(-1)?.text ?? "";
-  const showHeading = tier === "none" || !subtitles || emergency || keyboardOpen;
   const textSize = bigText ? "text-xl" : "text-lg";
-  const status: MicStatus = listening ? "listening" : speaking ? "speaking" : doc === "processing" ? "processing" : "ready";
-  const preparing = begun && !started && is3d;
   const pct = Math.round(progress * 100);
 
   // ---------------- Pilot counts (category codes only; off unless configured) ----------------
@@ -812,92 +857,7 @@ export default function ConsultationRoom({ room }: { room: RoomStyle }) {
     return () => window.removeEventListener("pagehide", leave);
   }, []);
 
-  const doctor2d = <Doctor2D state={docRef} since={since} lips={lips} activity={activity} reducedMotion={reducedMotion} paused={paused || hidden} room={room} />;
-  const caption =
-    begun && subtitles && subtitleText && !emergency ? (
-      <p aria-hidden className={`bg-slate-900 px-4 py-3 text-center font-semibold leading-snug text-white ${bigText ? "text-xl" : "text-base sm:text-lg"}`}>
-        {subtitleText}
-      </p>
-    ) : null;
-
-  const stage =
-    tier === "none" ? null : (
-      <div className="overflow-hidden rounded-2xl border border-slate-300 shadow-sm">
-        <div className={`relative overflow-hidden bg-slate-100 ${emergency ? "aspect-[4/3] max-h-64 w-full lg:max-h-none" : keyboardOpen ? "aspect-[3/4] max-h-[24vh] w-full sm:aspect-[16/10] lg:aspect-[16/9] lg:max-h-none" : "aspect-[3/4] max-h-[62vh] w-full sm:aspect-[16/10] lg:aspect-[16/9]"}`}>
-          <div className="h-full w-full" role="img" aria-label={`Virtual health guide in the ${room.greeting} consultation room. ${STATE_LABEL[doc]}.`}>
-            {tier === null ? (
-              <StageMessage text="Preparing the consultation room…" />
-            ) : tier === "fallback" ? (
-              doctor2d
-            ) : (
-              <StageBoundary onFail={() => setFailed3d("3D could not start on this device. Showing the simple picture.")} fallback={doctor2d}>
-                <Doctor3D
-                  key={tier}
-                  state={docRef}
-                  since={since}
-                  lips={lips}
-                  activity={activity}
-                  reducedMotion={reducedMotion}
-                  paused={paused || hidden}
-                  tier={tier}
-                  room={room}
-                  attire={room.attire}
-                  chart={lines3d}
-                  onProgress={setProgress}
-                  onAvatarReady={() => setAvatarReady(true)}
-                  onAvatarError={() => setFailed3d("The 3D doctor could not load. Showing the simple picture instead.")}
-                  onSlow={() => {
-                    const next = stepDown(tier);
-                    if (next === "fallback") setFailed3d("3D was running slowly on this device. Showing the simple picture.");
-                    else {
-                      setAvatarReady(false);
-                      setSlowTier(next);
-                    }
-                  }}
-                />
-              </StageBoundary>
-            )}
-          </div>
-          <div className="pointer-events-none absolute inset-x-2 top-2 flex flex-wrap items-start justify-between gap-2">
-            <span className={`rounded-full px-3 py-1 text-xs font-bold ${emergency ? "bg-red-700 text-white" : "bg-white/90 text-slate-800"}`}>
-              <span aria-hidden className={`mr-1.5 inline-block h-2 w-2 rounded-full ${emergency ? "bg-white" : doc === "listening" ? "bg-green-600" : "bg-blue-700"}`} />
-              {STATE_LABEL[doc]}
-            </span>
-            <span className="rounded-full bg-slate-900/80 px-3 py-1 text-xs font-semibold text-white">Virtual guide · not a doctor</span>
-          </div>
-          {preparing && (
-            <div className="absolute inset-0 grid place-items-center bg-slate-900/55 p-4 backdrop-blur-sm">
-              <div className="w-full max-w-sm rounded-2xl bg-white p-4 text-center shadow-xl">
-                <p className="text-lg font-bold text-blue-950">Preparing your consultation…</p>
-                <p className="mt-1 text-sm text-slate-700">{avatarReady ? "The doctor is ready." : progress < 0.02 ? "Preparing room…" : `Loading doctor… ${pct}%`}</p>
-                <div role="progressbar" aria-label="Preparing your consultation" aria-valuemin={0} aria-valuemax={100} aria-valuenow={avatarReady ? 100 : pct} className="mt-3 h-2 overflow-hidden rounded-full bg-slate-200">
-                  <div className="h-full rounded-full bg-blue-800 transition-[width] duration-300" style={{ width: `${avatarReady ? 100 : Math.max(4, pct)}%` }} />
-                </div>
-                <p className="mt-2 text-xs text-slate-600">You can type your answers as soon as the doctor speaks.</p>
-                {!avatarReady && (
-                  <button type="button" onClick={() => setDisplay("2d")} className="mt-3 min-h-11 w-full rounded-xl border-2 border-blue-900 px-4 py-2 font-semibold text-blue-900 hover:bg-blue-50">
-                    Continue in lightweight mode
-                  </button>
-                )}
-              </div>
-            </div>
-          )}
-          {!begun && (
-            <div className="absolute inset-x-0 bottom-0 flex justify-center bg-gradient-to-t from-slate-900/60 to-transparent p-3 pt-10">
-              <div className="w-full max-w-md rounded-2xl bg-white/95 p-3 text-center shadow-xl sm:p-4">
-                <p className="text-base font-bold text-blue-950 sm:text-lg">{room.greeting} consultation room</p>
-                <p className="mt-1 hidden text-sm text-slate-700 sm:block">A virtual health guide helps you find the safest next step. It is not a doctor and cannot diagnose.</p>
-                <button type="button" onClick={() => setBegun(true)} className="mt-2 w-full rounded-xl bg-blue-900 px-5 py-2.5 text-lg font-bold text-white hover:bg-blue-800 sm:mt-3 sm:py-3">
-                  Begin consultation
-                </button>
-              </div>
-            </div>
-          )}
-        </div>
-        {caption}
-      </div>
-    );
-
+  const chip = "min-h-11 rounded-full border-2 border-slate-300 bg-white px-4 py-2 text-base font-semibold text-slate-800 hover:border-blue-500";
   const privacy = (
     <p className="flex items-start gap-2 rounded-xl bg-green-50 px-3 py-2 text-sm text-green-900">
       <span aria-hidden>🔒</span>
@@ -941,159 +901,6 @@ export default function ConsultationRoom({ room }: { room: RoomStyle }) {
       </div>
     </div>
   ) : null;
-
-  const conversationControls = begun ? (
-    <ConversationControls
-      status={status}
-      talk={{ available: talk.available, listening, reason: talk.reason }}
-      canAnswer={canAnswer}
-      speaking={speaking}
-      slower={slower}
-      onTalk={onTalk}
-      onType={typeInstead}
-      onRepeat={repeat}
-      onStop={stopSpeaking}
-      onSlower={toggleSlower}
-      onExplain={explainNow}
-      onBack={back}
-      canBack={started && history.length > 1 && !done}
-      aboveSheet={!emergency}
-      typing={keyboardOpen}
-    />
-  ) : null;
-
-  const settings = (
-    <details className="rounded-2xl border border-slate-200 bg-white p-3 text-sm" open>
-      <summary className="cursor-pointer font-semibold text-slate-800">Display and sound</summary>
-      <div className="mt-3 flex flex-wrap items-center gap-2" role="group" aria-label="Consultation settings">
-        <Toggle on={voiceOn} onClick={toggleVoice}>{voiceOn ? "🔊 Voice on" : "🔇 Muted"}</Toggle>
-        <Toggle on={paused} onClick={togglePause}>{paused ? "▶ Resume" : "⏸ Pause"}</Toggle>
-        <Toggle on={subtitles} onClick={() => setSubtitles((s) => !s)}>💬 Subtitles</Toggle>
-        <Toggle on={bigText} onClick={() => setBigText((s) => !s)}>A+ Larger text</Toggle>
-        <Toggle on={reducedMotion} onClick={() => setReducedMotion((s) => !s)}>Reduce motion</Toggle>
-        <label className="flex items-center gap-2 font-semibold text-slate-800">
-          Display
-          <select
-            value={display}
-            onChange={(e) => {
-              setFailed3d(null);
-              setSlowTier(null);
-              setAvatarReady(false);
-              setDisplay(e.target.value as Display);
-            }}
-            className="min-h-11 rounded-lg border-2 border-slate-300 bg-white px-2 py-2"
-          >
-            <option value="auto">Automatic</option>
-            <option value="high">High quality 3D</option>
-            <option value="medium">Balanced 3D</option>
-            <option value="low">Light 3D</option>
-            <option value="2d">Low data (2D)</option>
-            <option value="text">Text only</option>
-          </select>
-        </label>
-      </div>
-    </details>
-  );
-
-  // ---------------- Patient answer area ----------------
-  const kind: "main" | "other" = inp.kind === "text" ? "main" : "other";
-  const wordsForm = (
-    <form
-      className="space-y-2"
-      onSubmit={(e) => {
-        e.preventDefault();
-        if (text.trim()) sendWords(text);
-        else if (inp.kind === "text" && inp.optional) answer("");
-      }}
-    >
-      {/* Phones, keyboard open: the choices push the question off screen, so it
-          is repeated (visually only) just above the box being typed in. */}
-      {kind === "other" && keyboardOpen && started && (
-        <p aria-hidden data-question-repeat className="rounded-lg bg-slate-100 px-3 py-2 text-sm font-semibold text-blue-950">
-          {turn.say}
-        </p>
-      )}
-      <label htmlFor="consult-text" className={kind === "main" ? "sr-only" : "block text-base font-semibold text-slate-800"}>
-        {kind === "main" ? "Your answer" : "Or answer in your own words"}
-      </label>
-      <div className="flex flex-col gap-2 sm:flex-row">
-        {kind === "main" ? (
-          <textarea
-            id="consult-text"
-            ref={answerBox}
-            value={text}
-            maxLength={inp.kind === "text" ? inp.maxLength : 300}
-            rows={2}
-            onChange={(e) => onTyping(e.target.value)}
-            placeholder={inp.kind === "text" ? inp.placeholder : undefined}
-            className={`w-full rounded-xl border-2 border-slate-300 px-4 py-3 ${textSize} focus:border-blue-700`}
-          />
-        ) : (
-          <input
-            id="consult-text"
-            ref={answerBox}
-            value={text}
-            maxLength={300}
-            onChange={(e) => onTyping(e.target.value)}
-            placeholder="Type or press Talk"
-            className={`w-full rounded-xl border-2 border-slate-300 px-4 py-2.5 ${textSize} focus:border-blue-700`}
-          />
-        )}
-      </div>
-      <div className="flex flex-wrap items-center gap-3">
-        <button type="submit" disabled={!text.trim()} className="min-h-12 rounded-xl bg-blue-900 px-6 py-2.5 text-lg font-bold text-white hover:bg-blue-800 disabled:opacity-40">
-          Send
-        </button>
-        {inp.kind === "text" && inp.optional && (
-          <button type="button" onClick={() => answer("")} className="min-h-12 rounded-xl border-2 border-slate-300 bg-white px-5 py-2.5 text-lg font-semibold text-slate-800">
-            Skip
-          </button>
-        )}
-      </div>
-      {micNote && <p role="status" className="text-sm text-slate-700">{micNote}</p>}
-    </form>
-  );
-
-  // Ways to answer when the patient doesn't know, or doesn't understand.
-  const chip = "min-h-11 rounded-full border-2 border-slate-300 bg-white px-4 py-2 text-base font-semibold text-slate-800 hover:border-blue-500";
-  const helpRow =
-    started && !done && !emergency ? (
-      <div className="flex flex-wrap gap-2" role="group" aria-label="Help with this question">
-        {SYMPTOM_STEPS.has(turn.step) && !state.helpDescribe && (
-          <button type="button" className={`${chip} border-blue-900 text-blue-950`} onClick={helpMeDescribe}>
-            🧭 Help me describe it
-          </button>
-        )}
-        {turn.step === "concern" ? null : (
-          turn.unsure && (
-            <button type="button" className={chip} onClick={() => answer(turn.step === "describe" || turn.step === "concern-more" ? "?describe" : "?unsure")}>
-              🤷 I&apos;m not sure
-            </button>
-          )
-        )}
-        {(turn.step === "medicines" || turn.step === "duration") && (
-          <button type="button" className={chip} onClick={() => answer("?forgot")}>
-            💭 I don&apos;t remember
-          </button>
-        )}
-        {turn.step !== "concern" && (
-          <button type="button" className={chip} onClick={explainNow}>
-            ❓ What does this mean?
-          </button>
-        )}
-        {turn.step !== "concern" && turn.step !== "concern-more" && (
-          <button type="button" className={chip} onClick={whyNow}>
-            💬 Why do you ask?
-          </button>
-        )}
-        {/* Hard words in the question get their own "what does … mean?" */}
-        {termsIn(turn.question ?? turn.say, { hardOnly: true, max: 2 }).map((g) => (
-          <button key={g.id} type="button" className={chip} onClick={() => meaningNow(g.term, g.meaning)}>
-            📖 What does “{g.term}” mean?
-          </button>
-        ))}
-      </div>
-    ) : null;
 
   // "I heard: … Is that correct?" — uncertain speech is confirmed first.
   const heardPanel = heard ? (
@@ -1203,59 +1010,6 @@ export default function ConsultationRoom({ room }: { room: RoomStyle }) {
     </section>
   ) : null;
 
-  let answerArea: ReactNode = null;
-  if (!begun) {
-    answerArea =
-      tier === "none" ? (
-        <button type="button" onClick={() => setBegun(true)} className="w-full rounded-xl bg-blue-900 px-5 py-4 text-lg font-bold text-white hover:bg-blue-800">
-          Begin consultation
-        </button>
-      ) : (
-        <p className="text-lg text-slate-700">Press “Begin consultation” to start. You can also choose text only (Display → Text only).</p>
-      );
-  } else if (!started) {
-    answerArea = <p className="text-lg text-slate-700">The doctor will be with you in a moment…</p>;
-  } else if (inp.kind === "text") {
-    answerArea = wordsForm;
-  } else if (inp.kind === "single") {
-    answerArea = (
-      <div className="space-y-4">
-        <div className={`grid gap-3 ${inp.options.length <= 3 ? "sm:grid-cols-3" : "sm:grid-cols-2"}`}>
-          {inp.options.map((o) => (
-            <BigChoice key={o.id} tone={o.tone === "danger" ? "danger" : "default"} onClick={() => (o.id === "words:other" ? answerBox.current?.focus() : answer(o.id))}>
-              {o.label}
-            </BigChoice>
-          ))}
-        </div>
-        {wordsForm}
-      </div>
-    );
-  } else if (inp.kind === "multi") {
-    answerArea = (
-      <div className="space-y-3">
-        <div className="grid gap-3">
-          {inp.options.map((o) => (
-            <BigChoice key={o.id} selected={multi.includes(o.id)} onClick={() => setMulti((m) => (m.includes(o.id) ? m.filter((x) => x !== o.id) : [...m, o.id]))}>
-              <span className="block">{o.label}</span>
-              {o.hint && <span className="mt-1 block text-base font-normal text-slate-600">{o.hint}</span>}
-            </BigChoice>
-          ))}
-        </div>
-        <button type="button" onClick={() => answer(multi)} className="w-full rounded-xl bg-blue-900 px-6 py-4 text-lg font-bold text-white hover:bg-blue-800">
-          {multi.length ? inp.doneLabel : inp.noneLabel}
-        </button>
-        {wordsForm}
-      </div>
-    );
-  } else if (inp.kind === "body") {
-    answerArea = (
-      <div className="space-y-4">
-        <BodyMap options={inp.options} onPick={(id) => answer(id)} />
-        {wordsForm}
-      </div>
-    );
-  }
-
   const safetyAnswers = chart.safety.filter((r) => r.provided && r.label !== "Danger signs at the start").map((r) => (r.value === "No" ? r.label : `${r.label}: ${r.value}`));
   const resultMeta = {
     relation: state.relation,
@@ -1273,142 +1027,651 @@ export default function ConsultationRoom({ room }: { room: RoomStyle }) {
     extra: summaryExtra(state),
   };
 
-  // Desktop: a side panel. Phones and tablets: a bottom sheet that peeks
-  // ("Visit chart · 5 noted") and opens over the page when tapped.
   const noted = [...chart.reported, ...chart.safety].filter((r) => r.provided).length;
-  const chartPanel = (
-    <aside
-      aria-label="Patient chart"
-      className={`h-fit rounded-2xl border border-slate-300 bg-white p-4 shadow-sm lg:sticky lg:top-4 ${keyboardOpen && !sheetOpen ? "max-lg:hidden" : ""} max-lg:fixed max-lg:inset-x-0 max-lg:bottom-0 max-lg:z-30 max-lg:rounded-b-none max-lg:border-x-0 max-lg:border-b-0 max-lg:p-0 max-lg:shadow-[0_-8px_24px_rgba(15,23,42,0.18)]`}
-    >
-      <button
-        type="button"
-        onClick={() => setSheetOpen((o) => !o)}
-        aria-expanded={sheetOpen}
-        aria-controls="chart-sheet"
-        className="flex min-h-13 w-full items-center justify-between gap-3 px-4 py-3 text-left lg:hidden"
+
+  const displaySelect = (
+    <label className="flex items-center justify-between gap-3 text-sm font-semibold text-slate-800">
+      Display
+      <select
+        value={display}
+        onChange={(e) => {
+          setFailed3d(null);
+          setSlowTier(null);
+          setAvatarReady(false);
+          setDisplay(e.target.value as Display);
+        }}
+        className="min-h-10 rounded-lg border border-slate-300 bg-white px-2 py-1.5"
       >
-        <span className="font-bold text-blue-950">
-          📋 Visit chart <span className="font-semibold text-slate-600">· {noted} noted</span>
-        </span>
-        <span className="rounded-full bg-slate-100 px-3 py-1 text-sm font-semibold text-slate-800">{sheetOpen ? "Hide ▼" : "Show ▲"}</span>
-      </button>
-      <div id="chart-sheet" className={sheetOpen ? "max-lg:max-h-[70vh] max-lg:overflow-y-auto max-lg:border-t max-lg:border-slate-200 max-lg:px-4 max-lg:py-3" : "max-lg:max-h-0 max-lg:overflow-hidden"}>
-        <PatientChart chart={chart} />
-      </div>
-    </aside>
+        <option value="auto">Automatic</option>
+        <option value="high">High quality 3D</option>
+        <option value="medium">Balanced 3D</option>
+        <option value="low">Light 3D</option>
+        <option value="2d">Simple picture (low data)</option>
+        <option value="text">Text only</option>
+      </select>
+    </label>
   );
 
-  // One layout for every state, so the doctor is never reloaded. During an
-  // emergency the emergency guidance comes first (left, or top on a phone)
-  // and the concerned doctor stays visible beside it.
-  return (
-    <div ref={topRef} className={`space-y-4 ${emergency ? "" : "max-lg:pb-16"}`}>
-      <JourneyBar current={journey} />
-      {demoMode && !emergency && <DemoPanel active={demo} onPlay={playDemo} onReset={resetDemo} />}
-      {reviewMode && <ReviewPanel state={state} turn={turn} />}
-      {debugMode && DebugPanel && <DebugPanel state={state} turn={turn} doctor={doc} speaking={speaking} listening={listening} tier={String(tier)} voiceIssue={voiceIssue} />}
+  // ================= Presentation: an immersive consultation =================
+  // One full-screen scene. The 3D room fills the screen (desktop) or the top
+  // of it (phones); the HUD shows only what matters now: the doctor's
+  // question, the ways to answer, the tool she is using with you, and My Visit.
+
+  const phase = !begun
+    ? "Ready when you are"
+    : emergency
+      ? "Emergency guidance"
+      : done
+        ? "Visit summary"
+        : !started
+          ? "Preparing"
+          : turn.step === "check" || turn.step.startsWith("confirm:")
+            ? "Safety check"
+            : SYMPTOM_STEPS.has(turn.step)
+              ? "Describing the problem"
+              : ["medicines", "allergies", "conditions"].includes(turn.step)
+                ? "Health details"
+                : "Questions";
+  const statusText = listening ? "Listening to you…" : speaking ? "Speaking" : doc === "processing" ? "Thinking…" : started && canAnswer ? "Your turn" : STATE_LABEL[doc];
+  const statusDot = listening ? "bg-red-500 motion-safe:animate-pulse" : speaking ? "bg-sky-400" : doc === "processing" ? "bg-amber-400" : "bg-emerald-400";
+
+  // What the doctor shows: a tool beside her, or answers under her question.
+  const longList = inp.kind === "single" && inp.options.length > 5;
+  const toolKind: "body" | "list" | "multi" | "entry" | null =
+    !started || done || emergency
+      ? null
+      : inp.kind === "body"
+        ? "body"
+        : inp.kind === "multi"
+          ? "multi"
+          : longList
+            ? "list"
+            : extraEntryKind(turn, saved)
+                ? "entry"
+                : null;
+  const toolTitle = toolKind === "body" ? "Show me where" : toolKind === "multi" ? "Is any of these happening now?" : toolKind === "list" ? "Choose the closest" : turn.entry === "pain" ? "How strong is it?" : turn.entry === "temperature" ? "Your measured temperature" : "From your Health Passport";
+
+  // ---- Layout measurements (desktop): the camera frames the doctor in the
+  // free space between the panels.
+  const visitShown = wide && visitOpen && !emergency && !done && begun;
+  const sidePanel = wide && (emergency || (done && inp.kind === "result"));
+  const toolShown = wide && !!toolKind;
+  const frame = wide
+    ? {
+        l: toolShown || demoMode || reviewMode || (education && !emergency) ? 448 : 0,
+        r: sidePanel ? Math.min(640, Math.round(viewW * 0.46)) + 24 : visitShown ? 356 : 0,
+        t: 64,
+        b: begun && !sidePanel ? Math.round(dockH * 0.62) + 24 : 40,
+      }
+    : { l: 0, r: 0, t: 0, b: 18 };
+
+  const doctor2d = (
+    <div className="h-full w-full" style={{ background: room.wall, paddingLeft: frame.l, paddingRight: frame.r, paddingTop: frame.t, paddingBottom: frame.b }}>
+      <Doctor2D state={docRef} since={since} lips={lips} activity={activity} reducedMotion={reducedMotion} paused={paused || hidden} room={room} />
+    </div>
+  );
+
+  const stage =
+    tier === "none" ? (
+      <div aria-hidden className="h-full w-full bg-[radial-gradient(ellipse_at_top,#f7f5f0,#e6ebef)]" />
+    ) : (
+      <div className="relative h-full w-full" role="img" aria-label={`Virtual health guide in the ${room.greeting} consultation room. ${STATE_LABEL[doc]}.`}>
+        {tier === null ? (
+          <div className="h-full w-full" style={{ background: room.wall }} />
+        ) : tier === "fallback" ? (
+          doctor2d
+        ) : (
+          <StageBoundary onFail={() => setFailed3d("3D could not start on this device. Showing the simple picture.")} fallback={doctor2d}>
+            <Doctor3D
+              key={tier}
+              state={docRef}
+              since={since}
+              lips={lips}
+              activity={activity}
+              reducedMotion={reducedMotion}
+              paused={paused || hidden}
+              tier={tier}
+              room={room}
+              attire={room.attire}
+              chart={lines3d}
+              frame={frame}
+              onProgress={setProgress}
+              onAvatarReady={() => setAvatarReady(true)}
+              onAvatarError={(e) => {
+                const lost = e instanceof Error && /context lost/i.test(e.message);
+                // The graphics chip gave up: try a lighter level before the picture.
+                const next = lost ? stepDown(tier) : "fallback";
+                if (next === "fallback") setFailed3d("The 3D doctor could not load. Showing the simple picture instead.");
+                else {
+                  setAvatarReady(false);
+                  setSlowTier(next);
+                }
+              }}
+              onSlow={() => {
+                // A level the patient chose is respected; "Automatic" adapts.
+                if (display !== "auto") return;
+                const next = stepDown(tier);
+                if (next === "fallback") setFailed3d("3D was running slowly on this device. Showing the simple picture.");
+                else {
+                  setAvatarReady(false);
+                  setSlowTier(next);
+                }
+              }}
+            />
+          </StageBoundary>
+        )}
+        {/* A soft vignette: the eye goes to the doctor, not the bright walls. */}
+        {tier !== null && <div aria-hidden className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_70%_75%_at_50%_42%,transparent_55%,rgba(15,23,42,0.22))]" />}
+        {/* The situation changed: the room quietly recedes so the guidance leads. */}
+        <div aria-hidden className={`pointer-events-none absolute inset-0 bg-slate-900 transition-opacity duration-700 ${emergency ? "opacity-25" : done ? "opacity-10" : "opacity-0"}`} />
+      </div>
+    );
+
+  // ---------------- Top bar ----------------
+  const btnGhost = "inline-flex min-h-10 items-center gap-1.5 rounded-full px-3 text-sm font-semibold text-slate-800 hover:bg-slate-900/5 focus-visible:bg-slate-900/5";
+  const topBar = (
+    <header className={`relative z-40 flex h-14 shrink-0 items-center gap-2 px-3 sm:px-4 ${wide ? "absolute inset-x-0 top-0 bg-gradient-to-b from-white/90 to-white/60 backdrop-blur-md" : "border-b border-slate-200 bg-white"} ${emergency ? "border-b-2 border-red-700" : ""}`}>
+      <a href={department.href} className={btnGhost} aria-label="Leave the consultation">
+        <span aria-hidden>←</span>
+        <span className="hidden sm:inline">Leave</span>
+      </a>
+      <div className="min-w-0 flex-1 leading-tight">
+        <h1 className="truncate text-[15px] font-bold text-slate-900 sm:text-base">
+          <span aria-hidden className="mr-1.5">{department.icon}</span>
+          {department.name}
+          <span className="font-semibold text-slate-500"> · Virtual consultation</span>
+        </h1>
+        <p className="truncate text-xs text-slate-600">Virtual health guide · not a doctor · {phase}</p>
+      </div>
+      {begun && (
+        <p role="status" aria-live="polite" className="hidden items-center gap-2 rounded-full bg-slate-900/85 px-3 py-1.5 text-xs font-semibold text-white md:flex">
+          <span aria-hidden className={`inline-block h-2 w-2 rounded-full ${emergency ? "bg-red-400" : statusDot}`} />
+          {emergency ? "Urgent" : statusText}
+        </p>
+      )}
+      {begun && !emergency && !done && (
+        <button type="button" onClick={() => (wide ? setVisitOpen((o) => !o) : setSheetOpen((o) => !o))} aria-expanded={wide ? visitOpen : sheetOpen} aria-controls="my-visit" className={`${btnGhost} ${(wide ? visitOpen : sheetOpen) ? "bg-blue-900/10 text-blue-950" : ""}`}>
+          <span aria-hidden>📋</span>
+          <span>My Visit</span>
+          {noted > 0 && <span className="rounded-full bg-blue-900 px-1.5 text-[11px] font-bold text-white">{noted}</span>}
+        </button>
+      )}
+      <button type="button" onClick={() => setSettingsOpen((o) => !o)} aria-expanded={settingsOpen} aria-controls="room-settings" className={btnGhost} aria-label="Settings">
+        <span aria-hidden>⚙️</span>
+        <span className="hidden lg:inline">Settings</span>
+      </button>
+      <a href="/ai-hospital/emergency" className="inline-flex min-h-10 items-center gap-1 rounded-full border-2 border-red-700 bg-white px-3 text-sm font-bold text-red-800 hover:bg-red-50">
+        <span aria-hidden>🚨</span> <span className="hidden sm:inline">Emergency</span>
+        <span className="sm:hidden">108</span>
+      </a>
+    </header>
+  );
+
+  const settings = settingsOpen ? (
+    <div id="room-settings" role="group" aria-label="Consultation settings" className="absolute right-3 top-16 z-50 w-[min(360px,calc(100vw-24px))] space-y-3 rounded-2xl bg-white p-4 text-sm shadow-[0_24px_60px_-20px_rgba(15,23,42,.5)] ring-1 ring-slate-900/10">
+      <div className="flex items-center justify-between">
+        <p className="font-bold text-slate-900">Display and sound</p>
+        <button type="button" onClick={() => setSettingsOpen(false)} className="rounded-full px-2 py-1 text-sm font-semibold text-slate-600 hover:bg-slate-100">
+          Close
+        </button>
+      </div>
+      <div className="flex flex-wrap gap-2">
+        <Toggle on={voiceOn} onClick={toggleVoice}>{voiceOn ? "🔊 Voice on" : "🔇 Muted"}</Toggle>
+        <Toggle on={slower} onClick={toggleSlower}>🐢 Slower</Toggle>
+        <Toggle on={paused} onClick={togglePause}>{paused ? "▶ Resume" : "⏸ Pause"}</Toggle>
+        <Toggle on={bigText} onClick={() => setBigText((v) => !v)}>A+ Larger text</Toggle>
+        <Toggle on={reducedMotion} onClick={() => setReducedMotion((v) => !v)}>Reduce motion</Toggle>
+      </div>
+      {displaySelect}
+      {privacy}
+    </div>
+  ) : null;
+
+  // ---------------- Notices ----------------
+  // Short, and gone after a few seconds: the consultation carries on either way.
+  const noticeOn = (key: string) => !!key && !seenNotices.includes(key);
+  const notices = (
+    <>
       {fromReception && !emergency && (
-        <p className="rounded-xl bg-blue-50 px-4 py-2 text-blue-950">
+        <p className="rounded-full bg-white/95 px-4 py-1.5 text-sm text-blue-950 shadow ring-1 ring-slate-900/5">
           From Reception: <q>{fromReception}</q> — this will be your first answer.
         </p>
       )}
-      {failed3d && <p role="status" className="rounded-xl bg-amber-50 px-4 py-2 text-sm font-semibold text-amber-900">{failed3d}</p>}
-      {voiceIssue && voiceOn && (
-        <p role="status" className="rounded-xl bg-amber-50 px-4 py-2 text-sm font-semibold text-amber-900">
-          Voice isn&apos;t available right now. The doctor&apos;s words are shown as text — you can keep going by reading and typing.
+      {failed3d && noticeOn(failed3d) && (
+        <p role="status" className="rounded-full bg-white/95 px-4 py-1.5 text-sm font-semibold text-slate-800 shadow ring-1 ring-slate-900/10">
+          {failed3d}
         </p>
       )}
-      <div className={emergency ? "" : "grid gap-5 lg:grid-cols-[minmax(0,1fr)_360px]"}>
-        <div className={emergency ? "grid gap-4 lg:grid-cols-[minmax(0,1fr)_360px] lg:items-start" : "space-y-4"}>
-          {emergency && (
-            <EmergencyMode
-              inline
-              flags={inp.flags}
-              notice={turn.say}
-              onExit={() => {
-                if (demo) resetDemo();
-                else answer("exit");
-              }}
-              exitLabel={demo ? "End demo scenario — reset" : "This is not an emergency — go back"}
-            />
-          )}
-          <div className={emergency ? "space-y-3 lg:sticky lg:top-4" : "space-y-4"}>
-            {stage}
-            {conversationControls}
-          </div>
-          {!emergency && (
-            <section aria-labelledby="consult-question" className="space-y-4 rounded-2xl border border-slate-300 bg-white p-5 shadow-sm">
-              {log.length > 1 && (
-                <details className="text-sm">
-                  <summary className="cursor-pointer font-semibold text-slate-700">Conversation so far ({log.length})</summary>
-                  <ol className="mt-2 max-h-64 space-y-1.5 overflow-y-auto">
-                    {log.map((l, i) => (
-                      <li key={i} className={l.who === "guide" ? "text-slate-700" : "text-right font-semibold text-blue-900"}>
-                        <span className="sr-only">{l.who === "guide" ? "Guide: " : "You: "}</span>
-                        {l.text}
-                      </li>
-                    ))}
-                  </ol>
-                </details>
-              )}
-              <h2 id="consult-question" aria-live="polite" className={showHeading || !started ? `${keyboardOpen ? (bigText ? "text-xl" : "text-lg leading-snug") : bigText ? "text-3xl" : "text-2xl"} font-bold text-blue-950` : "sr-only"}>
-                {started ? turn.say : `${room.greeting} consultation room`}
-              </h2>
-              {note && (
-                <p role="status" className="rounded-lg bg-amber-50 px-3 py-2 font-semibold text-amber-950">
-                  {note}
-                </p>
-              )}
-              {started && turn.hint && <p className={`${keyboardOpen ? "text-sm" : textSize} text-slate-600`}>{turn.hint}</p>}
-              {heardPanel}
-              {professionalCard}
-              {educationCard}
-              {consent}
-              {answerArea}
-              {extraEntry}
-              {helpRow}
-              {started && turn.step.startsWith("q:") && (
-                <p className="text-sm text-slate-600">
-                  Question {questionsFor(toAnswers(state).context).filter((q) => q.id in state.answers).length + 1} about this problem. Each answer is checked for warning signs before the next question.
-                </p>
-              )}
-              {started && history.length > 1 && !done && (
-                <div className="flex flex-wrap gap-3 border-t border-slate-200 pt-4">
-                  <button type="button" onClick={restart} className="min-h-11 rounded-xl border-2 border-slate-300 px-4 py-2.5 font-semibold text-slate-800">
-                    ↺ Start again
-                  </button>
-                </div>
-              )}
-            </section>
-          )}
-          {!emergency && settings}
-          {!emergency && privacy}
-          {done && inp.kind === "result" && (
-            <div className="space-y-5">
-              <HandoffPanel level={inp.level} />
-              <section aria-labelledby="visit-summary" className="space-y-3">
-                <h2 id="visit-summary" className="text-2xl font-bold text-blue-950">📋 Patient-prepared visit summary</h2>
-                <ResultView
-                  answers={toAnswers(state)}
-                  meta={resultMeta}
-                  onRestart={restart}
-                  onEmergency={(flags) => setHistory((h) => [...h, { ...state, emergency: { flags, clear: { kind: "text" } } }])}
-                />
-              </section>
-              <div className="no-print rounded-2xl border border-slate-200 bg-white p-4">
-                <p className="text-slate-700">
-                  {state.otherConcerns.length ? `You also mentioned ${state.otherConcerns.join(" and ")}. ` : ""}Another problem, or for someone else? Your summary stays in My Visit until you close this tab.
-                </p>
-                <button type="button" onClick={restart} className="mt-3 min-h-11 rounded-xl border-2 border-blue-900 px-4 py-2.5 font-semibold text-blue-900 hover:bg-blue-50">
-                  ↺ Start a new consultation
-                </button>
-              </div>
-            </div>
-          )}
+      {voiceIssue && voiceOn && noticeOn("voice") && (
+        <p role="status" className="rounded-full bg-white/95 px-4 py-1.5 text-sm font-semibold text-slate-800 shadow ring-1 ring-slate-900/10">
+          Voice isn&apos;t available right now. The doctor&apos;s words are shown here — you can keep going by reading and typing.
+        </p>
+      )}
+    </>
+  );
+
+  // ---------------- Entry: the room prepares; healthcare never waits for it ----------------
+  const loadingSteps = [
+    { label: `Preparing ${room.greeting}`, done: tier !== null },
+    { label: "Loading the consultation room", done: !is3d || progress > 0.02 || avatarReady },
+    { label: "Preparing your virtual health guide", done: !is3d || avatarReady },
+  ];
+  const entry = !begun ? (
+    <div className="pointer-events-auto w-full max-w-[460px] rounded-[24px] bg-white/95 p-5 shadow-[0_30px_80px_-30px_rgba(15,23,42,.55)] ring-1 ring-slate-900/5 backdrop-blur-xl sm:p-6">
+      <p className="text-xs font-bold uppercase tracking-[0.14em] text-blue-800">Virtual consultation</p>
+      <p className="mt-1 text-2xl font-bold leading-tight text-slate-900">{room.greeting}</p>
+      <p className="mt-2 text-[15px] leading-relaxed text-slate-700">Your virtual health guide will ask about the problem and help you find the safest next step. It is not a doctor and cannot diagnose.</p>
+      {is3d && (
+        <ol className="mt-4 space-y-1.5" aria-label="Preparing the room">
+          {loadingSteps.map((st) => (
+            <li key={st.label} className="flex items-center gap-2 text-sm text-slate-700">
+              <span aria-hidden className={`grid h-5 w-5 place-items-center rounded-full text-[11px] font-bold ${st.done ? "bg-emerald-600 text-white" : "bg-slate-200 text-slate-500"}`}>{st.done ? "✓" : "·"}</span>
+              <span className={st.done ? "" : "text-slate-500"}>{st.label}{!st.done && st.label.startsWith("Preparing your") && progress > 0.02 ? ` · ${pct}%` : ""}</span>
+            </li>
+          ))}
+        </ol>
+      )}
+      <button type="button" onClick={() => setBegun(true)} className="mt-5 w-full rounded-2xl bg-blue-900 px-5 py-3.5 text-lg font-bold text-white shadow-lg shadow-blue-900/20 hover:bg-blue-800">
+        Begin consultation
+      </button>
+      {is3d && !avatarReady && (
+        <button type="button" onClick={() => setDisplay("2d")} className="mt-2 w-full rounded-2xl px-5 py-2.5 text-sm font-semibold text-blue-900 hover:bg-blue-50">
+          Continue without 3D (faster)
+        </button>
+      )}
+      <div className="mt-4 border-t border-slate-100 pt-3">{displaySelect}</div>
+      <p className="mt-3 text-xs leading-relaxed text-slate-500">🔒 {PRIVACY_LINE} The microphone is only used if you press Talk.</p>
+    </div>
+  ) : null;
+
+  // ---------------- The answer tools ----------------
+  const chipBtn = "min-h-11 rounded-full border border-slate-300 bg-white px-4 py-2 text-[15px] font-semibold text-slate-900 shadow-sm hover:border-blue-600 hover:bg-blue-50 focus-visible:border-blue-600";
+  const helpChip = "min-h-9 rounded-full px-3 py-1.5 text-sm font-semibold text-blue-900 hover:bg-blue-50 focus-visible:bg-blue-50";
+
+  const choices =
+    started && inp.kind === "single" && !longList ? (
+      <div className="flex flex-wrap gap-2" role="group" aria-label="Answers">
+        {inp.options.map((o) => (
+          <button
+            key={o.id}
+            type="button"
+            onClick={() => (o.id === "words:other" ? answerBox.current?.focus() : answer(o.id))}
+            className={`${chipBtn} ${o.tone === "danger" ? "border-red-300 text-red-900 hover:border-red-600 hover:bg-red-50" : ""} ${inp.options.length <= 3 ? "min-w-[96px] px-6" : ""}`}
+          >
+            {o.label}
+          </button>
+        ))}
+      </div>
+    ) : null;
+
+  const toolBody =
+    toolKind === "body" && inp.kind === "body" ? (
+      <BodyMap options={inp.options} onPick={(id) => answer(id)} />
+    ) : toolKind === "list" && inp.kind === "single" ? (
+      <div className="grid gap-2" role="group" aria-label="Answers">
+        {inp.options.map((o) => (
+          <BigChoice key={o.id} tone={o.tone === "danger" ? "danger" : "default"} onClick={() => (o.id === "words:other" ? answerBox.current?.focus() : answer(o.id))}>
+            {o.label}
+          </BigChoice>
+        ))}
+      </div>
+    ) : toolKind === "multi" && inp.kind === "multi" ? (
+      <div className="space-y-3">
+        <div className="grid gap-2">
+          {inp.options.map((o) => (
+            <BigChoice key={o.id} selected={multi.includes(o.id)} onClick={() => setMulti((m) => (m.includes(o.id) ? m.filter((x) => x !== o.id) : [...m, o.id]))}>
+              <span className="block">{o.label}</span>
+              {o.hint && <span className="mt-1 block text-base font-normal text-slate-600">{o.hint}</span>}
+            </BigChoice>
+          ))}
         </div>
-        {!emergency && chartPanel}
+        <button type="button" onClick={() => answer(multi)} className="sticky bottom-0 w-full rounded-2xl bg-blue-900 px-6 py-3.5 text-lg font-bold text-white shadow-lg hover:bg-blue-800">
+          {multi.length ? inp.doneLabel : inp.noneLabel}
+        </button>
+      </div>
+    ) : toolKind === "entry" ? (
+      extraEntry
+    ) : null;
+
+  const tool = toolKind ? (
+    <section aria-labelledby="tool-title" className="space-y-3">
+      <h2 id="tool-title" className="text-[13px] font-bold uppercase tracking-[0.12em] text-blue-800">
+        {toolTitle}
+      </h2>
+      {toolBody}
+    </section>
+  ) : null;
+
+  // ---------------- The dock: the doctor's words, then the ways to answer ----------------
+  const kind: "main" | "other" = inp.kind === "text" ? "main" : "other";
+  const inputRow = (
+    <form
+      className="sticky bottom-0 z-10 -mx-4 space-y-2 border-t border-slate-100 bg-white/95 px-4 pb-3 pt-3 backdrop-blur sm:-mx-5 sm:px-5"
+      onSubmit={(e) => {
+        e.preventDefault();
+        if (text.trim()) sendWords(text);
+        else if (inp.kind === "text" && inp.optional) answer("");
+      }}
+    >
+      <label htmlFor="consult-text" className="sr-only">
+        {kind === "main" ? "Your answer" : "Or answer in your own words"}
+      </label>
+      <div className="flex items-end gap-2">
+        <button
+          type="button"
+          onClick={onTalk}
+          disabled={!canAnswer || !talk.available}
+          aria-pressed={listening}
+          title={talk.available ? "Speak your answer" : talk.reason}
+          className={`grid h-12 shrink-0 place-items-center rounded-full px-4 text-[15px] font-bold text-white shadow-md disabled:opacity-40 ${listening ? "bg-red-700" : "bg-blue-900 hover:bg-blue-800"}`}
+        >
+          <span>🎙️ {listening ? "Stop listening" : "Talk"}</span>
+        </button>
+        {kind === "main" ? (
+          <textarea
+            id="consult-text"
+            ref={answerBox}
+            value={text}
+            maxLength={inp.kind === "text" ? inp.maxLength : 300}
+            rows={1}
+            disabled={!canAnswer}
+            onChange={(e) => onTyping(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter" && !e.shiftKey) {
+                e.preventDefault();
+                if (text.trim()) sendWords(text);
+              }
+            }}
+            placeholder={inp.kind === "text" ? inp.placeholder : "Type your answer"}
+            className={`min-h-12 w-full resize-none rounded-[22px] border border-slate-300 bg-slate-50 px-4 py-3 ${textSize} leading-snug focus:border-blue-700 focus:bg-white`}
+          />
+        ) : (
+          <input
+            id="consult-text"
+            ref={answerBox}
+            value={text}
+            maxLength={300}
+            disabled={!canAnswer}
+            onChange={(e) => onTyping(e.target.value)}
+            placeholder="Or type your answer"
+            className={`min-h-12 w-full rounded-full border border-slate-300 bg-slate-50 px-4 py-2.5 ${textSize} focus:border-blue-700 focus:bg-white`}
+          />
+        )}
+        <button type="submit" disabled={!text.trim()} className="h-12 shrink-0 rounded-full bg-blue-900 px-5 text-[15px] font-bold text-white shadow-md hover:bg-blue-800 disabled:bg-slate-300 disabled:shadow-none">
+          Send
+        </button>
+      </div>
+      {inp.kind === "text" && inp.optional && canAnswer && (
+        <button type="button" onClick={() => answer("")} className={helpChip}>
+          Skip
+        </button>
+      )}
+      {micNote && (
+        <p role="status" className="text-sm text-slate-700">
+          {micNote}
+        </p>
+      )}
+      {!talk.available && talk.reason && canAnswer && <p className="text-xs text-slate-500">{talk.reason}</p>}
+      <p className="text-xs text-slate-500">
+        🔒 Your consultation information stays on this device. {listening ? "The microphone is on now." : "The microphone is only used if you press Talk."}
+      </p>
+    </form>
+  );
+
+  const helpers =
+    started && !done && !emergency ? (
+      <div className="-mx-1 flex flex-wrap gap-0.5" role="group" aria-label="Help with this question">
+        {SYMPTOM_STEPS.has(turn.step) && !state.helpDescribe && (
+          <button type="button" className={`${helpChip} bg-blue-50`} onClick={helpMeDescribe}>
+            🧭 Help me describe it
+          </button>
+        )}
+        {turn.step !== "concern" && turn.unsure && (
+          <button type="button" className={helpChip} onClick={() => answer(turn.step === "describe" || turn.step === "concern-more" ? "?describe" : "?unsure")}>
+            🤷 I&apos;m not sure
+          </button>
+        )}
+        {(turn.step === "medicines" || turn.step === "duration") && (
+          <button type="button" className={helpChip} onClick={() => answer("?forgot")}>
+            💭 I don&apos;t remember
+          </button>
+        )}
+        {turn.step !== "concern" && (
+          <button type="button" className={helpChip} onClick={explainNow}>
+            ❓ What does this mean?
+          </button>
+        )}
+        {turn.step !== "concern" && turn.step !== "concern-more" && (
+          <button type="button" className={helpChip} onClick={whyNow}>
+            💬 Why do you ask?
+          </button>
+        )}
+        {termsIn(turn.question ?? turn.say, { hardOnly: true, max: 2 }).map((g) => (
+          <button key={g.id} type="button" className={helpChip} onClick={() => meaningNow(g.term, g.meaning)}>
+            📖 What does “{g.term}” mean?
+          </button>
+        ))}
+      </div>
+    ) : null;
+
+  const qNumber = started && turn.step.startsWith("q:") ? questionsFor(toAnswers(state).context).filter((q) => q.id in state.answers).length + 1 : 0;
+  const miniBtn = "min-h-9 whitespace-nowrap rounded-full px-2.5 text-sm font-semibold text-slate-700 hover:bg-slate-100 disabled:opacity-35 sm:px-3";
+  const dockHeader = (
+    <div className="flex items-center justify-between gap-1">
+      <p className="flex min-w-0 items-center gap-1.5 whitespace-nowrap text-[13px] font-semibold text-slate-600">
+        <span aria-hidden className={`inline-block h-2 w-2 shrink-0 rounded-full ${statusDot}`} />
+        <span className="hidden sm:inline">Health guide ·</span>
+        <span className="truncate">{statusText}</span>
+        {qNumber > 0 && <span className="hidden text-slate-400 md:inline">· question {qNumber}</span>}
+      </p>
+      <div className="flex shrink-0 items-center">
+        <button type="button" onClick={repeat} disabled={!started || emergency} className={miniBtn}>
+          ↻ Repeat
+        </button>
+        <button type="button" onClick={stopSpeaking} disabled={!speaking} className={miniBtn}>
+          ■ Stop
+        </button>
+        <button type="button" onClick={back} disabled={!(started && history.length > 1 && !done)} className={miniBtn}>
+          ← Back
+        </button>
       </div>
     </div>
   );
+
+  const dockBody = (
+    <>
+      {dockHeader}
+      {note && (
+        <p role="status" className="rounded-2xl bg-sky-50 px-4 py-2.5 text-[15px] leading-relaxed text-slate-800">
+          {note}
+        </p>
+      )}
+      <h2 id="consult-question" aria-live="polite" className={`${bigText ? "text-[28px]" : keyboardOpen ? "text-lg" : "text-[21px] sm:text-[23px]"} font-semibold leading-snug tracking-[-0.01em] text-slate-900`}>
+        {started ? turn.say : `Your health guide will be with you in a moment…`}
+      </h2>
+      {started && turn.hint && !keyboardOpen && <p className={`${bigText ? "text-lg" : "text-[15px]"} leading-relaxed text-slate-600`}>{turn.hint}</p>}
+      {heardPanel}
+      {consent}
+      {professionalCard}
+      {choices}
+      {/* Phones: health information and the tool (body map aside) sit under the question. */}
+      {!wide && educationCard}
+      {!wide && toolKind && toolKind !== "body" && tool}
+      {helpers}
+      {started && history.length > 2 && !done && (
+        <button type="button" onClick={restart} className={`${helpChip} text-slate-600`}>
+          ↺ Start again
+        </button>
+      )}
+      {inputRow}
+    </>
+  );
+
+  // ---------------- My Visit ----------------
+  const editAnswer = (label: string) => {
+    const step = EDIT_STEP[label];
+    if (!step) return;
+    stopSpeaking();
+    const next = reopen(state, step);
+    if (next !== state) commit(next, `Change: ${label.toLowerCase()}`);
+    setSheetOpen(false);
+  };
+  const visitPanel = (
+    <aside id="my-visit" aria-label="My Visit" className="space-y-3">
+      <MyVisit chart={chart} onEdit={canAnswer ? editAnswer : undefined} />
+    </aside>
+  );
+
+  // ---------------- Emergency and summary panels ----------------
+  const emergencyPanel = emergency ? (
+    <EmergencyMode
+      inline
+      flags={inp.flags}
+      notice={turn.say}
+      onExit={() => {
+        if (demo) resetDemo();
+        else answer("exit");
+      }}
+      exitLabel={demo ? "End demo scenario — reset" : "This is not an emergency — go back"}
+    />
+  ) : null;
+
+  const summaryPanel =
+    done && inp.kind === "result" ? (
+      <div className="space-y-5">
+        <p className="rounded-2xl bg-slate-900 px-5 py-4 text-[17px] leading-relaxed text-white">{subtitleText || turn.say}</p>
+        <HandoffPanel level={inp.level} />
+        <section aria-labelledby="visit-summary" className="space-y-3">
+          <h2 id="visit-summary" className="text-2xl font-bold text-blue-950">
+            📋 Patient-prepared visit summary
+          </h2>
+          <p className="text-sm text-slate-600">Please check that I recorded this correctly.</p>
+          <ResultView
+            answers={toAnswers(state)}
+            meta={resultMeta}
+            onRestart={restart}
+            onEmergency={(flags) => setHistory((h) => [...h, { ...state, emergency: { flags, clear: { kind: "text" } } }])}
+          />
+        </section>
+        <div className="no-print rounded-2xl border border-slate-200 bg-white p-4">
+          <p className="text-slate-700">
+            {state.otherConcerns.length ? `You also mentioned ${state.otherConcerns.join(" and ")}. ` : ""}Another problem, or for someone else? Your summary stays in My Visit until you close this tab.
+          </p>
+          <button type="button" onClick={restart} className="mt-3 min-h-11 rounded-xl border-2 border-blue-900 px-4 py-2.5 font-semibold text-blue-900 hover:bg-blue-50">
+            ↺ Start a new consultation
+          </button>
+        </div>
+      </div>
+    ) : null;
+
+  const devPanels = (
+    <>
+      {demoMode && !emergency && <DemoPanel active={demo} onPlay={playDemo} onReset={resetDemo} />}
+      {reviewMode && <ReviewPanel state={state} turn={turn} />}
+      {debugMode && DebugPanel && <DebugPanel state={state} turn={turn} doctor={doc} speaking={speaking} listening={listening} tier={String(tier)} voiceIssue={voiceIssue} />}
+    </>
+  );
+
+  const glass = "pointer-events-auto rounded-[22px] bg-white/93 shadow-[0_24px_70px_-28px_rgba(15,23,42,.55)] ring-1 ring-slate-900/5 backdrop-blur-xl";
+
+  // The stage keeps the same place in the tree in every layout, so the 3D
+  // doctor is never reloaded by a resize, a rotation or a change of state.
+  const stageHeight = wide ? undefined : tier === "none" ? 0 : keyboardOpen ? "17dvh" : emergency || done ? "24dvh" : !begun ? "52dvh" : "42dvh";
+
+  return (
+    <div
+      ref={topRef}
+      className={`fixed inset-x-0 top-0 z-40 flex flex-col overflow-hidden bg-[#e8ecef] text-slate-900 ${bigText ? "text-lg" : ""}`}
+      style={{ height: shellH ? `${shellH}px` : "100dvh", transform: shellTop ? `translateY(${shellTop}px)` : undefined }}
+    >
+      {topBar}
+      {settings}
+      <div className={`relative min-h-0 flex-1 ${wide ? "" : "flex flex-col"}`}>
+        <div className={wide ? "absolute inset-0" : "relative shrink-0 overflow-hidden transition-[height] duration-300"} style={stageHeight !== undefined ? { height: stageHeight } : undefined}>
+          {stage}
+        </div>
+
+        {wide ? (
+          <>
+            <div className="pointer-events-none absolute inset-x-0 top-[68px] z-30 flex flex-col items-center gap-2 px-4">{notices}</div>
+            {(toolShown || demoMode || reviewMode || debugMode || (education && !emergency)) && (
+              <div className={`${glass} absolute bottom-6 left-6 top-[72px] z-20 w-[400px] space-y-4 overflow-y-auto p-5`}>
+                {devPanels}
+                {!emergency && educationCard}
+                {toolShown && tool}
+              </div>
+            )}
+            <div className={`${glass} absolute right-6 top-[72px] z-20 max-h-[calc(100%-96px)] w-[320px] overflow-y-auto p-5 ${visitShown ? "" : "hidden"}`}>{visitPanel}</div>
+            {sidePanel && (
+              <div className={`${glass} absolute bottom-6 right-6 top-[72px] z-20 overflow-y-auto p-5`} style={{ width: Math.min(640, Math.round(viewW * 0.46)) }}>
+                {emergencyPanel}
+                {summaryPanel}
+              </div>
+            )}
+            {!begun && (
+              <div className="pointer-events-none absolute inset-0 z-20 flex items-end justify-center p-6 pb-10 lg:items-center lg:justify-end lg:pr-[6vw]">{entry}</div>
+            )}
+            {begun && !sidePanel && (
+              <div className="pointer-events-none absolute inset-x-0 bottom-6 z-20 flex justify-center px-6" style={{ paddingLeft: frame.l ? frame.l + 8 : 24, paddingRight: frame.r ? frame.r + 8 : 24 }}>
+                <section ref={dockRef} aria-labelledby="consult-question" className={`${glass} flex max-h-[58vh] w-full max-w-[760px] flex-col gap-3 overflow-y-auto px-5 pt-4`}>
+                  {dockBody}
+                </section>
+              </div>
+            )}
+          </>
+        ) : (
+          <div className="relative z-20 -mt-4 flex min-h-0 flex-1 flex-col rounded-t-[22px] bg-white shadow-[0_-10px_30px_-12px_rgba(15,23,42,.25)]">
+            <div className="flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto px-4 pt-4">
+              <div className="flex flex-col gap-2">{notices}</div>
+              {devPanels}
+              {!begun ? (
+                entry
+              ) : emergency ? (
+                emergencyPanel
+              ) : done ? (
+                summaryPanel
+              ) : (
+                <section aria-labelledby="consult-question" className="flex flex-col gap-3">
+                  {dockBody}
+                </section>
+              )}
+            </div>
+            {/* My Visit: a bottom sheet over the conversation. */}
+            {(
+              <div className={`absolute inset-x-0 bottom-0 z-30 max-h-[78dvh] overflow-y-auto rounded-t-[22px] bg-white px-4 pb-6 pt-3 shadow-[0_-16px_40px_-10px_rgba(15,23,42,.35)] transition-transform duration-300 ${sheetOpen ? "translate-y-0" : "pointer-events-none translate-y-full"}`} aria-hidden={!sheetOpen}>
+                <div className="mb-2 flex justify-between">
+                  <span aria-hidden className="mx-auto h-1.5 w-10 rounded-full bg-slate-300" />
+                </div>
+                <button type="button" onClick={() => setSheetOpen(false)} className="absolute right-3 top-2 rounded-full px-3 py-1 text-sm font-semibold text-slate-600 hover:bg-slate-100">
+                  Close
+                </button>
+                {visitPanel}
+              </div>
+            )}
+            {/* Phones: the body map is a full-screen tool while it is needed. */}
+            {toolKind === "body" && !bodyDismissed && (
+              <div className="fixed inset-x-0 bottom-0 top-14 z-50 flex flex-col bg-white">
+                <div className="border-b border-slate-200 px-4 py-3">
+                  <p className="text-[13px] font-bold uppercase tracking-[0.12em] text-blue-800">Show me where</p>
+                  <p className="mt-1 text-lg font-semibold leading-snug text-slate-900">{turn.say}</p>
+                </div>
+                <div className="flex-1 overflow-y-auto px-4 py-4">{toolBody}</div>
+                <div className="border-t border-slate-200 px-4 py-3">
+                  <button type="button" onClick={() => setBodyDismissed(true)} className="w-full rounded-full border border-slate-300 px-4 py-3 text-[15px] font-semibold text-slate-800">
+                    ⌨️ Say it in words instead
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+      {!begun && tier === "none" && wide && null}
+    </div>
+  );
+}
+
+function extraEntryKind(turn: Turn, saved: { medicines?: string; allergies?: string; conditions?: string }) {
+  if (turn.entry === "pain" || turn.entry === "temperature") return true;
+  return (turn.step === "medicines" || turn.step === "allergies" || turn.step === "conditions") && !!saved[turn.step];
 }

@@ -1,7 +1,6 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { AI_HOSPITAL } from "../../../../config";
-import PageHeader from "../../../../components/PageHeader";
 import ConsultationRoom from "../../../consult-room/ConsultationRoom";
 import { ROOMS, roomFor } from "../../../consult-room/rooms";
 import { getDepartment } from "../../../data/departments";
@@ -24,21 +23,11 @@ export default async function RoomPage({ params }: { params: Promise<{ slug: str
   const room = roomFor(slug);
   if (!d || !room) notFound();
 
+  // The room is a full-screen mode of its own (no site header or footer);
+  // it carries its own top bar with Leave and Emergency.
   return (
     <main className="flex-1">
-      <PageHeader
-        title={`${d.plainName} consultation room`}
-        icon={d.icon}
-        intro="The virtual doctor asks about the problem, keeps a note of what you say, and shows you the safest next step. It does not diagnose — a real health professional does."
-        crumbs={[
-          { href: "/ai-hospital", label: AI_HOSPITAL.name },
-          { href: "/ai-hospital/departments", label: "Departments" },
-          { href: `/ai-hospital/departments/${d.slug}`, label: d.plainName },
-        ]}
-      />
-      <div className="mx-auto max-w-7xl px-4 py-6 sm:px-6">
-        <ConsultationRoom room={room} />
-      </div>
+      <ConsultationRoom room={room} department={{ name: d.plainName, icon: d.icon, href: `/ai-hospital/departments/${d.slug}` }} />
     </main>
   );
 }

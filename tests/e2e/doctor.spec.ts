@@ -20,12 +20,12 @@ async function sayIt(page: Page, words: string) {
   await box(page).fill(words);
   await page.getByRole("button", { name: "Send" }).first().click();
 }
-const chart = (page: Page) => page.getByRole("complementary", { name: "Patient chart" });
+const chart = (page: Page) => page.locator("#my-visit");
 
 test("final demonstration: 'something feels wrong here' → body map → chest → middle → pressure → safety takes over", async ({ page }) => {
   const errors = await begin(page);
   await sayIt(page, "I don't know. Something feels wrong here.");
-  await expect(page.getByRole("heading", { name: /Where do you feel it|where in your body/i })).toBeVisible();
+  await expect(page.getByRole("heading", { name: /where you feel it|where in your body/i })).toBeVisible();
   // Tap the picture: it asks to confirm the place before recording it.
   await page.getByRole("group", { name: "Body areas" }).getByRole("button", { name: "Chest" }).click();
   await expect(page.getByRole("heading", { name: /Which side/ })).toBeVisible();
@@ -67,6 +67,7 @@ test("interruptions: STOP repeatedly, Back, change of display mid-visit — memo
   await expect(page.getByRole("button", { name: "18 to 59 years" })).toBeVisible();
   await page.getByRole("button", { name: "60 years or older" }).click();
   // Switch to text only in the middle: the visit is not restarted.
+  await page.getByRole("button", { name: "Settings" }).click();
   await page.getByLabel("Display").selectOption("text");
   await expect(chart(page)).toContainText("I've been coughing for three weeks");
   await expect(chart(page)).toContainText("60 years or older");
@@ -109,7 +110,7 @@ test("a long consultation (20+ turns) with detours stays coherent and the summar
       (await tryClick("About the same")) ||
       (await tryClick(/^Mild/)) ||
       (await tryClick("Skip"));
-    if (!step) await page.locator("main button.min-h-14").first().click();
+    if (!step) await page.getByRole("group", { name: "Answers" }).getByRole("button").first().click();
     turns++;
     await page.waitForTimeout(50);
   }
@@ -191,6 +192,7 @@ test("rotating the phone mid-visit: layout fits, the question stays reachable, m
     await page.setViewportSize(size);
     expect(await noSideScroll(page)).toBe(true);
     const next = page.getByRole("button", { name: "None of these — continue" });
+    await next.waitFor(); // a rotation can switch between the phone and desktop layouts
     await next.scrollIntoViewIfNeeded();
     await expect(next).toBeVisible();
   }
@@ -257,7 +259,7 @@ for (const mode of ["visual viewport (current browsers)", "whole window (older A
     await box(page).focus(); // the keyboard opens for a text box
     await keyboard(true);
     await expect.poll(async () => (await stage.boundingBox())!.height).toBeLessThan(tallStage * 0.6);
-    await expect(question).toHaveText(/What brought you here today/);
+    await expect(question).toHaveText(/What is troubling you today/);
     await check();
     await sayIt(page, "I've been coughing for three weeks");
     await expect(question).toHaveText(/is any of these happening/i);
@@ -277,6 +279,7 @@ test("the 3D doctor can't download mid-visit: the simple picture takes over and 
   const errors = await begin(page, "2d");
   await sayIt(page, "I've been coughing for three weeks");
   await page.getByRole("button", { name: "None of these — continue" }).click();
+  await page.getByRole("button", { name: "Settings" }).click();
   await page.getByLabel("Display").selectOption("high");
   await expect(page.getByRole("status").filter({ hasText: /could not (load|start)|Showing the simple picture/ })).toBeVisible({ timeout: 20_000 });
   await page.getByRole("button", { name: "18 to 59 years" }).click();

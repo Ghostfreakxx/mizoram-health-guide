@@ -75,7 +75,7 @@ describe("the virtual guide never diagnoses or prescribes", () => {
   it("introduces itself as a virtual guide, never as a doctor", () => {
     const t = nextTurn(start());
     expect(t.say).toBe(
-      "Hello. I'm your virtual health guide for this General Medicine consultation. I'll ask a few questions to help determine what kind of care may be appropriate. If anything you tell me suggests an emergency, I'll tell you immediately. What brought you here today?",
+      "Hello. I'm your virtual health guide for General Medicine. What is troubling you today?",
     );
     expect(t.hint).toMatch(/I am not a doctor/);
   });

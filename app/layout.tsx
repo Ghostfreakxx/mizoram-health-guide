@@ -7,6 +7,7 @@ import SiteFooter from "./components/SiteFooter";
 import { SITE } from "./config";
 import OfflineSupport from "./components/OfflineSupport";
 import { LanguageProvider } from "./i18n/LanguageProvider";
+import ChromeGate from "./components/ChromeGate";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -41,12 +42,16 @@ export default function RootLayout({
       <body className="min-h-full flex flex-col font-sans">
         <LanguageProvider>
         <OfflineSupport />
-        <SiteHeader />
+        <ChromeGate>
+          <SiteHeader />
+        </ChromeGate>
         <div id="main-content" className="flex-1 flex flex-col">
           {children}
         </div>
-        <SiteFooter />
-        <BottomNav />
+        <ChromeGate>
+          <SiteFooter />
+          <BottomNav />
+        </ChromeGate>
         <WebVitals />
         </LanguageProvider>
       </body>

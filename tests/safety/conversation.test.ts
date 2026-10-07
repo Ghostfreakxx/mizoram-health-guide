@@ -47,7 +47,7 @@ describe("it feels like a conversation", () => {
 
   it("'My stomach hurts' → 'Where exactly does it hurt?' → 'here on the right' is clarified, never guessed", () => {
     const { s, doctor } = talk(["I don't feel well", "My stomach hurts"]);
-    expect(doctor.at(-1)).toMatch(/Where exactly does it hurt\?$/);
+    expect(doctor.at(-1)).toMatch(/Where exactly does it hurt\? Please tap the area on the body\.$/);
     const r = talk(["here on the right"], s);
     expect(r.s.bodyArea).toBeUndefined();
     expect(r.s.sideHint).toBe("right");

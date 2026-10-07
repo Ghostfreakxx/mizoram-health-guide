@@ -175,7 +175,8 @@ export const HANDOFF_LINE =
 export const UNCLEAR_LINE = "Sorry, I didn't quite catch that. Could you choose one of the answers below, or say it another way?";
 
 export function defaultIntro(department: string) {
-  return `Hello. I'm your virtual health guide for this ${department} consultation. I'll ask a few questions to help determine what kind of care may be appropriate. If anything you tell me suggests an emergency, I'll tell you immediately. What brought you here today?`;
+  // Spoken: short and conversational. The rest is written under it (hint).
+  return `Hello. I'm your virtual health guide for ${department}. What is troubling you today?`;
 }
 
 export function startConsultation(department: string, intro = defaultIntro(department), focus: string[] = []): ConsultState {
@@ -354,12 +355,12 @@ function bodyTurn(s: ConsultState): Turn {
     });
   }
   const say = s.helpDescribe
-    ? "That's okay. I'll help you describe it. First, where in your body do you notice the problem?"
+    ? "That's okay. I'll help you describe it. First, where in your body do you notice the problem? Please tap the area on the body."
     : s.whereFirst
-      ? "I'm not completely sure what you mean yet. Where do you feel it? You can show me on the picture."
+      ? "That's okay. I'll help you describe it. Please tap the area on the body where you feel it."
       : PAINFUL.has(s.complaint ?? "")
-        ? "Where exactly does it hurt?"
-        : "Where on the body is the problem?";
+        ? "Where exactly does it hurt? Please tap the area on the body."
+        : "Where on the body is the problem? Please tap the area on the body.";
   return compose(s, {
     step: "body",
     say,
@@ -439,7 +440,7 @@ export function nextTurn(s: ConsultState): Turn {
       step: "concern",
       say: s.intro,
       question: "What brought you here today?",
-      hint: "Say it in your own words — for example, “I've been coughing for three weeks”. I am not a doctor; I help you find the safest next step.",
+      hint: "Say it in your own words — for example, “I've been coughing for three weeks”. If anything sounds like an emergency, I'll tell you straight away. I am not a doctor; I help you find the safest next step.",
       input: { kind: "text", placeholder: "What brings you here today?", optional: false, maxLength: MAX_TEXT },
       mood: "warm",
     };
@@ -1436,6 +1437,50 @@ function bodyFromWords(t: string): string | null {
 
 // "Help me describe it": the doctor walks through where → what it feels like
 // → when → all the time or comes and goes → how strong → what changes it.
+// "Change" in My Visit: forget one recorded answer so the doctor asks it
+// again. The new answer goes through the same checks as any answer (safety
+// first); everything else the patient said is kept.
+export const REOPENABLE = ["body", "duration", "progression", "severity", "age", "who", "medicines", "allergies", "conditions"] as const;
+const REOPEN_WORD: Record<string, string> = {
+  body: "where it is",
+  duration: "when it started",
+  progression: "how it has changed",
+  severity: "how bad it is",
+  age: "the age group",
+  who: "who it is for",
+  medicines: "current medicines",
+  allergies: "allergies",
+  conditions: "long-term conditions",
+};
+export function reopen(s: ConsultState, step: string): ConsultState {
+  if (!(REOPENABLE as readonly string[]).includes(step)) return s;
+  const unknown = { ...s.unknown };
+  delete unknown[step];
+  const base: ConsultState = { ...s, unknown, corrections: [...s.corrections, `Asked again: ${REOPEN_WORD[step]}`], notes: [`Of course — let's change ${REOPEN_WORD[step]}.`] };
+  switch (step) {
+    case "body":
+      delete base.unknown.side;
+      return { ...base, bodyArea: undefined, bodySide: undefined, bodyWords: undefined, bodyDone: false };
+    case "duration":
+      return { ...base, duration: undefined, remembered: s.remembered.filter((x) => x !== "duration") };
+    case "progression":
+      return { ...base, progression: undefined };
+    case "severity":
+      return { ...base, severity: undefined, painScore: undefined };
+    case "age":
+      return { ...base, age: undefined, remembered: s.remembered.filter((x) => x !== "age") };
+    case "who":
+      return { ...base, who: undefined, relation: undefined };
+    case "medicines":
+      return { ...base, medicines: undefined, medicinesDone: false };
+    case "allergies":
+      return { ...base, allergies: undefined, allergiesDone: false };
+    case "conditions":
+      return { ...base, conditions: undefined, conditionsDone: false };
+  }
+  return s;
+}
+
 export function startHelpDescribe(s: ConsultState): ConsultState {
   if (s.emergency) return s;
   if (s.concernText === undefined) return respond(s, "concern", "I can't explain it");

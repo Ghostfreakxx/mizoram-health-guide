@@ -99,11 +99,13 @@ test("consultation room: a three-week cough gets follow-up questions, a chart an
   await page.getByRole("button", { name: "None of these — continue" }).click();
   // "I've been…" already says who the visit is for: the doctor remembers it and does not ask again.
   await expect(page.getByRole("heading", { name: "How old are you?" })).toBeVisible();
-  const chart = page.getByRole("complementary", { name: "Patient chart" });
+  const chart = page.locator("#my-visit");
   await expect(chart).toContainText("I've been coughing for about three weeks");
   await expect(chart).toContainText("Self");
   await expect(chart).toContainText("More than 2 weeks");
-  await expect(chart).toContainText("Not provided");
+  // My Visit lists only what the patient said: nothing is invented or guessed.
+  await expect(chart).not.toContainText("Age group");
+  await expect(chart).not.toContainText("°C");
   // Answer the rest: adult, female, nothing special, cough, then "No" / first option / skip.
   await page.getByRole("button", { name: "18 to 59 years" }).click();
   await page.getByRole("button", { name: "Female" }).click();
@@ -118,7 +120,7 @@ test("consultation room: a three-week cough gets follow-up questions, a chart an
     else if (await skip.count()) await skip.click();
     else if (await page.getByRole("button", { name: "About the same" }).count()) await page.getByRole("button", { name: "About the same" }).click();
     else if (await page.getByRole("button", { name: /^Mild/ }).count()) await page.getByRole("button", { name: /^Mild/ }).click();
-    else await page.locator("main button.min-h-14").first().click();
+    else await page.getByRole("group", { name: "Answers" }).getByRole("button").first().click();
   }
   await expect(page.getByRole("heading", { name: "📋 Patient-prepared visit summary" })).toBeVisible();
   await expect(page.getByText("PATIENT-PREPARED VISIT SUMMARY", { exact: true })).toBeVisible();
@@ -165,7 +167,7 @@ test("reception hands the patient's words to the consultation room (in memory, n
   await expect(page.getByText("From Reception:")).toBeVisible();
   await page.getByLabel("Display").selectOption("text");
   await page.getByRole("button", { name: "Begin consultation" }).click();
-  const chart = page.getByRole("complementary", { name: "Patient chart" });
+  const chart = page.locator("#my-visit");
   await expect(chart).toContainText("I have been coughing for three weeks.", { timeout: 20000 });
   await expect(chart).toContainText("More than 2 weeks");
 });
@@ -188,7 +190,7 @@ test("consultation room: own-words answers are understood, or the doctor asks ag
   await words.fill("banana");
   await page.getByRole("button", { name: "Send" }).click();
   await expect(page.getByRole("status").filter({ hasText: "I didn't quite understand that." })).toBeVisible();
-  for (const name of ["Talk", "Type instead", "Repeat", "Stop"]) await expect(page.getByRole("button", { name: new RegExp(name) }).first()).toBeVisible();
+  for (const name of ["Talk", "Repeat", "Stop", "Send"]) await expect(page.getByRole("button", { name: new RegExp(name) }).first()).toBeVisible();
 });
 
 test("consultation room: an emergency is shown in the page, with the doctor beside it", async ({ page }) => {
@@ -244,7 +246,7 @@ test("consultation room: explain, why, 'not sure', and verified health education
   await words.fill("Do I have TB?");
   await page.getByRole("button", { name: "Send" }).click();
   await expect(page.getByRole("status").filter({ hasText: "I can't tell you what it is" })).toBeVisible();
-  const chart = page.getByRole("complementary", { name: "Patient chart" });
+  const chart = page.locator("#my-visit");
   await expect(chart).toContainText("Not sure");
 });
 
@@ -259,7 +261,7 @@ test("consultation room: 'I can't explain what's wrong' → the doctor helps des
   await expect(page.getByRole("heading", { name: /Which area — the left, the right, the middle, or both sides\?/ })).toBeVisible();
   await page.getByRole("button", { name: "Right", exact: true }).click();
   await expect(page.getByRole("heading", { name: /What does it feel like\?/ })).toBeVisible();
-  await expect(page.getByRole("complementary", { name: "Patient chart" })).toContainText("Lower tummy — right side");
+  await expect(page.locator("#my-visit")).toContainText("Lower tummy — right side");
   // No helpline, no emergency: the doctor is still helping.
   await expect(page.getByText("Urgent medical attention")).toHaveCount(0);
 });
@@ -278,7 +280,7 @@ test("consultation room: unknown topics and corrections keep the consultation go
   await words.fill("Actually, I said left, not right.");
   await page.getByRole("button", { name: "Send" }).click();
   await expect(page.getByRole("status").filter({ hasText: "Okay. I've changed that to the left side." })).toBeVisible();
-  await expect(page.getByRole("complementary", { name: "Patient chart" })).toContainText("Lower tummy — left side");
+  await expect(page.locator("#my-visit")).toContainText("Lower tummy — left side");
   await words.fill("What does my spleen do?");
   await page.getByRole("button", { name: "Send" }).click();
   await expect(page.getByRole("status").filter({ hasText: "I don't have verified information about that in my health guide yet" })).toBeVisible();
@@ -306,7 +308,7 @@ test("My Visit: a finished consultation's summary is there (tab memory only), an
     else if (await skip.count()) await skip.click();
     else if (await page.getByRole("button", { name: "About the same" }).count()) await page.getByRole("button", { name: "About the same" }).click();
     else if (await page.getByRole("button", { name: /^Mild/ }).count()) await page.getByRole("button", { name: /^Mild/ }).click();
-    else await page.locator("main button.min-h-14").first().click();
+    else await page.getByRole("group", { name: "Answers" }).getByRole("button").first().click();
   }
   await page.getByRole("link", { name: "📋 Open My Visit" }).click();
   await expect(page).toHaveURL(/\/my-visit$/);
