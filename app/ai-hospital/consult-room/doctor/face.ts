@@ -21,7 +21,7 @@ const ZERO: Face = { browInnerUp: 0, browDown: 0, browOuterUp: 0, mouthSmile: 0,
 // so most expressions open them slightly (eyeWide) to look attentive.
 export const EXPRESSIONS: Record<Expression, Face> = {
   neutral: { ...ZERO, mouthSmile: 0.08, eyeWide: 0.2 },
-  welcoming: { ...ZERO, mouthSmile: 0.32, browInnerUp: 0.12, browOuterUp: 0.08, eyeSquint: 0.12, eyeWide: 0.12 },
+  welcoming: { ...ZERO, mouthSmile: 0.24, browInnerUp: 0.12, browOuterUp: 0.08, eyeSquint: 0.12, eyeWide: 0.12 },
   listening: { ...ZERO, mouthSmile: 0.1, browInnerUp: 0.16, eyeWide: 0.24 },
   thinking: { ...ZERO, browDown: 0.12, mouthPress: 0.12, eyeSquint: 0.1, eyeWide: 0.08 },
   reassuring: { ...ZERO, mouthSmile: 0.2, browInnerUp: 0.14, eyeSquint: 0.08, eyeWide: 0.14 },

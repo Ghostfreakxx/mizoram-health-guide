@@ -120,12 +120,16 @@ def face(V: np.ndarray, T: Targets) -> None:
     close to the head, open (not heavy) brows, slightly larger eyes, fuller
     lips at a very slight resting lift. Small, deliberate amounts only."""
     for name, w in (
-        ("head/head-oval", 0.45),
-        ("head/head-scale-horiz-decr", 0.25),
-        ("head/head-fat-decr", 0.25),
-        ("chin/chin-width-decr", 0.35),
-        ("chin/chin-bones-decr", 0.3),
-        ("chin/chin-height-incr", 0.15),
+        # A soft, slightly round lower face with a rounded chin: a narrow,
+        # long chin read as pointed (and older) from the patient's chair.
+        ("head/head-oval", 0.3),
+        ("head/head-round", 0.15),
+        ("head/head-scale-horiz-decr", 0.12),
+        ("head/head-fat-decr", 0.15),
+        ("chin/chin-width-incr", 0.1),
+        ("chin/chin-bones-decr", 0.2),
+        ("chin/chin-height-decr", 0.15),
+        ("chin/chin-prominent-decr", 0.2),
         ("neck/neck-scale-horiz-decr", 0.25),
         ("eyebrows/eyebrows-trans-up", 0.25),
         ("eyebrows/eyebrows-angle-up", 0.15),
@@ -624,7 +628,7 @@ def main(cache: Path, out: Path) -> None:
     parting = np.exp(-((V[:, 0] - part_x) / 0.07) ** 2) * (rel[:, 1] > 0.25) * (rel[:, 2] > -0.6)
     top = np.clip(rel[:, 1] / 1.2, 0, 1)
     sides = np.clip(np.abs(rel[:, 0]) / 0.8, 0, 1) * (1 - top)
-    thick = np.clip(-f_hair / 0.24, 0, 1) ** 0.85 * (0.1 + 0.09 * top + 0.06 * np.clip(-rel[:, 2], 0, 1)) * (1 - 0.35 * parting) * (1 - 0.45 * sides)
+    thick = np.clip(-f_hair / 0.24, 0, 1) ** 0.85 * (0.08 + 0.045 * top + 0.06 * np.clip(-rel[:, 2], 0, 1)) * (1 - 0.35 * parting) * (1 - 0.45 * sides)
     Ph = V + bN * thick[:, None]
     Ph[:, 1] += 0.0
     P, Fl, near = clip(Ph, F_all["body"], f_hair)

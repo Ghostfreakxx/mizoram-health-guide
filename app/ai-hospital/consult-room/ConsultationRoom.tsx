@@ -1407,7 +1407,7 @@ export default function ConsultationRoom({ room, department }: { room: RoomStyle
                 if (text.trim()) sendWords(text);
               }
             }}
-            placeholder={inp.kind === "text" ? inp.placeholder : "Type your answer"}
+            placeholder={inp.kind === "text" && viewW >= 480 ? inp.placeholder : "Type your answer"}
             className={`min-h-12 w-full resize-none rounded-[22px] border border-slate-300 bg-slate-50 px-4 py-3 ${textSize} leading-snug focus:border-blue-700 focus:bg-white`}
           />
         ) : (
