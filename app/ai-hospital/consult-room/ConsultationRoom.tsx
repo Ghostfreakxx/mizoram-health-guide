@@ -94,6 +94,7 @@ const subscribeWide = (cb: () => void) => {
 };
 const useWide = () => useSyncExternalStore(subscribeWide, () => window.matchMedia(WIDE).matches, () => false);
 const useViewWidth = () => useSyncExternalStore(subscribeWide, () => window.innerWidth, () => 1280);
+const useViewHeight = () => useSyncExternalStore(subscribeWide, () => window.innerHeight, () => 800);
 
 // Steps where the patient is still describing the problem.
 const SYMPTOM_STEPS = new Set(["concern", "concern-more", "complaint", "describe", "body", "side", "simple-pain"]);
@@ -237,11 +238,14 @@ export default function ConsultationRoom({ room, department }: { room: RoomStyle
   const [sheetOpen, setSheetOpen] = useState(false); // My Visit bottom sheet (phones/tablets)
   const wide = useWide();
   const viewW = useViewWidth();
+  const viewH = useViewHeight();
   const [visitOpen, setVisitOpen] = useState(true); // My Visit panel (desktop)
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [seenNotices, setSeenNotices] = useState<string[]>([]); // notices already shown for a few seconds
   const [bodyDismissed, setBodyDismissed] = useState(false); // phones: "say it in words instead"
   const dockRef = useRef<HTMLElement>(null);
+  const inputRef = useRef<HTMLFormElement>(null);
+  const [inputH, setInputH] = useState(140);
   const [dockH, setDockH] = useState(260);
   const [shellH, setShellH] = useState(0); // phones, keyboard open: fit the room above the keyboard
   const [shellTop, setShellTop] = useState(0);
@@ -368,6 +372,20 @@ export default function ConsultationRoom({ room, department }: { room: RoomStyle
     const t = setTimeout(() => setSeenNotices((n) => [...n, ...keys]), 8000);
     return () => clearTimeout(t);
   }, [failed3d, voiceIssue, seenNotices]);
+  // Phones: the full-screen body map stops above the answer box, so the
+  // patient can always say it in words instead.
+  useEffect(() => {
+    const el = inputRef.current;
+    if (!el || typeof ResizeObserver === "undefined") return;
+    const ro = new ResizeObserver(() => setInputH(Math.round(el.getBoundingClientRect().height)));
+    ro.observe(el);
+    return () => ro.disconnect();
+  });
+  // Each new question shows its tool again (even if the last one was hidden).
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- reset per question
+    setBodyDismissed(false);
+  }, [turn.step, history.length]);
   // My Visit starts open where there is room for it beside the doctor.
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect -- screen size is known only after mount
@@ -1176,12 +1194,15 @@ export default function ConsultationRoom({ room, department }: { room: RoomStyle
         <span className="hidden sm:inline">Leave</span>
       </a>
       <div className="min-w-0 flex-1 leading-tight">
-        <h1 className="truncate text-[15px] font-bold text-slate-900 sm:text-base">
+        <h1 className="truncate text-sm font-bold text-slate-900 sm:text-base">
           <span aria-hidden className="mr-1.5">{department.icon}</span>
           {department.name}
-          <span className="font-semibold text-slate-500"> · Virtual consultation</span>
+          <span className="hidden font-semibold text-slate-500 sm:inline"> · Virtual consultation</span>
         </h1>
-        <p className="truncate text-xs text-slate-600">Virtual health guide · not a doctor · {phase}</p>
+        <p className="truncate text-xs text-slate-600">
+          <span className="hidden sm:inline">Virtual health guide · not a doctor · </span>
+          {phase}
+        </p>
       </div>
       {begun && (
         <p role="status" aria-live="polite" className="hidden items-center gap-2 rounded-full bg-slate-900/85 px-3 py-1.5 text-xs font-semibold text-white md:flex">
@@ -1192,7 +1213,8 @@ export default function ConsultationRoom({ room, department }: { room: RoomStyle
       {begun && !emergency && !done && (
         <button type="button" onClick={() => (wide ? setVisitOpen((o) => !o) : setSheetOpen((o) => !o))} aria-expanded={wide ? visitOpen : sheetOpen} aria-controls="my-visit" className={`${btnGhost} ${(wide ? visitOpen : sheetOpen) ? "bg-blue-900/10 text-blue-950" : ""}`}>
           <span aria-hidden>📋</span>
-          <span>My Visit</span>
+          <span className="hidden min-[380px]:inline">My Visit</span>
+          <span className="sr-only min-[380px]:hidden">My Visit</span>
           {noted > 0 && <span className="rounded-full bg-blue-900 px-1.5 text-[11px] font-bold text-white">{noted}</span>}
         </button>
       )}
@@ -1244,7 +1266,7 @@ export default function ConsultationRoom({ room, department }: { room: RoomStyle
       )}
       {voiceIssue && voiceOn && noticeOn("voice") && (
         <p role="status" className="rounded-full bg-white/95 px-4 py-1.5 text-sm font-semibold text-slate-800 shadow ring-1 ring-slate-900/10">
-          Voice isn&apos;t available right now. The doctor&apos;s words are shown here — you can keep going by reading and typing.
+          Voice is off on this device — the doctor&apos;s words are written here.
         </p>
       )}
     </>
@@ -1346,7 +1368,8 @@ export default function ConsultationRoom({ room, department }: { room: RoomStyle
   const kind: "main" | "other" = inp.kind === "text" ? "main" : "other";
   const inputRow = (
     <form
-      className="sticky bottom-0 z-10 -mx-4 space-y-2 border-t border-slate-100 bg-white/95 px-4 pb-3 pt-3 backdrop-blur sm:-mx-5 sm:px-5"
+      ref={inputRef}
+      className="sticky bottom-0 z-10 -mx-4 mt-auto space-y-2 border-t border-slate-100 bg-white/95 px-4 pb-3 pt-3 backdrop-blur sm:-mx-5 sm:px-5"
       onSubmit={(e) => {
         e.preventDefault();
         if (text.trim()) sendWords(text);
@@ -1363,9 +1386,11 @@ export default function ConsultationRoom({ room, department }: { room: RoomStyle
           disabled={!canAnswer || !talk.available}
           aria-pressed={listening}
           title={talk.available ? "Speak your answer" : talk.reason}
-          className={`grid h-12 shrink-0 place-items-center rounded-full px-4 text-[15px] font-bold text-white shadow-md disabled:opacity-40 ${listening ? "bg-red-700" : "bg-blue-900 hover:bg-blue-800"}`}
+          className={`inline-flex h-12 shrink-0 items-center justify-center gap-1 whitespace-nowrap rounded-full px-4 text-[15px] font-bold text-white shadow-md disabled:opacity-40 ${listening ? "bg-red-700" : "bg-blue-900 hover:bg-blue-800"}`}
         >
-          <span>🎙️ {listening ? "Stop listening" : "Talk"}</span>
+          <span aria-hidden>🎙️</span>
+          <span className="hidden min-[360px]:inline"> {listening ? "Stop listening" : "Talk"}</span>
+          <span className="sr-only min-[360px]:hidden">{listening ? "Stop listening" : "Talk"}</span>
         </button>
         {kind === "main" ? (
           <textarea
@@ -1465,14 +1490,14 @@ export default function ConsultationRoom({ room, department }: { room: RoomStyle
         {qNumber > 0 && <span className="hidden text-slate-400 md:inline">· question {qNumber}</span>}
       </p>
       <div className="flex shrink-0 items-center">
-        <button type="button" onClick={repeat} disabled={!started || emergency} className={miniBtn}>
-          ↻ Repeat
+        <button type="button" onClick={repeat} disabled={!started || emergency} className={miniBtn} aria-label="Repeat">
+          ↻<span className="hidden min-[360px]:inline"> Repeat</span>
         </button>
-        <button type="button" onClick={stopSpeaking} disabled={!speaking} className={miniBtn}>
-          ■ Stop
+        <button type="button" onClick={stopSpeaking} disabled={!speaking} className={miniBtn} aria-label="Stop">
+          ■<span className="hidden min-[360px]:inline"> Stop</span>
         </button>
-        <button type="button" onClick={back} disabled={!(started && history.length > 1 && !done)} className={miniBtn}>
-          ← Back
+        <button type="button" onClick={back} disabled={!(started && history.length > 1 && !done)} className={miniBtn} aria-label="Back">
+          ←<span className="hidden min-[360px]:inline"> Back</span>
         </button>
       </div>
     </div>
@@ -1576,11 +1601,14 @@ export default function ConsultationRoom({ room, department }: { room: RoomStyle
 
   // The stage keeps the same place in the tree in every layout, so the 3D
   // doctor is never reloaded by a resize, a rotation or a change of state.
-  const stageHeight = wide ? undefined : tier === "none" ? 0 : keyboardOpen ? "17dvh" : emergency || done ? "24dvh" : !begun ? "52dvh" : "42dvh";
+  // Phones: the face and upper body lead; taller screens give the doctor more.
+  const tall = viewH >= 900 ? 50 : viewH < 700 ? 36 : 42;
+  const stageHeight = wide ? undefined : tier === "none" ? 0 : keyboardOpen ? "17dvh" : emergency ? "14dvh" : done ? "24dvh" : !begun ? `${tall + 8}dvh` : `${tall}dvh`;
 
   return (
     <div
       ref={topRef}
+      data-layout={wide ? "wide" : "narrow"}
       className={`fixed inset-x-0 top-0 z-40 flex flex-col overflow-hidden bg-[#e8ecef] text-slate-900 ${bigText ? "text-lg" : ""}`}
       style={{ height: shellH ? `${shellH}px` : "100dvh", transform: shellTop ? `translateY(${shellTop}px)` : undefined }}
     >
@@ -1593,7 +1621,7 @@ export default function ConsultationRoom({ room, department }: { room: RoomStyle
 
         {wide ? (
           <>
-            <div className="pointer-events-none absolute inset-x-0 top-[68px] z-30 flex flex-col items-center gap-2 px-4">{notices}</div>
+            {!emergency && <div className="pointer-events-none absolute inset-x-0 top-[68px] z-30 flex flex-col items-center gap-2 px-4">{notices}</div>}
             {(toolShown || demoMode || reviewMode || debugMode || (education && !emergency)) && (
               <div className={`${glass} absolute bottom-6 left-6 top-[72px] z-20 w-[400px] space-y-4 overflow-y-auto p-5`}>
                 {devPanels}
@@ -1612,8 +1640,22 @@ export default function ConsultationRoom({ room, department }: { room: RoomStyle
               <div className="pointer-events-none absolute inset-0 z-20 flex items-end justify-center p-6 pb-10 lg:items-center lg:justify-end lg:pr-[6vw]">{entry}</div>
             )}
             {begun && !sidePanel && (
-              <div className="pointer-events-none absolute inset-x-0 bottom-6 z-20 flex justify-center px-6" style={{ paddingLeft: frame.l ? frame.l + 8 : 24, paddingRight: frame.r ? frame.r + 8 : 24 }}>
-                <section ref={dockRef} aria-labelledby="consult-question" className={`${glass} flex max-h-[58vh] w-full max-w-[760px] flex-col gap-3 overflow-y-auto px-5 pt-4`}>
+              <div
+                className={`pointer-events-none absolute inset-x-0 bottom-6 z-20 flex flex-col items-center justify-end gap-3 px-6 ${tier === "none" ? "top-[72px]" : ""}`}
+                style={{ paddingLeft: frame.l ? frame.l + 8 : 24, paddingRight: frame.r ? frame.r + 8 : 24 }}
+              >
+                {/* Text only: the conversation itself fills the space the picture would. */}
+                {tier === "none" && log.length > 1 && (
+                  <ol aria-label="Conversation so far" className="pointer-events-auto flex min-h-0 w-full max-w-[760px] flex-col gap-2 overflow-y-auto px-1">
+                    {log.slice(0, -1).slice(-14).map((l, i) => (
+                      <li key={i} className={`max-w-[85%] rounded-2xl px-4 py-2.5 text-[15px] leading-relaxed ${l.who === "guide" ? "self-start bg-white text-slate-800 shadow-sm ring-1 ring-slate-900/5" : "self-end bg-blue-900 text-white"}`}>
+                        <span className="sr-only">{l.who === "guide" ? "Guide: " : "You: "}</span>
+                        {l.text}
+                      </li>
+                    ))}
+                  </ol>
+                )}
+                <section ref={dockRef} aria-labelledby="consult-question" className={`${glass} flex max-h-[58vh] w-full max-w-[760px] shrink-0 flex-col gap-3 overflow-y-auto px-5 pt-4`}>
                   {dockBody}
                 </section>
               </div>
@@ -1622,7 +1664,7 @@ export default function ConsultationRoom({ room, department }: { room: RoomStyle
         ) : (
           <div className="relative z-20 -mt-4 flex min-h-0 flex-1 flex-col rounded-t-[22px] bg-white shadow-[0_-10px_30px_-12px_rgba(15,23,42,.25)]">
             <div className="flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto px-4 pt-4">
-              <div className="flex flex-col gap-2">{notices}</div>
+              {!emergency && <div className="flex flex-col gap-2">{notices}</div>}
               {devPanels}
               {!begun ? (
                 entry
@@ -1631,14 +1673,14 @@ export default function ConsultationRoom({ room, department }: { room: RoomStyle
               ) : done ? (
                 summaryPanel
               ) : (
-                <section aria-labelledby="consult-question" className="flex flex-col gap-3">
+                <section aria-labelledby="consult-question" className="flex flex-1 flex-col gap-3">
                   {dockBody}
                 </section>
               )}
             </div>
             {/* My Visit: a bottom sheet over the conversation. */}
             {(
-              <div className={`absolute inset-x-0 bottom-0 z-30 max-h-[78dvh] overflow-y-auto rounded-t-[22px] bg-white px-4 pb-6 pt-3 shadow-[0_-16px_40px_-10px_rgba(15,23,42,.35)] transition-transform duration-300 ${sheetOpen ? "translate-y-0" : "pointer-events-none translate-y-full"}`} aria-hidden={!sheetOpen}>
+              <div className={`absolute inset-x-0 bottom-0 z-30 max-h-[78dvh] overflow-y-auto rounded-t-[22px] bg-white px-4 pb-6 pt-3 transition-transform duration-300 ${sheetOpen ? "translate-y-0 shadow-[0_-16px_40px_-10px_rgba(15,23,42,.35)]" : "pointer-events-none invisible translate-y-full"}`} aria-hidden={!sheetOpen}>
                 <div className="mb-2 flex justify-between">
                   <span aria-hidden className="mx-auto h-1.5 w-10 rounded-full bg-slate-300" />
                 </div>
@@ -1650,15 +1692,15 @@ export default function ConsultationRoom({ room, department }: { room: RoomStyle
             )}
             {/* Phones: the body map is a full-screen tool while it is needed. */}
             {toolKind === "body" && !bodyDismissed && (
-              <div className="fixed inset-x-0 bottom-0 top-14 z-50 flex flex-col bg-white">
+              <div className="fixed inset-x-0 top-14 z-50 flex flex-col border-b border-slate-200 bg-white shadow-[0_8px_24px_-12px_rgba(15,23,42,.3)]" style={{ bottom: inputH }}>
                 <div className="border-b border-slate-200 px-4 py-3">
                   <p className="text-[13px] font-bold uppercase tracking-[0.12em] text-blue-800">Show me where</p>
                   <p className="mt-1 text-lg font-semibold leading-snug text-slate-900">{turn.say}</p>
                 </div>
-                <div className="flex-1 overflow-y-auto px-4 py-4">{toolBody}</div>
-                <div className="border-t border-slate-200 px-4 py-3">
-                  <button type="button" onClick={() => setBodyDismissed(true)} className="w-full rounded-full border border-slate-300 px-4 py-3 text-[15px] font-semibold text-slate-800">
-                    ⌨️ Say it in words instead
+                <div className="flex-1 overflow-y-auto px-4 py-4">
+                  {toolBody}
+                  <button type="button" onClick={() => setBodyDismissed(true)} className="mt-3 w-full rounded-full px-4 py-2.5 text-sm font-semibold text-slate-600 hover:bg-slate-100">
+                    Hide the picture
                   </button>
                 </div>
               </div>

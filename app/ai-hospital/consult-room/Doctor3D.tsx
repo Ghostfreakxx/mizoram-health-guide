@@ -152,15 +152,17 @@ export default function Doctor3D(props: StageProps) {
     >
       <Camera frame={props.frame ?? NO_FRAME} />
       <color attach="background" args={[props.room.wall]} />
-      {!low && <Environment intensity={high ? 0.45 : 0.35} />}
-      {/* Clinic lighting: a soft key from the ceiling panel (front-left), a
-          gentle fill from the patient's side, window light, and a faint rim
-          so she separates from the chair. */}
-      <hemisphereLight args={["#fffaf3", "#e3d9cc", low ? 1.2 : 0.75]} />
+      {!low && <Environment intensity={high ? 0.32 : 0.26} />}
+      {/* Portrait lighting for a consultation: a soft key from the ceiling
+          panel at front-left, low enough to model the face and put a
+          catchlight in the eyes; a cooler fill from the patient's side; a
+          warm rim from the window behind; little flat ambient (flat ambient
+          made the face look waxy). */}
+      <hemisphereLight args={["#fffaf3", "#d9cfc2", low ? 1.0 : 0.34]} />
       <directionalLight
-        position={[-0.9, 2.6, 0.9]}
-        intensity={1.9}
-        color="#fff6ea"
+        position={[-1.7, 1.9, 0.7]}
+        intensity={2.7}
+        color="#fff3e6"
         castShadow={high}
         shadow-mapSize={[1024, 1024]}
         shadow-bias={-0.0003}
@@ -171,8 +173,8 @@ export default function Doctor3D(props: StageProps) {
         shadow-camera-top={1.6}
         shadow-camera-bottom={-0.6}
       />
-      <directionalLight position={[1.2, 1.3, 1.4]} intensity={0.55} color="#f2f6ff" />
-      {!low && <directionalLight position={[0.6, 2.0, -2.6]} intensity={0.7} color="#ffffff" />}
+      <directionalLight position={[1.4, 1.3, 1.4]} intensity={0.42} color="#eef3ff" />
+      {!low && <directionalLight position={[0.8, 2.2, -2.2]} intensity={1.0} color="#fff1df" />}
       <Room3D room={props.room} tier={props.tier} chart={props.chart} />
       <group position={[0, 0, LAYOUT.doctorZ]}>
         <DoctorAvatar

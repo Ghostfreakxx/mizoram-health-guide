@@ -61,20 +61,20 @@ export default function EmergencyMode({
       lang={lang === "lus" ? "lus" : "en"}
       className={inline ? "overflow-hidden rounded-2xl border-2 border-red-700 bg-white text-slate-950" : "fixed inset-0 z-[100] overflow-y-auto bg-white text-slate-950"}
     >
-      <div className="bg-red-700 px-4 py-5 text-white">
+      <div className={`bg-red-700 px-4 text-white ${inline ? "py-3.5 sm:py-5" : "py-5"}`}>
         <div className="mx-auto max-w-2xl">
           {notice && <p className="text-sm font-bold uppercase tracking-widest text-red-100">Urgent medical attention</p>}
-          <Heading id="emergency-heading" ref={headingRef} tabIndex={-1} className="text-3xl font-black outline-none sm:text-4xl">
+          <Heading id="emergency-heading" ref={headingRef} tabIndex={-1} className={`font-black outline-none ${inline ? "text-2xl sm:text-4xl" : "text-3xl sm:text-4xl"}`}>
             {crisis ? tr("emergency.heading.crisis") : tr("emergency.heading")}
           </Heading>
           {active.length > 0 && (
-            <p className="mt-1 text-lg font-semibold text-red-50">{active.map((f) => flagTitle(f.id)).join(" · ")}</p>
+            <p className={`mt-1 font-semibold text-red-50 ${inline ? "text-base sm:text-lg" : "text-lg"}`}>{active.map((f) => flagTitle(f.id)).join(" · ")}</p>
           )}
-          {notice && <p className="mt-2 text-lg font-semibold text-white">{notice}</p>}
+          {notice && <p className={`mt-2 font-semibold text-white ${inline ? "text-[15px] leading-snug sm:text-lg" : "text-lg"}`}>{notice}</p>}
         </div>
       </div>
 
-      <div className="mx-auto max-w-2xl space-y-6 px-4 py-6">
+      <div className={`mx-auto max-w-2xl space-y-6 px-4 ${inline ? "py-4 sm:py-6" : "py-6"}`}>
         {/* Immediate action */}
         <div className="grid gap-3">
           {crisis && (

@@ -331,21 +331,21 @@ function PropItem({ prop }: { prop: Prop }) {
   switch (prop) {
     case "bp-monitor":
       return (
-        <group position={[0.5, 0.785, -0.66]} rotation={[0, -0.5, 0]}>
+        <group position={[0.56, 0.785, -0.88]} rotation={[0, -0.5, 0]}>
           <Box size={[0.16, 0.07, 0.13]} position={[0, 0.035, 0]} color="#f1f5f9" rough={0.4} />
           <mesh position={[0, 0.072, 0.012]} rotation={[-Math.PI / 2 + 0.3, 0, 0]}>
             <planeGeometry args={[0.1, 0.055]} />
             <meshStandardMaterial color="#0b3b36" emissive="#0f766e" emissiveIntensity={0.35} roughness={0.2} />
           </mesh>
           <mesh position={[0.17, 0.02, 0.02]} rotation={[Math.PI / 2, 0, 0.3]}>
-            <torusGeometry args={[0.055, 0.016, 10, 24]} />
-            <meshStandardMaterial color="#1e3a8a" roughness={0.85} />
+            <torusGeometry args={[0.042, 0.012, 10, 24]} />
+            <meshStandardMaterial color="#334155" roughness={0.9} />
           </mesh>
         </group>
       );
     case "stethoscope":
       return (
-        <group position={[0.32, 0.79, -0.42]} rotation={[0, 0.4, 0]}>
+        <group position={[0.4, 0.79, -0.76]} rotation={[0, 0.4, 0]}>
           <mesh rotation={[Math.PI / 2, 0, 0]}>
             <torusGeometry args={[0.07, 0.005, 8, 32, Math.PI * 1.6]} />
             <meshStandardMaterial color="#111827" roughness={0.4} />
@@ -355,7 +355,7 @@ function PropItem({ prop }: { prop: Prop }) {
       );
     case "sanitizer":
       return (
-        <group position={[-0.62, 0.785, -0.42]}>
+        <group position={[-0.62, 0.785, -0.8]}>
           <Cyl r={0.032} h={0.13} position={[0, 0.065, 0]} color="#bae6fd" rough={0.15} />
           <Cyl r={0.012} h={0.04} position={[0, 0.15, 0]} color="#f8fafc" />
           <Box size={[0.05, 0.01, 0.014]} position={[0.02, 0.17, 0]} color="#f8fafc" />
@@ -410,7 +410,7 @@ function PropItem({ prop }: { prop: Prop }) {
       return <Poster kind="height" position={[0.74, 1.3, -2.08]} size={[0.3, 0.45]} />;
     case "peak-flow":
       return (
-        <group position={[0.42, 0.79, -0.5]} rotation={[0, -0.4, Math.PI / 2]}>
+        <group position={[0.44, 0.79, -0.78]} rotation={[0, -0.4, Math.PI / 2]}>
           <Cyl r={0.022} h={0.16} position={[0, 0, 0]} color="#e0f2fe" rough={0.2} />
           <Cyl r={0.012} h={0.05} position={[0, 0.1, 0]} color="#93c5fd" />
         </group>
@@ -484,7 +484,7 @@ function PropItem({ prop }: { prop: Prop }) {
       );
     case "doppler":
       return (
-        <group position={[0.48, 0.785, -0.66]} rotation={[0, -0.4, 0]}>
+        <group position={[0.54, 0.785, -0.88]} rotation={[0, -0.4, 0]}>
           <Box size={[0.12, 0.05, 0.18]} position={[0, 0.025, 0]} color="#f8fafc" rough={0.3} />
           <Box size={[0.08, 0.002, 0.05]} position={[0, 0.051, -0.04]} color="#0f766e" emissive="#14b8a6" />
           <Cyl r={0.018} h={0.1} position={[0.1, 0.02, 0.05]} rotation={[Math.PI / 2, 0, 0]} color="#e2e8f0" />
@@ -614,8 +614,8 @@ export default function Room3D({ room, tier, chart }: { room: RoomStyle; tier: E
         </group>
       )}
       <Box size={[0.38, 0.015, 0.13]} position={[-0.32, 0.787, -0.78]} rotation={[0, 0.35, 0]} color="#e5e7eb" rough={0.5} />
-      <Box size={[0.17, 0.006, 0.24]} position={[0.12, 0.783, -0.4]} rotation={[0, -0.12, 0]} color="#ffffff" rough={0.9} />
-      <Cyl r={0.0045} h={0.14} position={[0.24, 0.787, -0.4]} rotation={[Math.PI / 2, 0, 0.35]} color="#1e3a8a" />
+      <Box size={[0.17, 0.006, 0.24]} position={[0.14, 0.783, -0.6]} rotation={[0, -0.12, 0]} color="#ffffff" rough={0.9} />
+      <Cyl r={0.0045} h={0.14} position={[0.26, 0.787, -0.6]} rotation={[Math.PI / 2, 0, 0.35]} color="#1e3a8a" />
 
       {room.props.filter((p) => !minimal || p.endsWith("poster") || p === "anatomy-chart").map((p) => (
         <PropItem key={p} prop={p} />

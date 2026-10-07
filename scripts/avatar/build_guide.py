@@ -624,10 +624,15 @@ def main(cache: Path, out: Path) -> None:
     parting = np.exp(-((V[:, 0] - part_x) / 0.07) ** 2) * (rel[:, 1] > 0.25) * (rel[:, 2] > -0.6)
     top = np.clip(rel[:, 1] / 1.2, 0, 1)
     sides = np.clip(np.abs(rel[:, 0]) / 0.8, 0, 1) * (1 - top)
-    thick = np.clip(-f_hair / 0.12, 0, 1) ** 0.5 * (0.1 + 0.09 * top + 0.06 * np.clip(-rel[:, 2], 0, 1)) * (1 - 0.35 * parting) * (1 - 0.45 * sides)
+    thick = np.clip(-f_hair / 0.24, 0, 1) ** 0.85 * (0.1 + 0.09 * top + 0.06 * np.clip(-rel[:, 2], 0, 1)) * (1 - 0.35 * parting) * (1 - 0.45 * sides)
     Ph = V + bN * thick[:, None]
     Ph[:, 1] += 0.0
     P, Fl, near = clip(Ph, F_all["body"], f_hair)
+    # Smooth the shell (never inwards): hair lies in soft curves, not in the
+    # facets of the body mesh it was built from.
+    # The hairline itself stays on the scalp: smoothing fades in away from it.
+    interior = np.clip(-f_hair[np.maximum(near, 0)] / 0.35, 0, 1)[:, None] * (near >= 0)[:, None]
+    P = P + (drape(P.copy(), Fl, vertex_normals(P, Fl), 6) - P) * interior
     hc = np.tile(hexrgb("#1e1612"), (len(P), 1)) * (1 + rng.normal(0, 0.05, (len(P), 1)))
     # the parting shows a little scalp colour
     pp = np.exp(-((P[:, 0] - part_x) / 0.035) ** 2) * ((P - head_c)[:, 1] > 0.3) * ((P - head_c)[:, 2] > -0.5)

@@ -160,7 +160,7 @@ test("voice can't play: the doctor carries on in text and says so once", async (
     Object.defineProperty(window.speechSynthesis, "getVoices", { value: () => v });
   });
   await begin(page, "2d");
-  await expect(page.getByText(/Voice isn't available right now/)).toBeVisible();
+  await expect(page.getByText(/Voice is off on this device/)).toBeVisible();
   await sayIt(page, "I have a headache");
   await expect(chart(page)).toContainText("I have a headache");
 });
@@ -190,9 +190,11 @@ test("rotating the phone mid-visit: layout fits, the question stays reachable, m
   await sayIt(page, "I've been coughing for three weeks");
   for (const size of [landscape, portrait, landscape, portrait]) {
     await page.setViewportSize(size);
+    // A rotation can switch between the phone and desktop layouts: wait for it.
+    await page.locator(`[data-layout="${size.width >= 1024 ? "wide" : "narrow"}"]`).waitFor();
     expect(await noSideScroll(page)).toBe(true);
     const next = page.getByRole("button", { name: "None of these — continue" });
-    await next.waitFor(); // a rotation can switch between the phone and desktop layouts
+    await next.waitFor();
     await next.scrollIntoViewIfNeeded();
     await expect(next).toBeVisible();
   }
@@ -321,4 +323,31 @@ test("'sorry, I meant no' changes the last answer, says so, and does not answer 
     break;
   }
   throw new Error("did not reach the night-sweats question");
+});
+
+test("the VD3 target experience: 'something hurts around here' → help → body map → My Visit → correct it → emergency", async ({ page }) => {
+  const errors = await begin(page, "2d");
+  const question = page.locator("#consult-question");
+  await expect(question).toHaveText("Hello. I'm your virtual health guide for General Medicine. What is troubling you today?");
+  await sayIt(page, "I don't really know. Something hurts around here.");
+  // The doctor does not fail: she offers help, and the body map appears.
+  await expect(question).toHaveText(/^That's okay\. I'll help you describe it\./);
+  const areas = page.getByRole("group", { name: "Body areas" });
+  await expect(areas).toBeVisible();
+  await areas.getByRole("button", { name: "Lower tummy" }).click();
+  await expect(page.locator("#my-visit")).toContainText("Lower tummy");
+  // Correct an earlier answer from My Visit: the doctor asks it again.
+  const visit = page.locator("#my-visit");
+  if (!(await visit.isVisible())) await page.getByRole("button", { name: /My Visit/ }).click();
+  await visit.getByRole("button", { name: /Change: Where/ }).click();
+  await expect(question).toHaveText(/let's change where it is/i);
+  await page.getByRole("group", { name: "Body areas" }).getByRole("button", { name: "Upper tummy" }).click();
+  await expect(visit).toContainText("Upper tummy");
+  await expect(visit).not.toContainText("Lower tummy");
+  // A red flag at any point: the whole consultation becomes calm Emergency Mode.
+  await sayIt(page, "I am vomiting blood");
+  await expect(page.getByRole("region", { name: /Emergency/ })).toBeVisible();
+  await expect(page.getByRole("link", { name: /Call 108/ }).first()).toBeInViewport();
+  await expect(page.locator("#consult-question")).toHaveCount(0);
+  expect(errors).toEqual([]);
 });

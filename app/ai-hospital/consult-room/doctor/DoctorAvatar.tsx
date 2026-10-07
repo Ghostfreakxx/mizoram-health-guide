@@ -137,7 +137,7 @@ function makeMaterial(name: string, old: THREE.MeshStandardMaterial, detail: boo
         roughness: 0.6,
         specularIntensity: 0.45,
         specularColor: new THREE.Color("#ffe7dc"),
-        sheen: 0.35,
+        sheen: 0.15,
         sheenColor: new THREE.Color("#ffcfb8"),
         sheenRoughness: 0.6,
         clearcoat: 0.03,
@@ -481,7 +481,7 @@ export default function DoctorAvatar(props: DoctorAvatarProps) {
     const lookDown = f.gaze.target === "down" || f.gaze.target === "chart" ? 0.18 : f.gaze.target === "visual" ? 0.1 : 0; // lids follow a downward look
     // A relaxed upper lid rests just over the top of the iris; wide-open lids
     // showing white above the iris read as a stare. Wider when attentive.
-    const restLid = Math.max(0, 0.13 - f.face.eyeWide * 0.6);
+    const restLid = Math.max(0, 0.08 - f.face.eyeWide * 0.5);
     const target2: Record<string, number> = {
       eyeBlink_L: Math.min(1, restLid + f.blink * (1 - restLid) + lookDown),
       eyeBlink_R: Math.min(1, restLid + f.blink * (1 - restLid) + lookDown),
