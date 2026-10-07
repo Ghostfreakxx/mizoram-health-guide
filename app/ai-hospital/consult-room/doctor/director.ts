@@ -28,7 +28,7 @@ export type Plan = {
 
 // A short pause while an answer is checked: longer answers take a little
 // longer to "read" (0.6–1.4 s). Never used for an emergency.
-export const thinkMs = (words: string) => Math.min(1400, 600 + words.length * 10);
+export const thinkMs = (words: string) => Math.min(900, 350 + words.length * 6);
 
 export const resultState = (level: Level): DoctorState => (level === "RED" || level === "ORANGE" ? "concerned" : level === "GREEN" ? "reassuring" : "explaining");
 

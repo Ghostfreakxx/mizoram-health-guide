@@ -23,13 +23,13 @@ describe("the director", () => {
     expect(p.before).toBeUndefined();
   });
 
-  it("an ordinary question gets a short, natural pause (0.6–1.4 s), thinking first", () => {
+  it("an ordinary question gets a short, natural pause (0.35–0.9 s), thinking first", () => {
     const p = planTurn(turnFor("I've been coughing for three weeks"), ctx);
-    expect(p.delayMs).toBeGreaterThanOrEqual(600);
-    expect(p.delayMs).toBeLessThanOrEqual(1400);
+    expect(p.delayMs).toBeGreaterThanOrEqual(350);
+    expect(p.delayMs).toBeLessThanOrEqual(900);
     expect(p.before).toBe("processing");
     expect(p.interrupt).toBe(false);
-    expect(thinkMs("x".repeat(500))).toBe(1400);
+    expect(thinkMs("x".repeat(500))).toBe(900);
   });
 
   it("presenting the body map → the doctor 'shows' it", () => {

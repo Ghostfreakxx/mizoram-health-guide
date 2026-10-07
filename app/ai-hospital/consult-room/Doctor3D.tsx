@@ -96,22 +96,42 @@ function Environment({ intensity }: { intensity: number }) {
   return null;
 }
 
-// Watches the frame rate once the doctor is shown; below 22 fps for 4 s the
-// stage steps down a quality level.
+// Watches the frame rate once the doctor is shown. Below 22 fps for 4 s it
+// first renders at a lower resolution (the picture softens a little; the
+// doctor is still there), down to 60% of normal; only if that is still too
+// slow does the stage step down a quality level. A device far too slow for
+// resolution to help (under 8 fps twice in a row, or under 4 fps once)
+// steps down sooner.
+const MIN_SCALE = 0.6;
 function FpsGuard({ active, onSlow }: { active: boolean; onSlow?: () => void }) {
-  const acc = useRef({ frames: 0, time: 0, fired: false });
+  // warm: the first 2 s after the doctor appears are skipped (shaders are
+  // still compiling); a very slow window must happen twice before giving up.
+  const acc = useRef({ frames: 0, time: 0, fired: false, warm: 0, verySlow: 0 });
+  const setDpr = useThree((s) => s.setDpr);
+  const dpr = useThree((s) => s.viewport.dpr);
+  const base = useRef(dpr);
   useFrame((_, dt) => {
     const a = acc.current;
     if (!active || a.fired || !onSlow) return;
+    if (a.warm < 2) {
+      a.warm += Math.min(dt, 0.5);
+      return;
+    }
     a.frames += 1;
     a.time += Math.min(dt, 0.5);
     if (a.time >= 4) {
-      if (a.frames / a.time < 22) {
+      const fps = a.frames / a.time;
+      a.frames = 0;
+      a.time = 0;
+      if (fps >= 22) return;
+      const next = Math.max(base.current * MIN_SCALE, dpr * 0.75);
+      a.verySlow = fps < 8 ? a.verySlow + 1 : 0;
+      if (fps >= 4 && (a.verySlow === 1 || (fps >= 8 && next < dpr - 0.01))) {
+        if (next < dpr - 0.01) setDpr(next);
+      } else {
         a.fired = true;
         onSlow();
       }
-      a.frames = 0;
-      a.time = 0;
     }
   });
   return null;

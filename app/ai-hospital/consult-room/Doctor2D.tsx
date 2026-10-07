@@ -51,7 +51,28 @@ export default function Doctor2D({
   useEffect(() => {
     if (paused) return;
     let raf = 0;
+    let last = 0;
+    // The picture is a full-screen SVG that the browser repaints in software:
+    // 30 updates a second is enough for breathing, blinks and lips, and an
+    // attribute is only written when it visibly changes.
+    const written = new Map<Element, Record<string, string>>();
+    // Numbers are kept to 0.1 of a unit (about a quarter of a pixel), so
+    // changes too small to see do not cause a repaint.
+    const set = (el: Element | null, name: string, raw: string) => {
+      if (!el) return;
+      const value = raw.replace(/-?\d+\.\d+/g, (n) => (+n).toFixed(1));
+      let m = written.get(el);
+      if (!m) written.set(el, (m = {}));
+      if (m[name] === value) return;
+      m[name] = value;
+      el.setAttribute(name, value);
+    };
     const tick = (now: number) => {
+      if (now - last < 32) {
+        raf = requestAnimationFrame(tick);
+        return;
+      }
+      last = now;
       const t = now / 1000;
       const r = lips.current?.rhythm(t);
       const patientActive = activity?.current ? t - activity.current : 99;
@@ -60,30 +81,30 @@ export default function Doctor2D({
       const deg = 180 / Math.PI;
       const g = f.gaze.target;
       const look = g === "chart" ? [-3.2, 1.6] : g === "down" ? [0, 2.4] : g === "away" ? [3, -0.6] : g === "visual" ? [-1.4, 2.6] : [f.gaze.sx * 70, f.gaze.sy * 70];
-      eyes.current?.setAttribute("transform", `translate(${look[0].toFixed(2)} ${look[1].toFixed(2)})`);
+      set(eyes.current, "transform", `translate(${look[0].toFixed(2)} ${look[1].toFixed(2)})`);
       const b = f.body;
-      head.current?.setAttribute("transform", `translate(${(b.headYaw * 55).toFixed(2)} ${(b.headPitch * 38 + b.lean * 3).toFixed(2)}) rotate(${(b.headRoll * deg).toFixed(2)} 160 128)`);
-      body.current?.setAttribute("transform", `translate(0 ${(b.breath * 1.1).toFixed(2)})`);
-      hand.current?.setAttribute("transform", `translate(0 ${(-b.gesture * 12).toFixed(2)})`);
+      set(head.current, "transform", `translate(${(b.headYaw * 55).toFixed(2)} ${(b.headPitch * 38 + b.lean * 3).toFixed(2)}) rotate(${(b.headRoll * deg).toFixed(2)} 160 128)`);
+      set(body.current, "transform", `translate(0 ${(b.breath * 1.1).toFixed(2)})`);
+      set(hand.current, "transform", `translate(0 ${(-b.gesture * 12).toFixed(2)})`);
       // upper lids follow blinks and downward looks
       const lid = Math.min(1, f.blink + (g === "down" || g === "chart" ? 0.25 : 0));
       const lidH = (lid * 9).toFixed(2);
-      lidL.current?.setAttribute("height", lidH);
-      lidR.current?.setAttribute("height", lidH);
+      set(lidL.current, "height", lidH);
+      set(lidR.current, "height", lidH);
       // mouth: opening from the voice; corners from the expression
       const jaw = v?.jawOpen ?? 0;
       const press = v?.mouthPress ?? 0;
       const open = Math.max(0, jaw * 15 + (v?.lipsPart ?? 0) * 2.2 - press * 2);
       const wide = (v?.mouthStretch ?? 0) * 3 - ((v?.mouthPucker ?? 0) + (v?.mouthFunnel ?? 0)) * 3.5;
-      mouth.current?.setAttribute("ry", open.toFixed(2));
-      mouth.current?.setAttribute("rx", (8.5 + wide).toFixed(2));
+      set(mouth.current, "ry", open.toFixed(2));
+      set(mouth.current, "rx", (8.5 + wide).toFixed(2));
       const corner = 163 - f.face.mouthSmile * 6 + f.face.mouthFrown * 3; // neutral: corners level, a little up when smiling
       const w = 12 + wide;
-      upperLip.current?.setAttribute("d", `M${160 - w} ${corner} Q${160 - w / 2} ${160.4 - open * 0.15} 160 ${161.3 - open * 0.2} Q${160 + w / 2} ${160.4 - open * 0.15} ${160 + w} ${corner} Q160 ${164.2 - open * 0.25} ${160 - w} ${corner} Z`);
-      lowerLip.current?.setAttribute("d", `M${160 - w + 1} ${corner + 0.4} Q160 ${164.6 + open * 0.95} ${160 + w - 1} ${corner + 0.4} Q160 ${168.6 + open} ${160 - w + 1} ${corner + 0.4} Z`);
+      set(upperLip.current, "d", `M${160 - w} ${corner} Q${160 - w / 2} ${160.4 - open * 0.15} 160 ${161.3 - open * 0.2} Q${160 + w / 2} ${160.4 - open * 0.15} ${160 + w} ${corner} Q160 ${164.2 - open * 0.25} ${160 - w} ${corner} Z`);
+      set(lowerLip.current, "d", `M${160 - w + 1} ${corner + 0.4} Q160 ${164.6 + open * 0.95} ${160 + w - 1} ${corner + 0.4} Q160 ${168.6 + open} ${160 - w + 1} ${corner + 0.4} Z`);
       const lift = (f.face.browInnerUp + f.face.browOuterUp * 0.5 - f.face.browDown) * 4;
-      browL.current?.setAttribute("d", `M133 ${109 - lift * 0.5} Q142 ${104.5 - lift} 151 ${106.5 - lift * 1.1}`);
-      browR.current?.setAttribute("d", `M169 ${106.5 - lift * 1.1} Q178 ${104.5 - lift} 187 ${109 - lift * 0.5}`);
+      set(browL.current, "d", `M133 ${109 - lift * 0.5} Q142 ${104.5 - lift} 151 ${106.5 - lift * 1.1}`);
+      set(browR.current, "d", `M169 ${106.5 - lift * 1.1} Q178 ${104.5 - lift} 187 ${109 - lift * 0.5}`);
       raf = requestAnimationFrame(tick);
     };
     raf = requestAnimationFrame(tick);

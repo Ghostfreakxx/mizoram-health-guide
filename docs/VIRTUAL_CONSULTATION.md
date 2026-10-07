@@ -242,12 +242,41 @@ The avatar only *presents* what the engine decided. It has no medical logic.
 - Errors in 3D fall back to the 2D guide (error boundary). WebGL missing →
   2D guide automatically.
 
+## Full-screen consultation (VD3)
+
+The room page (`/ai-hospital/departments/<slug>/room`) is its own scene: the
+site header, footer and bottom navigation are hidden (`components/ChromeGate.tsx`)
+and the consultation fills the screen (`100dvh`). What stays on screen:
+
+- **Top bar** — Leave, department · "Virtual consultation", a status pill
+  (Your turn / Speaking / Thinking… / Listening to you…), My Visit (with a
+  count), Settings, and **Emergency** (on very small phones: "108").
+- **The doctor** — the 3D camera frames head, shoulders and upper body
+  inside the free area left by the panels (`Doctor3D.tsx` → `setViewOffset`),
+  so she is never hidden behind a panel and stays dominant.
+- **The question dock** — the question, quick answers, the answer box with
+  Talk / Send / Skip, helpers (Help me describe it, I'm not sure, What does
+  this mean?, Why do you ask?) and Repeat / Stop / Back.
+- **Tools** (body map, long answer lists, checklists, health information)
+  appear in a column at the left on wide screens; on phones the body map is
+  a temporary full-screen tool above the answer box ("Hide the picture").
+- **My Visit** (`MyVisit.tsx`) — a side panel on wide screens and a bottom
+  sheet on phones. Everything the patient said, in plain groups, each with
+  **Change**: the doctor asks that question again ("Of course — let's change
+  where it is.") and every safety check runs again on the new answer.
+- **Emergency** replaces the dock with the calm emergency card (Call 108 on
+  screen on a 320 px phone too); no flashing, no sound.
+- **Entry** — loading steps, "Begin consultation" and "Continue without 3D
+  (faster)". `?view=high|medium|low|simple|text` forces a display level.
+
 ## Phones
 
-The doctor stays in the upper part of the screen; Talk / Type / Repeat /
-Stop / Explain / Back sit in a compact grid within thumb reach; the patient
-chart is a bottom sheet ("Visit chart · 5 noted") that opens over the page.
-Emergency guidance comes first on a phone, with the doctor below it.
+Portrait: the doctor in the upper part (36–50% of the height, depending on
+the phone), the question and answer box in a white panel below, within
+thumb reach. With the keyboard open the doctor shrinks to a strip and the
+panel follows the visual viewport, so the question and Send stay visible.
+Below 360 px the Talk / Repeat / Stop / Back buttons become icons (with
+labels for screen readers).
 
 ## Device tiers (`consult-room/capability.ts`)
 
@@ -260,21 +289,50 @@ Emergency guidance comes first on a phone, with the doctor below it.
 | text only | person's choice | no picture at all |
 
 All 3D tiers load the same doctor: automatically simplified models creased
-the face (an uncanny look), so tiers change rendering cost instead. Below
-22 fps for 4 s the stage steps down one tier by itself.
+the face (an uncanny look), so tiers change rendering cost instead.
 
-The person can always switch with the **Display** control.
+**Dynamic quality** (`FpsGuard` in `Doctor3D.tsx`): after a 2 s warm-up the
+frame rate is checked every 4 s. Below 22 fps the stage first renders at a
+lower resolution (75%, then 60%); if that is still too slow it steps down
+one tier (high → medium → low → 2D). Under 4 fps, or under 8 fps twice, it
+steps down without trying resolution. A level the person chose themselves is
+never stepped down for slowness (resolution still adapts). A lost graphics
+context steps down one tier; any other 3D error shows the 2D guide. The
+conversation state is never lost.
 
-### Measured (production build)
+The 2D guide redraws at most 30 times a second and only writes what visibly
+changed (it is a full-screen SVG repainted in software).
 
-| | Downloaded | Frame rate in a software-only browser (worst case) |
-|---|---|---|
-| 2D guide | 362 KB total page | 60 fps |
-| 3D room | +~240 KB (compressed JS) | 16 fps |
+The person can always switch under **Settings → Display**.
 
-Phones with a graphics chip render the code-built room much faster than the
-software renderer used for this measurement. Before release, measure on a
-low-cost Android phone (e.g. 3 GB RAM) on 3G.
+### Measured (production build, 1366×768, headless Chromium, software WebGL)
+
+There is no graphics chip in the test machine, so frame rates are a
+worst case; real phones with a GPU are much faster. Measured with
+`next start`, cold cache.
+
+| Display | Downloaded | JS | Doctor model | Frame rate | JS heap | Send → next question |
+|---|---|---|---|---|---|---|
+| text only | 326 KB | 276 KB | — | 60 fps | 6 MB | 35 ms |
+| 2D guide | 326 KB | 276 KB | — | 34 fps (was 8 before the redraw fix) | 7 MB | ~230 ms |
+| 3D low | 796 KB | 549 KB | 198 KB | 7 fps → 14 fps with dynamic resolution (1100×700) | 17 MB | ~120 ms |
+| 3D medium | 796 KB | 549 KB | 198 KB | 2 fps | 19 MB | ~750 ms |
+| 3D high | 796 KB | 549 KB | 198 KB | 2 fps | 13 MB | ~670 ms |
+| auto | 796 KB | 549 KB | 198 KB | settles on low / 2D by itself | 13 MB | ~120 ms |
+
+Before VD3 (same machine, commit `c003b26`): 810 KB downloaded, 546 KB JS,
+195 KB model; "auto" always ended in the 2D guide because a quality change
+was mistaken for a graphics failure (fixed). The doctor model is 362 KB
+(meshopt; 198 KB over the wire with compression) — before: 359 KB.
+
+**Voice** (`tests/e2e/voice.spec.ts`, instrumented speech engine; measured
+inside the page): Stop → speech cancelled 0 ms; Talk → 0 ms; typing → ~15 ms
+(includes the key event); emergency words → the emergency line is spoken in
+~17 ms with no thinking pause; Send → the doctor starts speaking ~0.6 s
+(a deliberate 0.35–0.9 s "thinking" pause — it was 0.6–1.4 s); the longest
+single utterance is one sentence (≤ 240 characters, typically < 100).
+
+Before release, measure on a low-cost Android phone (e.g. 3 GB RAM) on 3G.
 
 ## Shared across departments
 

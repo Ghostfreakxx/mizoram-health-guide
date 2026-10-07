@@ -1133,7 +1133,7 @@ export default function ConsultationRoom({ room, department }: { room: RoomStyle
     tier === "none" ? (
       <div aria-hidden className="h-full w-full bg-[radial-gradient(ellipse_at_top,#f7f5f0,#e6ebef)]" />
     ) : (
-      <div className="relative h-full w-full" role="img" aria-label={`Virtual health guide in the ${room.greeting} consultation room. ${STATE_LABEL[doc]}.`}>
+      <div className="relative h-full w-full" data-tier={tier ?? "loading"} role="img" aria-label={`Virtual health guide in the ${room.greeting} consultation room. ${STATE_LABEL[doc]}.`}>
         {tier === null ? (
           <div className="h-full w-full" style={{ background: room.wall }} />
         ) : tier === "fallback" ? (
