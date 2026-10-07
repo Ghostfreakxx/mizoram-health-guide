@@ -148,7 +148,8 @@ function makeMaterial(name: string, old: THREE.MeshStandardMaterial, detail: boo
       return m;
     }
     case "eye":
-      return new THREE.MeshPhysicalMaterial({ vertexColors: true, roughness: 0.45, specularIntensity: 0.3 });
+      // Wet, slightly glossy: the catchlight is what makes eyes read as alive.
+      return new THREE.MeshPhysicalMaterial({ vertexColors: true, roughness: 0.22, specularIntensity: 0.55, clearcoat: 0.6, clearcoatRoughness: 0.08 });
     case "cornea":
       return new THREE.MeshPhysicalMaterial({
         color: "#ffffff",
@@ -162,9 +163,23 @@ function makeMaterial(name: string, old: THREE.MeshStandardMaterial, detail: boo
     case "hair":
       // Low, dark sheen: a strong sheen lights the thin hairline edge at grazing
       // angles and reads as a pale "cap" rim around the forehead.
-      return new THREE.MeshPhysicalMaterial({ vertexColors: true, map: old.map, roughness: 0.7, sheen: 0.25, sheenColor: new THREE.Color("#3a2e27"), sheenRoughness: 0.5, specularIntensity: 0.22 });
+      // Black hair shows its shape through a soft, broad highlight (without it
+      // the head reads as a dark cap). Strand texture breaks the surface up.
+      return new THREE.MeshPhysicalMaterial({
+        vertexColors: true,
+        map: old.map,
+        roughness: 0.42,
+        specularIntensity: 0.55,
+        specularColor: new THREE.Color("#d9c7b8"),
+        sheen: 0.55,
+        sheenColor: new THREE.Color("#6e5a4c"),
+        sheenRoughness: 0.35,
+        envMapIntensity: 0.8,
+      });
     case "coat": {
-      const m = new THREE.MeshPhysicalMaterial({ vertexColors: true, roughness: 0.88, sheen: 0.5, sheenColor: new THREE.Color("#ffffff"), sheenRoughness: 0.8 });
+      // Cotton drill: matte, a touch below pure white so folds and shading
+      // read (pure white with a strong sheen glowed like plastic).
+      const m = new THREE.MeshPhysicalMaterial({ vertexColors: true, color: new THREE.Color("#e9ebee"), roughness: 0.94, sheen: 0.22, sheenColor: new THREE.Color("#f4f6f8"), sheenRoughness: 0.9, envMapIntensity: 0.6 });
       if (attire.coatColor) m.color = new THREE.Color(attire.coatColor);
       return m;
     }
@@ -264,7 +279,7 @@ function lerpTarget(cur: HandTarget, to: HandTarget, k: number) {
   cur.curl += (to.curl - cur.curl) * k;
 }
 
-function solveArm(rig: Rig, side: "L" | "R", t: HandTarget) {
+function solveArm(rig: Rig, side: "L" | "R", t: HandTarget, time = 0) {
   const b = rig.bones;
   const L = (v: THREE.Vector3) => rig.root.localToWorld(v.clone());
   aim(b[`upperarm01.${side}`], rig.rest[`upperarm01.${side}`], L(t.elbow));
@@ -273,7 +288,10 @@ function solveArm(rig: Rig, side: "L" | "R", t: HandTarget) {
   for (let f = 2; f <= 5; f++)
     for (let k = 1; k <= 3; k++) {
       const fb = b[`finger${f}-${k}.${side}`];
-      if (fb) fb.rotation.set(t.curl * (0.6 + k * 0.25), 0, 0);
+      // Fingers settle very slowly, each a little differently: hands at rest
+      // are never perfectly frozen (amplitude ~3°).
+      const settle = Math.sin(time * 0.21 + f * 1.7 + (side === "L" ? 0.9 : 0)) * 0.05 + Math.sin(time * 0.083 + f) * 0.03;
+      if (fb) fb.rotation.set(t.curl * (0.6 + k * 0.25) + settle * (k === 1 ? 1 : 0.6), 0, 0);
     }
   const th = b[`finger1-2.${side}`];
   if (th) th.rotation.set(t.curl * 0.4, 0, 0);
@@ -412,8 +430,9 @@ export default function DoctorAvatar(props: DoctorAvatarProps) {
       lerpTarget(arms.current.L, want.L, k(2.2));
       lerpTarget(arms.current.R, want.R, k(f.body.gesture > 0 ? 3 : 2.2));
     }
-    solveArm(rig, "L", arms.current.L);
-    solveArm(rig, "R", arms.current.R);
+    const still = props.reducedMotion ? 0 : t;
+    solveArm(rig, "L", arms.current.L, still);
+    solveArm(rig, "R", arms.current.R, still);
 
     // Breathing, attentive lean and a very slow weight shift.
     b["spine02"]?.quaternion.multiply(tmpQ.setFromEuler(tmpE.set(f.body.breath * 0.006 + f.body.lean * 0.035, 0, 0)));
@@ -460,9 +479,12 @@ export default function DoctorAvatar(props: DoctorAvatarProps) {
     const lip = props.lips.current?.visemeAt(now);
     const speaking = rhythm.speaking;
     const lookDown = f.gaze.target === "down" || f.gaze.target === "chart" ? 0.18 : f.gaze.target === "visual" ? 0.1 : 0; // lids follow a downward look
+    // A relaxed upper lid rests just over the top of the iris; wide-open lids
+    // showing white above the iris read as a stare. Wider when attentive.
+    const restLid = Math.max(0, 0.13 - f.face.eyeWide * 0.6);
     const target2: Record<string, number> = {
-      eyeBlink_L: Math.min(1, f.blink + lookDown),
-      eyeBlink_R: Math.min(1, f.blink + lookDown),
+      eyeBlink_L: Math.min(1, restLid + f.blink * (1 - restLid) + lookDown),
+      eyeBlink_R: Math.min(1, restLid + f.blink * (1 - restLid) + lookDown),
       browInnerUp: f.face.browInnerUp,
       browDown: f.face.browDown,
       browOuterUp: f.face.browOuterUp,

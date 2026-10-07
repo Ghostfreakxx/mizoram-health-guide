@@ -115,6 +115,43 @@ def shape(V: np.ndarray, T: Targets, age_years=35.0, asian=0.9, caucasian=0.1) -
         T.apply(V, f"macrodetails/height/female-{age}-averagemuscle-averageweight-maxheight", aw * 0.06)
 
 
+def face(V: np.ndarray, T: Targets) -> None:
+    """A woman of about 35 from Mizoram: a soft oval face, gentle jaw, ears
+    close to the head, open (not heavy) brows, slightly larger eyes, fuller
+    lips at a very slight resting lift. Small, deliberate amounts only."""
+    for name, w in (
+        ("head/head-oval", 0.45),
+        ("head/head-scale-horiz-decr", 0.25),
+        ("head/head-fat-decr", 0.25),
+        ("chin/chin-width-decr", 0.35),
+        ("chin/chin-bones-decr", 0.3),
+        ("chin/chin-height-incr", 0.15),
+        ("neck/neck-scale-horiz-decr", 0.25),
+        ("eyebrows/eyebrows-trans-up", 0.25),
+        ("eyebrows/eyebrows-angle-up", 0.15),
+        ("mouth/mouth-upperlip-volume-incr", 0.35),
+        ("mouth/mouth-lowerlip-volume-incr", 0.3),
+        ("mouth/mouth-cupidsbow-incr", 0.35),
+        ("mouth/mouth-scale-horiz-decr", 0.1),
+        ("nose/nose-point-width-decr", 0.35),
+        ("nose/nose-scale-horiz-decr", 0.2),
+        ("nose/nose-width2-decr", 0.2),
+        ("nose/nose-volume-decr", 0.15),
+        ("nose/nose-nostrils-width-decr", 0.2),
+    ):
+        T.apply(V, name, w)
+    for s_ in ("l", "r"):
+        for name, w in (
+            (f"ears/{s_}-ear-flap-decr", 0.7),
+            (f"ears/{s_}-ear-wing-decr", 0.7),
+            (f"ears/{s_}-ear-scale-decr", 0.25),
+            (f"eyes/{s_}-eye-scale-incr", 0.18),
+            (f"cheek/{s_}-cheek-volume-incr", 0.2),
+            (f"cheek/{s_}-cheek-bones-incr", 0.12),
+        ):
+            T.apply(V, name, w)
+
+
 # ---------------------------------------------------------------- geometry helpers
 
 
@@ -404,6 +441,7 @@ def main(cache: Path, out: Path) -> None:
     shape(V, T)
     # A relaxed, closed mouth at rest: the base mesh's lips sit slightly apart.
     T.apply(V, "expression/units/asian/mouth-compression", 0.35)
+    face(V, T)
     n = len(V)
     rng = np.random.default_rng(7)
 
@@ -454,23 +492,23 @@ def main(cache: Path, out: Path) -> None:
     f_skin = np.minimum(np.minimum(f_neck, f_hands), f_v)
 
     # ---- skin colours (vertex colours, sRGB here, linearised on export)
-    skin = hexrgb("#c48d6b")
+    skin = hexrgb("#cf9b7a")  # light-medium, warm: common in Mizoram
     C = np.tile(skin, (n, 1))
     C *= (1 + rng.normal(0, 0.012, (n, 1)))
     lips = np.maximum(mask_from_target(T, n, "mouth/mouth-lowerlip-volume-incr", 0.25),
                       mask_from_target(T, n, "mouth/mouth-upperlip-height-incr", 0.35))
     lips = smooth_mask(lips, F_all["body"], 2)
-    C = C * (1 - lips[:, None] * 0.5) + hexrgb("#a8645c") * lips[:, None] * 0.5
+    C = C * (1 - lips[:, None] * 0.45) + hexrgb("#b56a64") * lips[:, None] * 0.45
     # Eyebrows: a soft arched band above each eye (front of the face only)
     ax = np.abs(V[:, 0])
     along = np.clip((ax - 0.1) / 0.55, 0, 1)
     brow_y = eye_y + 0.13 + 0.05 * np.sin(np.pi * np.clip(along * 1.15, 0, 1))
-    width = 0.058 * (1 - 0.45 * along)
+    width = 0.044 * (1 - 0.5 * along)
     brows = np.exp(-((V[:, 1] - brow_y) / width) ** 2) * np.clip((ax - 0.12) / 0.06, 0, 1) * (ax < 0.7) * (V[:, 2] > eyeL[2] - 0.25)
     brows *= np.clip((0.72 - ax) / 0.12, 0, 1)
     brows = smooth_mask(brows, F_all["body"], 2)
     brows = np.clip(brows * 1.25, 0, 1)
-    C = C * (1 - brows[:, None] * 0.8) + hexrgb("#271a14") * brows[:, None] * 0.8
+    C = C * (1 - brows[:, None] * 0.62) + hexrgb("#2b1e17") * brows[:, None] * 0.62
     # Lash line: the eyelid rim where it meets the eyeball (upper lid darker)
     for ec in (eyeL, eyeR):
         r_eye = np.linalg.norm(V[np.unique(F_all["helper-l-eye"])] - eyeL, axis=1).mean()
@@ -490,7 +528,7 @@ def main(cache: Path, out: Path) -> None:
     depth = np.clip((lip_front - 0.06 - V[:, 2]) / 0.2, 0, 1)
     C = np.where(inside[:, None], C * (1 - depth[:, None]) + hexrgb("#4a2224") * depth[:, None], C)
     cheeks = np.exp(-(((np.abs(V[:, 0]) - 0.55) / 0.35) ** 2 + ((V[:, 1] - (eye_y - 0.45)) / 0.3) ** 2)) * (V[:, 2] > 0.8)
-    C = C * (1 - cheeks[:, None] * 0.16) + hexrgb("#c47468") * cheeks[:, None] * 0.16
+    C = C * (1 - cheeks[:, None] * 0.14) + hexrgb("#d27c70") * cheeks[:, None] * 0.14
     # Natural variation: a slightly warmer nose tip and ears, a lighter forehead,
     # a little shadow in the eye sockets. Never a uniform "painted" tone.
     nose = np.exp(-((V[:, 0] / 0.12) ** 2 + ((V[:, 1] - (eye_y - 0.32)) / 0.14) ** 2)) * (V[:, 2] > eyeL[2])
@@ -501,7 +539,7 @@ def main(cache: Path, out: Path) -> None:
     C = C * (1 + forehead[:, None] * 0.04)
     for ec in (eyeL, eyeR):
         socket = np.exp(-(((V[:, 0] - ec[0]) / 0.22) ** 2 + ((V[:, 1] - ec[1] + 0.03) / 0.16) ** 2)) * (V[:, 2] > ec[2] - 0.2)
-        C = C * (1 - socket[:, None] * 0.08) + hexrgb("#8f6658") * socket[:, None] * 0.08
+        C = C * (1 - socket[:, None] * 0.06) + hexrgb("#a07465") * socket[:, None] * 0.06
     C *= (1 + smooth_mask(rng.normal(0, 0.03, n), F_all["body"], 3)[:, None])
     C = np.clip(C, 0, 1)
 
@@ -567,16 +605,33 @@ def main(cache: Path, out: Path) -> None:
     front = np.cos(az)
     # height of the hairline above the head centre, by direction
     fr = np.clip(front, 0, 1)
-    line = np.where(front > 0, 0.5 * fr ** 1.5 - 0.15 * (1 - fr), -0.15 + 0.85 * front)
+    # A natural hairline: a soft rounded centre, curving down at the temples,
+    # in front of the ears, then behind them to the nape.
+    line = np.where(front > 0, 0.55 * fr ** 3 - 0.6 * (1 - fr) ** 1.2, -0.6 + 0.4 * front)
+    # a slightly lower, softer middle (no straight "cap" edge)
+    line -= 0.05 * np.exp(-(az / 0.25) ** 2)
     f_hair = np.maximum(line - rel[:, 1], np.linalg.norm(rel, axis=1) - 1.95)
     f_hair = np.maximum(f_hair, (eye_y - 1.05) - V[:, 1])
-    ears = (np.abs(V[:, 0]) > 0.66) & (V[:, 1] < eye_y + 0.12) & (V[:, 1] > eye_y - 0.75)
-    f_hair = np.where(ears, np.maximum(f_hair, 0.05), f_hair)
-    thick = np.clip(-f_hair / 0.3, 0, 1) ** 0.7 * (0.06 + 0.07 * np.clip(rel[:, 1] / 1.2, 0, 1) + 0.05 * np.clip(-rel[:, 2], 0, 1))
+    # Ears stay uncovered: a smooth round clearance around each ear (a hard
+    # mask left jagged triangles along the mesh edges).
+    ear_c_y, ear_c_z = eye_y - 0.3, eyeL[2] - 0.78
+    ear_d = np.sqrt(((V[:, 1] - ear_c_y) / 1.0) ** 2 + ((V[:, 2] - ear_c_z) / 0.85) ** 2)
+    f_ear = np.where(np.abs(V[:, 0]) > 0.5, 0.42 - ear_d, -1.0)
+    f_hair = np.maximum(f_hair, f_ear)
+    # Real volume (1–2 cm), already near the hairline, more at the crown and
+    # back; a side parting (her right) where the hair lies flatter.
+    part_x = 0.28
+    parting = np.exp(-((V[:, 0] - part_x) / 0.07) ** 2) * (rel[:, 1] > 0.25) * (rel[:, 2] > -0.6)
+    top = np.clip(rel[:, 1] / 1.2, 0, 1)
+    sides = np.clip(np.abs(rel[:, 0]) / 0.8, 0, 1) * (1 - top)
+    thick = np.clip(-f_hair / 0.12, 0, 1) ** 0.5 * (0.1 + 0.09 * top + 0.06 * np.clip(-rel[:, 2], 0, 1)) * (1 - 0.35 * parting) * (1 - 0.45 * sides)
     Ph = V + bN * thick[:, None]
     Ph[:, 1] += 0.0
     P, Fl, near = clip(Ph, F_all["body"], f_hair)
-    hc = np.tile(hexrgb("#241a15"), (len(P), 1)) * (1 + rng.normal(0, 0.05, (len(P), 1)))
+    hc = np.tile(hexrgb("#1e1612"), (len(P), 1)) * (1 + rng.normal(0, 0.05, (len(P), 1)))
+    # the parting shows a little scalp colour
+    pp = np.exp(-((P[:, 0] - part_x) / 0.035) ** 2) * ((P - head_c)[:, 1] > 0.3) * ((P - head_c)[:, 2] > -0.5)
+    hc = hc * (1 - pp[:, None] * 0.35) + hexrgb("#5a4234") * pp[:, None] * 0.35
     rh = P - head_c
     hair_uv = np.stack([np.arctan2(rh[:, 0], rh[:, 1]) / np.pi * 3.0, np.arctan2(rh[:, 2], rh[:, 1]) / np.pi * 1.5], -1)
     parts.append(Part("hair", "hair", P, Fl, near, np.clip(hc, 0, 1), uv=hair_uv))
