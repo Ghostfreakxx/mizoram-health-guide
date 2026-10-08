@@ -1257,8 +1257,9 @@ export default function ConsultationRoom({ room, department }: { room: RoomStyle
       {begun && !emergency && !done && (
         <button type="button" onClick={() => (!wide ? setSheetOpen((o) => !o) : leftPanel ? setVisitOverTool((o) => !o) : setVisitOpen((o) => !o))} aria-expanded={wide ? visitShown : sheetOpen} aria-controls="my-visit" className={`${btnGhost} ${(wide ? visitShown : sheetOpen) ? "bg-blue-900/10 text-blue-950" : ""}`}>
           <span aria-hidden>📋</span>
-          <span className="hidden min-[380px]:inline">My Visit</span>
-          <span className="sr-only min-[380px]:hidden">My Visit</span>
+          {/* Phones: icon and count only, so the department name has room. */}
+          <span className="hidden sm:inline">My Visit</span>
+          <span className="sr-only sm:hidden">My Visit</span>
           {noted > 0 && <span className="rounded-full bg-blue-900 px-1.5 text-[11px] font-bold text-white">{noted}</span>}
         </button>
       )}
@@ -1406,7 +1407,7 @@ export default function ConsultationRoom({ room, department }: { room: RoomStyle
                 key={o.id}
                 type="button"
                 onClick={() => answer(o.id)}
-                className="flex min-h-11 items-start gap-2 rounded-xl border border-red-200 bg-white px-3 py-2 text-left text-[15px] font-semibold leading-snug text-red-950 hover:border-red-400 hover:bg-red-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-red-700"
+                className="flex min-h-11 items-start gap-2 rounded-xl border border-red-200 bg-white px-2.5 py-1.5 text-left text-[14px] font-semibold leading-tight text-red-950 hover:border-red-400 hover:bg-red-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-red-700"
               >
                 <span aria-hidden className="mt-0.5 text-red-700">⚠</span>
                 <span>{o.label}</span>

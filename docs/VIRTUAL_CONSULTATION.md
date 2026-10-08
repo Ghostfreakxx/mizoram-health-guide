@@ -269,6 +269,54 @@ and the consultation fills the screen (`100dvh`). What stays on screen:
 - **Entry** — loading steps, "Begin consultation" and "Continue without 3D
   (faster)". `?view=high|medium|low|simple|text` forces a display level.
 
+## VD4: layout, memory and how the doctor speaks
+
+**Wide screens.** The conversation is a column on the right: the last few
+lines of the conversation (also the subtitles when there is no voice) above
+the current question, the answer choices and the answer box. Tools (body
+map, long answer lists, checklists) and My Visit are on the left. The camera
+frames the doctor, unobstructed, in the space between. The entry card uses
+the same column, so the framing does not jump when the visit starts.
+
+**Memory (`lib/consultMemory.ts`).** Whatever question is on screen, the
+doctor keeps what the patient says in passing: symptoms ("a headache and
+fever"), medicines by name ("I took paracetamol"), long-term conditions
+("I'm diabetic" — not a family member's), allergies, whether it comes and
+goes, and what makes it worse ("worse after food"). Nothing is taken from a
+denial ("no fever"). Nothing here changes urgency: the safety checks read
+every word first, and a medicine mention with a danger sign ("overdose")
+opens Emergency Mode. Facts volunteered at another question are said back
+("Thank you. I've noted paracetamol under your medicines.") and the same
+question is asked again; later questions build on them ("You mentioned
+paracetamol. Are you taking any other medicines?"). My Visit shows "You
+mentioned …"; the summary lists them.
+
+**Two problems at once.** "A headache and fever" → "You mentioned a fever
+and a headache. Which one is troubling you most?" with just those two (and
+"Something else"); the other stays in the summary as a symptom.
+
+**Spoken questions (`lib/consultSpeech.ts`).** Every danger-sign rule keeps
+its written, reviewed wording (`safety/triage.ts`, shown in the Triage
+Desk). The doctor says the same question in everyday English, to "you" or
+about "them" ("Do you have a stiff neck, or a rash that does not fade when
+you press on it?"), and refers back when the patient already mentioned it
+("You mentioned a headache. Is it severe?"). Tests check every rule has a
+spoken form, every spoken form keeps the rule's key words (with a short,
+explicit list of plain-word swaps such as "fluids" → "drinks"), and none
+speaks of "the person" to the patient. The spoken forms are listed beside
+each rule in the clinical review export (`docs/CLINICAL_REVIEW.md`).
+
+**Word meanings** are written under the question after the patient once
+needed an explanation — no longer read out with every question.
+
+**Director contract (`tests/safety/director-contract.test.ts`).** Ten states,
+each caused by a real event: GREETING (visit begins), PROCESSING (an answer
+arrives), ASKING (the next question), LISTENING (waiting), CLARIFYING (what
+does this mean / why / not understood), EXPLAINING (a routine result),
+CONCERNED (an urgent result), EMERGENCY (a red flag: no pause, interrupts
+everything), SUMMARIZING (the hand-off), COMPLETE. No smile while concerned,
+urgent or thinking; nods only while the patient is talking or typing.
+
 ## Phones
 
 Portrait: the doctor in the upper part (36–50% of the height, depending on
@@ -309,16 +357,19 @@ The person can always switch under **Settings → Display**.
 
 There is no graphics chip in the test machine, so frame rates are a
 worst case; real phones with a GPU are much faster. Measured with
-`next start`, cold cache.
+`next start`, cold cache (VD4, 8 Oct 2026).
 
 | Display | Downloaded | JS | Doctor model | Frame rate | JS heap | Send → next question |
 |---|---|---|---|---|---|---|
-| text only | 326 KB | 276 KB | — | 60 fps | 6 MB | 35 ms |
-| 2D guide | 326 KB | 276 KB | — | 34 fps (was 8 before the redraw fix) | 7 MB | ~230 ms |
-| 3D low | 796 KB | 549 KB | 198 KB | 7 fps → 14 fps with dynamic resolution (1100×700) | 17 MB | ~120 ms |
-| 3D medium | 796 KB | 549 KB | 198 KB | 2 fps | 19 MB | ~750 ms |
-| 3D high | 796 KB | 549 KB | 198 KB | 2 fps | 13 MB | ~670 ms |
-| auto | 796 KB | 549 KB | 198 KB | settles on low / 2D by itself | 13 MB | ~120 ms |
+| text only | 334 KB | 284 KB | — | 60 fps | 6 MB | ~50 ms |
+| 2D guide | 334 KB | 284 KB | — | 60 fps | 6 MB | ~45 ms |
+| 3D low | 810 KB | 557 KB | 203 KB (376 KB file) | 6.3 fps | 13 MB | ~140 ms |
+| 3D medium | 810 KB | 557 KB | 203 KB | 1.4 fps | 14–18 MB | ~800 ms |
+| 3D high | 810 KB | 557 KB | 203 KB | 1.5 fps | 15 MB | ~970 ms |
+
+In software rendering the medium and high levels are not usable; "auto"
+steps down to low or the 2D guide by itself (dynamic quality, above). The
+3D code and model load only when a 3D level is used.
 
 Before VD3 (same machine, commit `c003b26`): 810 KB downloaded, 546 KB JS,
 195 KB model; "auto" always ended in the 2D guide because a quality change
