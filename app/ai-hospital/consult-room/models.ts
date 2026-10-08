@@ -1,7 +1,7 @@
 import type { Tier } from "./capability";
 
 // Bump when the model is rebuilt (scripts/avatar) so phones fetch the new one.
-export const MODEL_VERSION = 10;
+export const MODEL_VERSION = 11;
 
 // Every 3D tier uses the same full-detail doctor (about 370 KB). Automatically
 // simplified versions damaged the face (creased forehead, broken lips), which

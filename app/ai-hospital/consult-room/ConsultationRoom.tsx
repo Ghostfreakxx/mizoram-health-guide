@@ -249,7 +249,7 @@ export default function ConsultationRoom({ room, department }: { room: RoomStyle
   const dockRef = useRef<HTMLElement>(null);
   const inputRef = useRef<HTMLFormElement>(null);
   const [inputH, setInputH] = useState(140);
-  const [dockH, setDockH] = useState(260);
+  const [visitOverTool, setVisitOverTool] = useState(false); // My Visit opened over a tool
   const [shellH, setShellH] = useState(0); // phones, keyboard open: fit the room above the keyboard
   const [shellTop, setShellTop] = useState(0);
   const [keyboardOpen, setKeyboardOpen] = useState(false); // on-screen keyboard (phones): the doctor area shrinks
@@ -384,14 +384,6 @@ export default function ConsultationRoom({ room, department }: { room: RoomStyle
     };
   }, []);
 
-  // The dock's height decides where the camera frames the doctor (desktop).
-  useEffect(() => {
-    const el = dockRef.current;
-    if (!el || typeof ResizeObserver === "undefined") return;
-    const ro = new ResizeObserver(() => setDockH(Math.round(el.getBoundingClientRect().height)));
-    ro.observe(el);
-    return () => ro.disconnect();
-  });
   // A notice is shown for 8 seconds, then retired (Settings still shows the display used).
   useEffect(() => {
     const keys = [failed3d ?? "", voiceIssue ? "voice" : ""].filter((k) => k && !seenNotices.includes(k));
@@ -586,6 +578,7 @@ export default function ConsultationRoom({ room, department }: { room: RoomStyle
     (next: ConsultState, said: string) => {
       stopMic.current?.();
       setLog((g) => [...g, { who: "patient", text: said }]);
+      setVisitOverTool(false);
       lastSaid.current = said;
       setText("");
       setMulti([]);
@@ -1144,15 +1137,20 @@ export default function ConsultationRoom({ room, department }: { room: RoomStyle
 
   // ---- Layout measurements (desktop): the camera frames the doctor in the
   // free space between the panels.
-  const visitShown = wide && visitOpen && !emergency && !done && begun;
   const sidePanel = wide && (emergency || (done && inp.kind === "result"));
   const toolShown = wide && !!toolKind;
+  // Wide screens: the conversation is a column on the right, tools and My
+  // Visit on the left, and the doctor is framed, unobstructed, in between.
+  // The entry card uses the same column, so the framing never jumps.
+  const leftPanel = toolShown || demoMode || reviewMode || (!!education && !emergency);
+  const visitShown = wide && !emergency && !done && begun && (leftPanel ? visitOverTool : visitOpen);
+  const colW = Math.min(480, Math.max(400, Math.round(viewW * 0.34)));
   const frame = wide
     ? {
-        l: toolShown || demoMode || reviewMode || (education && !emergency) ? 448 : 0,
-        r: sidePanel ? Math.min(640, Math.round(viewW * 0.46)) + 24 : visitShown ? 356 : 0,
+        l: leftPanel ? 448 : visitShown ? 352 : 0,
+        r: sidePanel ? Math.min(640, Math.round(viewW * 0.46)) + 24 : tier === "none" ? 0 : colW + 40,
         t: 64,
-        b: begun && !sidePanel ? Math.round(dockH * 0.62) + 24 : 40,
+        b: 24,
       }
     : { l: 0, r: 0, t: 0, b: 18 };
 
@@ -1244,7 +1242,7 @@ export default function ConsultationRoom({ room, department }: { room: RoomStyle
         </p>
       )}
       {begun && !emergency && !done && (
-        <button type="button" onClick={() => (wide ? setVisitOpen((o) => !o) : setSheetOpen((o) => !o))} aria-expanded={wide ? visitOpen : sheetOpen} aria-controls="my-visit" className={`${btnGhost} ${(wide ? visitOpen : sheetOpen) ? "bg-blue-900/10 text-blue-950" : ""}`}>
+        <button type="button" onClick={() => (!wide ? setSheetOpen((o) => !o) : leftPanel ? setVisitOverTool((o) => !o) : setVisitOpen((o) => !o))} aria-expanded={wide ? visitShown : sheetOpen} aria-controls="my-visit" className={`${btnGhost} ${(wide ? visitShown : sheetOpen) ? "bg-blue-900/10 text-blue-950" : ""}`}>
           <span aria-hidden>📋</span>
           <span className="hidden min-[380px]:inline">My Visit</span>
           <span className="sr-only min-[380px]:hidden">My Visit</span>
@@ -1443,6 +1441,7 @@ export default function ConsultationRoom({ room, department }: { room: RoomStyle
 
   // ---------------- The dock: the doctor's words, then the ways to answer ----------------
   const kind: "main" | "other" = inp.kind === "text" ? "main" : "other";
+  const roomyInput = wide && tier === "none";
   const inputRow = (
     <form
       ref={inputRef}
@@ -1463,11 +1462,11 @@ export default function ConsultationRoom({ room, department }: { room: RoomStyle
           disabled={!canAnswer || !talk.available}
           aria-pressed={listening}
           title={talk.available ? "Speak your answer" : talk.reason}
-          className={`inline-flex h-12 shrink-0 items-center justify-center gap-1 whitespace-nowrap rounded-full px-4 text-[15px] font-bold text-white shadow-md disabled:opacity-40 ${listening ? "bg-red-700" : "bg-blue-900 hover:bg-blue-800"}`}
+          className={`inline-flex h-12 shrink-0 items-center justify-center gap-1 whitespace-nowrap rounded-full text-[15px] font-bold text-white shadow-md disabled:opacity-40 ${roomyInput ? "px-4" : "w-12"} ${listening ? "bg-red-700" : "bg-blue-900 hover:bg-blue-800"}`}
         >
           <span aria-hidden>🎙️</span>
-          <span className="hidden min-[360px]:inline"> {listening ? "Stop listening" : "Talk"}</span>
-          <span className="sr-only min-[360px]:hidden">{listening ? "Stop listening" : "Talk"}</span>
+          {/* The answer box needs the width: the label is shown only where there is room. */}
+          <span className={roomyInput ? "" : "sr-only"}> {listening ? "Stop listening" : "Talk"}</span>
         </button>
         {kind === "main" ? (
           <textarea
@@ -1484,8 +1483,8 @@ export default function ConsultationRoom({ room, department }: { room: RoomStyle
                 if (text.trim()) sendWords(text);
               }
             }}
-            placeholder={inp.kind === "text" && viewW >= 480 ? inp.placeholder : "Type your answer"}
-            className={`min-h-12 w-full resize-none rounded-[22px] border border-slate-300 bg-slate-50 px-4 py-3 ${textSize} leading-snug focus:border-blue-700 focus:bg-white`}
+            placeholder={inp.kind === "text" && wide && tier === "none" ? inp.placeholder : "Type your answer"}
+            className={`min-h-12 w-full min-w-0 resize-none rounded-[22px] border border-slate-300 bg-slate-50 px-4 py-3 ${textSize} leading-snug focus:border-blue-700 focus:bg-white`}
           />
         ) : (
           <input
@@ -1495,11 +1494,11 @@ export default function ConsultationRoom({ room, department }: { room: RoomStyle
             maxLength={300}
             disabled={!canAnswer}
             onChange={(e) => onTyping(e.target.value)}
-            placeholder="Or type your answer"
-            className={`min-h-12 w-full rounded-full border border-slate-300 bg-slate-50 px-4 py-2.5 ${textSize} focus:border-blue-700 focus:bg-white`}
+            placeholder={roomyInput ? "Or type your answer" : "Or type here"}
+            className={`min-h-12 w-full min-w-0 rounded-full border border-slate-300 bg-slate-50 px-4 py-2.5 ${textSize} focus:border-blue-700 focus:bg-white`}
           />
         )}
-        <button type="submit" disabled={!text.trim()} className="h-12 shrink-0 rounded-full bg-blue-900 px-5 text-[15px] font-bold text-white shadow-md hover:bg-blue-800 disabled:bg-slate-300 disabled:shadow-none">
+        <button type="submit" disabled={!text.trim()} className="h-12 shrink-0 rounded-full bg-blue-900 px-4 text-[15px] font-bold text-white shadow-md hover:bg-blue-800 disabled:bg-slate-300 disabled:shadow-none">
           Send
         </button>
       </div>
@@ -1694,7 +1693,11 @@ export default function ConsultationRoom({ room, department }: { room: RoomStyle
 
         {wide ? (
           <>
-            {!emergency && tier !== "none" && <div className="pointer-events-none absolute inset-x-0 top-[68px] z-30 flex flex-col items-center gap-2 px-4">{notices}</div>}
+            {!emergency && tier !== "none" && (
+              <div className="pointer-events-none absolute inset-x-0 top-[68px] z-30 flex flex-col items-center gap-2 px-4" style={{ paddingLeft: frame.l + 16, paddingRight: frame.r + 16 }}>
+                {notices}
+              </div>
+            )}
             {(toolShown || demoMode || reviewMode || debugMode || (education && !emergency)) && (
               <div className={`${glass} absolute bottom-6 left-6 top-[72px] z-20 w-[400px] space-y-4 overflow-y-auto p-5`}>
                 {devPanels}
@@ -1702,7 +1705,14 @@ export default function ConsultationRoom({ room, department }: { room: RoomStyle
                 {toolShown && tool}
               </div>
             )}
-            <div className={`${glass} absolute right-6 top-[72px] z-20 max-h-[calc(100%-96px)] w-[320px] overflow-y-auto p-5 ${visitShown ? "" : "hidden"}`}>{visitPanel}</div>
+            <div className={`${glass} absolute left-6 top-[72px] ${leftPanel ? "z-30" : "z-20"} max-h-[calc(100%-96px)] w-[320px] overflow-y-auto p-5 ${visitShown ? "" : "hidden"}`}>
+              {leftPanel && (
+                <button type="button" onClick={() => setVisitOverTool(false)} className="float-right -mr-2 -mt-1 rounded-full px-3 py-1 text-sm font-semibold text-slate-600 hover:bg-slate-100">
+                  Close
+                </button>
+              )}
+              {visitPanel}
+            </div>
             {sidePanel && (
               <div
                 className={`${glass} absolute bottom-6 top-[72px] z-20 overflow-y-auto p-5 ${tier === "none" ? "left-1/2 -translate-x-1/2" : "right-6"}`}
@@ -1713,9 +1723,37 @@ export default function ConsultationRoom({ room, department }: { room: RoomStyle
               </div>
             )}
             {!begun && (
-              <div className="pointer-events-none absolute inset-0 z-20 flex items-end justify-center p-6 pb-10 lg:items-center lg:justify-end lg:pr-[6vw]">{entry}</div>
+              <div className="pointer-events-none absolute bottom-6 right-6 top-[72px] z-20 flex items-center" style={{ width: colW }}>
+                {entry}
+              </div>
             )}
-            {begun && !sidePanel && (
+            {/* The conversation column: what was said so far (also the
+                subtitles), then the current question and the ways to answer. */}
+            {begun && !sidePanel && tier !== "none" && (
+              <div className="pointer-events-none absolute bottom-6 right-6 top-[72px] z-20 flex flex-col justify-end gap-3" style={{ width: colW }}>
+                {log.length > 1 && (
+                  <ol
+                    ref={historyRef}
+                    aria-label="Conversation so far"
+                    className="pointer-events-auto flex min-h-0 flex-col gap-1.5 overflow-y-auto px-1 [mask-image:linear-gradient(to_bottom,transparent,black_48px)]"
+                  >
+                    {log.slice(0, -1).slice(-10).map((l, i) => (
+                      <li
+                        key={i}
+                        className={`max-w-[88%] rounded-2xl px-3.5 py-2 text-[14px] leading-snug shadow-sm ${l.who === "guide" ? "self-start bg-white/88 text-slate-800 ring-1 ring-slate-900/5" : "self-end bg-blue-900/90 text-white"}`}
+                      >
+                        <span className="sr-only">{l.who === "guide" ? "Guide: " : "You: "}</span>
+                        {l.text}
+                      </li>
+                    ))}
+                  </ol>
+                )}
+                <section ref={dockRef} aria-labelledby="consult-question" className={`${glass} flex max-h-[80%] w-full shrink-0 flex-col gap-3 overflow-y-auto px-5 pt-4`}>
+                  {dockBody}
+                </section>
+              </div>
+            )}
+            {begun && !sidePanel && tier === "none" && (
               <div
                 className={`pointer-events-none absolute inset-x-0 bottom-6 z-20 flex flex-col items-center justify-end gap-3 px-6 ${tier === "none" ? "top-[72px]" : ""}`}
                 style={{ paddingLeft: frame.l ? frame.l + 8 : 24, paddingRight: frame.r ? frame.r + 8 : 24 }}

@@ -420,17 +420,68 @@ def clip(P, F, f):
 
 
 def strand_texture(w=128, h=256, seed=3):
-    """Fine hair strands: streaks along v, as a greyscale PNG (bytes)."""
+    """Fine hair strands: streaks along v (RGBA PNG). The alpha follows the
+    strands (gaps 0.55, strands 1.0): inside the hair everything is kept,
+    but where the hairline fades the vertex alpha, only strands survive the
+    alpha cut-off, so the edge frays into hair instead of a hard cap line."""
     import io
     from PIL import Image, ImageFilter
     r = np.random.default_rng(seed)
     cols = r.uniform(0.55, 1.0, w)
     img = np.tile(cols, (h, 1))
     img *= r.uniform(0.9, 1.0, (h, w))
-    im = Image.fromarray((np.clip(img, 0, 1) * 255).astype(np.uint8), "L").filter(ImageFilter.GaussianBlur((0.4, 3)))
+    lum = np.array(Image.fromarray((np.clip(img, 0, 1) * 255).astype(np.uint8), "L").filter(ImageFilter.GaussianBlur((0.4, 3)))) / 255.0
+    alpha = 0.55 + 0.45 * np.clip((lum - 0.55) / 0.4, 0, 1)
+    rgba = np.stack([lum, lum, lum, alpha], -1)
+    im = Image.fromarray((rgba * 255).astype(np.uint8), "RGBA")
     buf = io.BytesIO()
-    im.convert("RGB").save(buf, "PNG", optimize=True)
+    im.save(buf, "PNG", optimize=True)
     return buf.getvalue()
+
+
+def bake_ao(parts, strength, rays=64, reach=1.4, seed=11, skip=()):
+    """Ambient occlusion baked into vertex colours: creases under the chin,
+    at the collar, between the lips, around the nose and eyes, where the hair
+    meets the skin. Rays are cast from every vertex against the whole figure
+    (Embree via trimesh). Skipped, with a note, if trimesh is not installed."""
+    try:
+        import trimesh
+    except ImportError:
+        print("note: trimesh not installed — ambient occlusion not baked")
+        return
+    occluders = [p for p in parts if strength.get(p.material, 0) > 0 or p.material in ("skin", "hair", "coat", "scrubs")]
+    Vs, Fs, base = [], [], 0
+    for p in occluders:
+        Vs.append(p.pos)
+        Fs.append(p.faces + base)
+        base += len(p.pos)
+    mesh = trimesh.Trimesh(np.concatenate(Vs), np.concatenate(Fs), process=False)
+    caster = mesh.ray
+    r = np.random.default_rng(seed)
+    # cosine-weighted directions around +z, rotated to each normal
+    u1, u2 = r.random(rays), r.random(rays)
+    local = np.stack([np.sqrt(u1) * np.cos(2 * np.pi * u2), np.sqrt(u1) * np.sin(2 * np.pi * u2), np.sqrt(1 - u1)], -1)
+    for p in parts:
+        k = strength.get(p.material, 0)
+        if k <= 0 or p.name in skip:
+            continue
+        N = vertex_normals(p.pos, p.faces)
+        t1 = np.cross(N, np.array([0.0, 1.0, 0.0]))
+        bad = np.linalg.norm(t1, axis=1) < 1e-3
+        t1[bad] = np.cross(N[bad], np.array([1.0, 0.0, 0.0]))
+        t1 /= np.maximum(np.linalg.norm(t1, axis=1, keepdims=True), 1e-9)
+        t2 = np.cross(N, t1)
+        dirs = (local[None, :, 0:1] * t1[:, None] + local[None, :, 1:2] * t2[:, None] + local[None, :, 2:3] * N[:, None]).reshape(-1, 3)
+        origins = np.repeat(p.pos + N * 0.004, rays, axis=0)
+        locs, idx_ray, _ = caster.intersects_location(origins, dirs, multiple_hits=False)
+        dist = np.full(len(origins), np.inf)
+        if len(idx_ray):
+            dist[idx_ray] = np.linalg.norm(locs - origins[idx_ray], axis=1)
+        occ = np.clip(1 - dist / reach, 0, 1).reshape(len(p.pos), rays).mean(1)
+        ao = np.where(np.linalg.norm(N, axis=1) > 0.5, 1 - occ, 1.0)  # no normal: leave as is
+        f = (1 - k * (1 - ao))[:, None]
+        p.color = np.clip(np.concatenate([p.color[:, :3] * f, p.color[:, 3:]], 1), 0, 1)
+        print(f"ao {p.name}: mean {ao.mean():.2f}, min {ao.min():.2f}")
 
 
 def srgb_to_linear(c):
@@ -545,6 +596,10 @@ def main(cache: Path, out: Path) -> None:
         socket = np.exp(-(((V[:, 0] - ec[0]) / 0.22) ** 2 + ((V[:, 1] - ec[1] + 0.03) / 0.16) ** 2)) * (V[:, 2] > ec[2] - 0.2)
         C = C * (1 - socket[:, None] * 0.06) + hexrgb("#a07465") * socket[:, None] * 0.06
     C *= (1 + smooth_mask(rng.normal(0, 0.03, n), F_all["body"], 3)[:, None])
+    # Hands: the backs of the hands are a little deeper and warmer than the
+    # face (they read pale and "gloved" next to it otherwise).
+    hand_m = np.clip(-f_hands / 0.3, 0, 1)
+    C = C * (1 - hand_m[:, None] * 0.16) + hexrgb("#b9846a") * hand_m[:, None] * 0.16
     C = np.clip(C, 0, 1)
 
     parts = []
@@ -571,7 +626,7 @@ def main(cache: Path, out: Path) -> None:
             P = P + d * 0.6
         return P
 
-    def shell(group, offset, field, color, name, material, smooth=0):
+    def shell(group, offset, field, color, name, material, smooth=0, shade=None):
         F = F_all[group]
         u = np.unique(F)
         N = vertex_normals(V, F)
@@ -581,6 +636,8 @@ def main(cache: Path, out: Path) -> None:
             Pg = drape(Pg, F, N, smooth)
         Pc, Fc, nr = clip(Pg, F, field(Pg))
         col = np.tile(hexrgb(color), (len(Pc), 1)) * (1 + rng.normal(0, 0.01, (len(Pc), 1)))
+        if shade is not None:
+            col = col * shade(Pc)[:, None]
         parts.append(Part(name, material, Pc, Fc, nr, np.clip(col, 0, 1)))
 
     def torso_field(P, top):
@@ -643,7 +700,10 @@ def main(cache: Path, out: Path) -> None:
     hc = hc * (1 - pp[:, None] * 0.35) + hexrgb("#5a4234") * pp[:, None] * 0.35
     rh = P - head_c
     hair_uv = np.stack([np.arctan2(rh[:, 0], rh[:, 1]) / np.pi * 3.0, np.arctan2(rh[:, 2], rh[:, 1]) / np.pi * 1.5], -1)
-    parts.append(Part("hair", "hair", P, Fl, near, np.clip(hc, 0, 1), uv=hair_uv))
+    # alpha: 1 inside, fading over the last ~1.2 cm to the hairline
+    edge_d = np.clip(-f_hair[np.maximum(near, 0)] / 0.12, 0, 1)
+    h_alpha = np.where(near >= 0, 0.62 + 0.38 * edge_d, 1.0)
+    parts.append(Part("hair", "hair", P, Fl, near, np.concatenate([np.clip(hc, 0, 1), h_alpha[:, None]], 1), uv=hair_uv))
     # Soft hairline: skin just outside the hair edge takes a little of the
     # hair colour, so the edge is not a hard cut-out line.
     sk = parts[0]
@@ -669,6 +729,7 @@ def main(cache: Path, out: Path) -> None:
     bun_uv = np.stack([ph.reshape(-1) / np.pi * 2.0, th.reshape(-1) / np.pi * 1.0], -1)
     parts.append(Part("bun", "hair", bp, np.array(bf), -np.ones(len(bp), dtype=np.int64), np.clip(bcol, 0, 1), uv=bun_uv))
 
+
     # ---- mouth interior: a dark cavity behind the lips. Without it the head is
     # hollow and the background shows through the gap between the lips.
     lipv = np.where(lips > 0.3)[0]
@@ -686,9 +747,11 @@ def main(cache: Path, out: Path) -> None:
     parts.append(Part("mouth-cavity", "mouth", mb, np.array(mf), -np.ones(len(mb), dtype=np.int64), np.tile(hexrgb("#2e1416"), (len(mb), 1))))
 
     # ---- eyelashes, teeth, tongue (CC0 helper geometry)
-    for g, col, mat in (("helper-upper-teeth", "#ece6da", "teeth"), ("helper-lower-teeth", "#e8e1d4", "teeth"), ("helper-tongue", "#9c4a4a", "mouth")):
+    # Teeth an ivory, not paper white, and set back: at rest a white line
+    # between the lips looked uncanny. AO darkens them further inside the mouth.
+    for g, col, mat in (("helper-upper-teeth", "#dcd3c5", "teeth"), ("helper-lower-teeth", "#d6ccbd", "teeth"), ("helper-tongue", "#9c4a4a", "mouth")):
         u, Fl_ = compact(F_all[g])
-        P = V[u] - np.array([0, 0, 0.12])  # set back so closed lips hide them
+        P = V[u] - np.array([0, 0.01, 0.16])  # set back so closed lips hide them
         parts.append(Part(g, mat, P, Fl_, u, np.tile(hexrgb(col), (len(u), 1))))
 
     # ---- eyes: CC0 high-poly eye proxy, coloured by angle from the eye's forward axis
@@ -729,6 +792,9 @@ def main(cache: Path, out: Path) -> None:
                 cf += [[a, c2, dd], [a, b, c2]]
         parts.append(Part(f"cornea.{side}", "cornea", cp, np.array(cf), -np.ones(len(cp), dtype=np.int64), np.ones((len(cp), 3))))
 
+    # ---- ambient occlusion (rest pose), strength per material
+    bake_ao(parts, {"skin": 0.6, "hair": 0.55, "coat": 0.55, "scrubs": 0.5, "teeth": 0.85, "mouth": 0.4})
+
     # ---- skeleton
     bones = skel["bones"]
     exported = [b for b in EXPORT_BONES if b in bones]
@@ -765,7 +831,7 @@ MATERIALS = {
     "skin": {"color": [1, 1, 1, 1], "rough": 0.62, "metal": 0.0},
     "scrubs": {"color": [1, 1, 1, 1], "rough": 0.9, "metal": 0.0},
     "coat": {"color": [1, 1, 1, 1], "rough": 0.88, "metal": 0.0},
-    "hair": {"color": [1, 1, 1, 1], "rough": 0.72, "metal": 0.0},
+    "hair": {"color": [1, 1, 1, 1], "rough": 0.72, "metal": 0.0, "mask": True},
     "lashes": {"color": [1, 1, 1, 1], "rough": 0.8, "metal": 0.0, "double": True},
     "teeth": {"color": [1, 1, 1, 1], "rough": 0.35, "metal": 0.0},
     "mouth": {"color": [1, 1, 1, 1], "rough": 0.6, "metal": 0.0},
@@ -783,7 +849,7 @@ def write(parts, bone_names, parents, heads, morph_full, out: Path, ground: floa
     for p in parts:
         k = len(p.pos)
         pos.append(p.pos)
-        col.append(p.color)
+        col.append(p.color if p.color.shape[1] == 4 else np.concatenate([p.color, np.ones((k, 1))], 1))
         jnt.append(p.joints)
         wgt.append(p.weights)
         src.append(p.src)
@@ -803,7 +869,7 @@ def write(parts, bone_names, parents, heads, morph_full, out: Path, ground: floa
 
     a_pos = g.accessor(P, "VEC3", 5126, 34962, minmax=True)
     a_nrm = g.accessor(Nn, "VEC3", 5126, 34962)
-    a_col = g.accessor(np.clip(np.round(np.concatenate([srgb_to_linear(Cc), np.ones((len(Cc), 1))], 1) * 255), 0, 255), "VEC4", 5121, 34962, normalized=True)
+    a_col = g.accessor(np.clip(np.round(np.concatenate([srgb_to_linear(Cc[:, :3]), Cc[:, 3:4]], 1) * 255), 0, 255), "VEC4", 5121, 34962, normalized=True)
     a_jnt = g.accessor(Jj, "VEC4", 5121 if len(bone_names) < 256 else 5123, 34962)
     a_wgt = g.accessor(Ww, "VEC4", 5126, 34962)
     a_uv = g.accessor(np.concatenate(uvs), "VEC2", 5126, 34962)
@@ -826,6 +892,9 @@ def write(parts, bone_names, parents, heads, morph_full, out: Path, ground: floa
         mat = {"name": mname, "pbrMetallicRoughness": pbr, "doubleSided": bool(m.get("double"))}
         if m.get("blend"):
             mat["alphaMode"] = "BLEND"
+        if m.get("mask"):
+            mat["alphaMode"] = "MASK"
+            mat["alphaCutoff"] = 0.5
         materials.append(mat)
         F = np.concatenate(flist)
         idx = g.accessor(F.reshape(-1), "SCALAR", 5125 if base > 65535 else 5123, 34963)

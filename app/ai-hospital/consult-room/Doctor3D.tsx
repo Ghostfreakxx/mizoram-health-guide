@@ -162,8 +162,11 @@ export default function Doctor3D(props: StageProps) {
       frameloop={props.paused ? "never" : "always"}
       gl={{ antialias: !low, powerPreference: high ? "high-performance" : "low-power" }}
       onCreated={({ gl }) => {
-        gl.toneMapping = THREE.ACESFilmicToneMapping;
-        gl.toneMappingExposure = 1.0;
+        // Neutral tone mapping keeps skin tones and the room's colours true;
+        // ACES desaturated the skin and made the hands look paler than the
+        // face (compared side by side in the room, VD4).
+        gl.toneMapping = THREE.NeutralToneMapping;
+        gl.toneMappingExposure = 0.95;
         gl.domElement.addEventListener("webglcontextlost", (e) => {
           e.preventDefault();
           if (alive.current) onLost.current(new Error("WebGL context lost"));

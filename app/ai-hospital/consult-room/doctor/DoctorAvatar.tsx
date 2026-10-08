@@ -165,11 +165,16 @@ function makeMaterial(name: string, old: THREE.MeshStandardMaterial, detail: boo
       // angles and reads as a pale "cap" rim around the forehead.
       // Black hair shows its shape through a soft, broad highlight (without it
       // the head reads as a dark cap). Strand texture breaks the surface up.
+      // The strand texture carries alpha and the hairline fades the vertex
+      // alpha: only the edge is cut into fine strands (alphaTest). No
+      // alpha-to-coverage: it made the whole crown partly see-through, so
+      // the scalp showed as silver specks.
       return new THREE.MeshPhysicalMaterial({
         vertexColors: true,
         map: old.map,
-        roughness: 0.42,
-        specularIntensity: 0.55,
+        alphaTest: 0.5,
+        roughness: 0.5,
+        specularIntensity: 0.4,
         specularColor: new THREE.Color("#d9c7b8"),
         sheen: 0.55,
         sheenColor: new THREE.Color("#6e5a4c"),

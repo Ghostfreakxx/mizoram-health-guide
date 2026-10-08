@@ -25,8 +25,9 @@ export const EXPRESSIONS: Record<Expression, Face> = {
   listening: { ...ZERO, mouthSmile: 0.1, browInnerUp: 0.16, eyeWide: 0.24 },
   thinking: { ...ZERO, browDown: 0.12, mouthPress: 0.12, eyeSquint: 0.1, eyeWide: 0.08 },
   reassuring: { ...ZERO, mouthSmile: 0.2, browInnerUp: 0.14, eyeSquint: 0.08, eyeWide: 0.14 },
-  concerned: { ...ZERO, browInnerUp: 0.34, browDown: 0.12, mouthPress: 0.1, eyeWide: 0.2 },
-  urgent: { ...ZERO, browInnerUp: 0.3, browDown: 0.28, mouthPress: 0.18, eyeWide: 0.26 },
+  concerned: { ...ZERO, browInnerUp: 0.34, browDown: 0.12, mouthPress: 0.1, mouthFrown: 0.06, eyeWide: 0.2 },
+  // The resting mouth turns up a little; a touch of frown makes it level (no hint of a smile in an emergency).
+  urgent: { ...ZERO, browInnerUp: 0.3, browDown: 0.28, mouthPress: 0.18, mouthFrown: 0.12, eyeWide: 0.26 },
   // Patient and helpful: a slight, kind lift of the brows; a small smile.
   helpful: { ...ZERO, mouthSmile: 0.14, browInnerUp: 0.22, eyeSquint: 0.05, eyeWide: 0.18 },
 };
