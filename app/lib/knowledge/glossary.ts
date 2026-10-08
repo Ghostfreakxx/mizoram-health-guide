@@ -39,7 +39,7 @@ export const GLOSSARY: Term[] = [
   t("faint", "fainting", /\bfaint\w*\b/i, "suddenly passing out for a short time", true),
   t("confusion", "confusion", /\bconfus\w*\b/i, "not thinking clearly, not knowing where they are, or not making sense", true),
   t("floppy", "floppy", /\bfloppy\b/i, "the body is weak and loose, like a rag doll", true),
-  t("seizure", "fits (seizures)", /\b(fits|seizures?|convulsions?)\b/i, "sudden shaking of the body that cannot be controlled, or suddenly going stiff and not responding", true),
+  t("seizure", "fits (seizures)", /\b(fits(?! (best|you|me|well|the))|seizures?|convulsions?)\b/i, "sudden shaking of the body that cannot be controlled, or suddenly going stiff and not responding", true),
   t("numb", "numbness", /\bnumb\w*\b/i, "loss of feeling, like pins and needles", true),
   t("weak", "weakness", /\bweak(ness)?\b/i, "less strength than normal"),
   t("swelling", "swelling", /\b(swollen|swelling)\b/i, "puffed up, bigger than normal"),

@@ -2,7 +2,7 @@
 
 import dynamic from "next/dynamic";
 import { Component, type ReactNode, useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
-import { type ConsultState, type Turn, BODY_AREAS, chartOf, converse, explainLine, nextTurn, reopen, respond, startConsultation, startHelpDescribe, toAnswers, whyLine } from "../../lib/consultation";
+import { type Chart, type ConsultState, type Turn, BODY_AREAS, chartOf, converse, explainLine, nextTurn, reopen, respond, startConsultation, startHelpDescribe, toAnswers, whyLine } from "../../lib/consultation";
 import { termsIn } from "../../lib/knowledge/glossary";
 import type { EducationAnswer } from "../../lib/education";
 import { hasConsent, loadPassport } from "../../lib/storage";
@@ -149,6 +149,7 @@ function summaryExtra(s: ConsultState): SummaryExtra {
   const notes = [
     ...Object.entries(s.unknown).map(([k, v]) => `${UNKNOWN_LABEL[k] ?? k}: ${v.toLowerCase()}`),
     ...s.corrections.map((c) => `Corrected by the patient: ${c}`),
+    ...(s.symptoms.length ? [`Symptoms the patient mentioned (in their words): ${s.symptoms.join(", ")}`] : []),
     ...(s.otherConcerns.length ? [`Also mentioned (not assessed in this consultation — please ask): ${s.otherConcerns.join("; ")}`] : []),
     ...(s.temperature && s.complaint !== "fever" ? [`Temperature measured by the patient: ${s.temperature}`] : []),
     ...(s.style.distressed && (!s.medicinesDone || !s.allergiesDone || !s.conditionsDone)
@@ -240,6 +241,8 @@ export default function ConsultationRoom({ room, department }: { room: RoomStyle
   const viewW = useViewWidth();
   const viewH = useViewHeight();
   const [visitOpen, setVisitOpen] = useState(true); // My Visit panel (desktop)
+  const [confirmRestart, setConfirmRestart] = useState(false);
+  const historyRef = useRef<HTMLOListElement>(null);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [seenNotices, setSeenNotices] = useState<string[]>([]); // notices already shown for a few seconds
   const [bodyDismissed, setBodyDismissed] = useState(false); // phones: "say it in words instead"
@@ -305,6 +308,30 @@ export default function ConsultationRoom({ room, department }: { room: RoomStyle
       t.forEach(clearTimeout);
       s.forEach(clearTimeout);
     };
+  }, []);
+
+  // Text only: the newest line of the conversation is always in view.
+  useEffect(() => {
+    const el = historyRef.current;
+    if (el) el.scrollTop = el.scrollHeight;
+  }, [log.length]);
+
+  // The room never scrolls as a whole. "overflow: clip" prevents it in
+  // current browsers; older ones can still scroll a hidden-overflow box when
+  // a text box takes focus, which pushed the top bar (with Emergency) off
+  // the screen. Any such scroll is undone at once.
+  useEffect(() => {
+    const el = topRef.current;
+    if (!el) return;
+    const onScroll = (e: Event) => {
+      const t = e.target;
+      if (t instanceof HTMLElement && t.dataset.pin !== undefined && (t.scrollTop || t.scrollLeft)) {
+        t.scrollTop = 0;
+        t.scrollLeft = 0;
+      }
+    };
+    el.addEventListener("scroll", onScroll, true);
+    return () => el.removeEventListener("scroll", onScroll, true);
   }, []);
 
   // Phones: when the on-screen keyboard opens, the doctor area shrinks, the
@@ -638,7 +665,10 @@ export default function ConsultationRoom({ room, department }: { room: RoomStyle
     if (o.kind === "education") setEducation(o.answer);
     if ("state" in o) replaceState(o.state);
     const plan = planReply(o, turn, "state" in o ? nextTurn(o.state) : turn);
-    reply(plan.lines, o.kind === "education" ? "" : o.line);
+    // The question is already the heading: the note shows only what is new.
+    const q = turn.question ?? turn.say;
+    const shown = o.kind === "education" ? "" : o.line.endsWith(q) && o.line.length > q.length ? o.line.slice(0, -q.length).trim() : o.line;
+    reply(plan.lines, shown);
   };
 
   // Words typed at Reception are sent as the first answer, once, after the greeting.
@@ -1034,9 +1064,10 @@ export default function ConsultationRoom({ room, department }: { room: RoomStyle
     sex: state.sex === "unspecified" ? undefined : state.sex,
     specialAsked: state.specialDone,
     concernText: state.concernText,
-    medicines: state.medicines,
-    allergies: state.allergies,
-    conditions: state.conditions,
+    // Merged with what the patient mentioned along the way (My Visit rows).
+    medicines: chartValue(chart, "Current medicines"),
+    allergies: chartValue(chart, "Known allergies"),
+    conditions: chartValue(chart, "Existing conditions")?.replace(/;?\s*Weak immune system$/, "") || undefined,
     location: (() => {
       const where = chart.reported.find((r) => r.label === "Where");
       return where?.provided ? where.value : BODY_AREAS.find((b) => b.id === state.bodyArea)?.label;
@@ -1090,7 +1121,9 @@ export default function ConsultationRoom({ room, department }: { room: RoomStyle
               : ["medicines", "allergies", "conditions"].includes(turn.step)
                 ? "Health details"
                 : "Questions";
-  const statusText = listening ? "Listening to you…" : speaking ? "Speaking" : doc === "processing" ? "Thinking…" : started && canAnswer ? "Your turn" : STATE_LABEL[doc];
+  // "Speaking" only when a voice is actually heard; with no voice the words
+  // are written, so the label says so.
+  const statusText = listening ? "Listening to you…" : speaking ? (voiceIssue || !voiceOn ? "Writing" : "Speaking") : doc === "processing" ? "Thinking…" : started && canAnswer ? "Your turn" : STATE_LABEL[doc];
   const statusDot = listening ? "bg-red-500 motion-safe:animate-pulse" : speaking ? "bg-sky-400" : doc === "processing" ? "bg-amber-400" : "bg-emerald-400";
 
   // What the doctor shows: a tool beside her, or answers under her question.
@@ -1107,7 +1140,7 @@ export default function ConsultationRoom({ room, department }: { room: RoomStyle
             : extraEntryKind(turn, saved)
                 ? "entry"
                 : null;
-  const toolTitle = toolKind === "body" ? "Show me where" : toolKind === "multi" ? "Is any of these happening now?" : toolKind === "list" ? "Choose the closest" : turn.entry === "pain" ? "How strong is it?" : turn.entry === "temperature" ? "Your measured temperature" : "From your Health Passport";
+  const toolTitle = toolKind === "body" ? "Show me where" : toolKind === "multi" ? "Tap all that apply" : toolKind === "list" ? (turn.step === "check" ? "Happening right now?" : "Choose the closest") : turn.entry === "pain" ? "How strong is it?" : turn.entry === "temperature" ? "Your measured temperature" : "From your Health Passport";
 
   // ---- Layout measurements (desktop): the camera frames the doctor in the
   // free space between the panels.
@@ -1245,6 +1278,27 @@ export default function ConsultationRoom({ room, department }: { room: RoomStyle
         <Toggle on={reducedMotion} onClick={() => setReducedMotion((v) => !v)}>Reduce motion</Toggle>
       </div>
       {displaySelect}
+      {started && history.length > 2 && !done && !emergency && (
+        <div className="border-t border-slate-200 pt-3">
+          {confirmRestart ? (
+            <div className="space-y-2" role="group" aria-label="Start again?">
+              <p className="font-semibold text-slate-900">Start again? Everything you told me in this visit will be cleared.</p>
+              <div className="flex gap-2">
+                <button type="button" onClick={() => { setConfirmRestart(false); setSettingsOpen(false); restart(); }} className="min-h-10 rounded-xl bg-slate-900 px-4 font-semibold text-white">
+                  Yes, start again
+                </button>
+                <button type="button" onClick={() => setConfirmRestart(false)} className="min-h-10 rounded-xl border border-slate-300 px-4 font-semibold text-slate-800">
+                  Keep my answers
+                </button>
+              </div>
+            </div>
+          ) : (
+            <button type="button" onClick={() => setConfirmRestart(true)} className="min-h-10 rounded-xl px-2 font-semibold text-slate-700 hover:bg-slate-100">
+              ↺ Start the consultation again…
+            </button>
+          )}
+        </div>
+      )}
       {privacy}
     </div>
   ) : null;
@@ -1264,7 +1318,7 @@ export default function ConsultationRoom({ room, department }: { room: RoomStyle
           {failed3d}
         </p>
       )}
-      {voiceIssue && voiceOn && noticeOn("voice") && (
+      {voiceIssue && voiceOn && tier !== "none" && noticeOn("voice") && (
         <p role="status" className="rounded-full bg-white/95 px-4 py-1.5 text-sm font-semibold text-slate-800 shadow ring-1 ring-slate-900/10">
           Voice is off on this device — the doctor&apos;s words are written here.
         </p>
@@ -1329,6 +1383,29 @@ export default function ConsultationRoom({ room, department }: { room: RoomStyle
   const toolBody =
     toolKind === "body" && inp.kind === "body" ? (
       <BodyMap options={inp.options} onPick={(id) => answer(id)} />
+    ) : toolKind === "list" && inp.kind === "single" && turn.step === "check" ? (
+      // The safety check: every danger sign stays visible (compact, two
+      // columns where there is room); "None of these" stays in reach.
+      <div className="space-y-3">
+        <div className="grid gap-1.5 sm:grid-cols-2" role="group" aria-label="Answers">
+          {inp.options
+            .filter((o) => o.id !== "none")
+            .map((o) => (
+              <button
+                key={o.id}
+                type="button"
+                onClick={() => answer(o.id)}
+                className="flex min-h-11 items-start gap-2 rounded-xl border border-red-200 bg-white px-3 py-2 text-left text-[15px] font-semibold leading-snug text-red-950 hover:border-red-400 hover:bg-red-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-red-700"
+              >
+                <span aria-hidden className="mt-0.5 text-red-700">⚠</span>
+                <span>{o.label}</span>
+              </button>
+            ))}
+        </div>
+        <button type="button" onClick={() => answer("none")} className="sticky bottom-0 w-full rounded-2xl bg-blue-900 px-6 py-3 text-lg font-bold text-white shadow-lg hover:bg-blue-800">
+          None of these — continue
+        </button>
+      </div>
     ) : toolKind === "list" && inp.kind === "single" ? (
       <div className="grid gap-2" role="group" aria-label="Answers">
         {inp.options.map((o) => (
@@ -1523,11 +1600,6 @@ export default function ConsultationRoom({ room, department }: { room: RoomStyle
       {!wide && educationCard}
       {!wide && toolKind && toolKind !== "body" && tool}
       {helpers}
-      {started && history.length > 2 && !done && (
-        <button type="button" onClick={restart} className={`${helpChip} text-slate-600`}>
-          ↺ Start again
-        </button>
-      )}
       {inputRow}
     </>
   );
@@ -1609,19 +1681,20 @@ export default function ConsultationRoom({ room, department }: { room: RoomStyle
     <div
       ref={topRef}
       data-layout={wide ? "wide" : "narrow"}
-      className={`fixed inset-x-0 top-0 z-40 flex flex-col overflow-hidden bg-[#e8ecef] text-slate-900 ${bigText ? "text-lg" : ""}`}
+      data-pin=""
+      className={`fixed inset-x-0 top-0 z-40 flex flex-col overflow-clip bg-[#e8ecef] text-slate-900 ${bigText ? "text-lg" : ""}`}
       style={{ height: shellH ? `${shellH}px` : "100dvh", transform: shellTop ? `translateY(${shellTop}px)` : undefined }}
     >
       {topBar}
       {settings}
-      <div className={`relative min-h-0 flex-1 ${wide ? "" : "flex flex-col"}`}>
-        <div className={wide ? "absolute inset-0" : "relative shrink-0 overflow-hidden transition-[height] duration-300"} style={stageHeight !== undefined ? { height: stageHeight } : undefined}>
+      <div data-pin="" className={`relative min-h-0 flex-1 overflow-clip ${wide ? "" : "flex flex-col"}`}>
+        <div data-pin="" className={wide ? "absolute inset-0" : "relative shrink-0 overflow-clip transition-[height] duration-300"} style={stageHeight !== undefined ? { height: stageHeight } : undefined}>
           {stage}
         </div>
 
         {wide ? (
           <>
-            {!emergency && <div className="pointer-events-none absolute inset-x-0 top-[68px] z-30 flex flex-col items-center gap-2 px-4">{notices}</div>}
+            {!emergency && tier !== "none" && <div className="pointer-events-none absolute inset-x-0 top-[68px] z-30 flex flex-col items-center gap-2 px-4">{notices}</div>}
             {(toolShown || demoMode || reviewMode || debugMode || (education && !emergency)) && (
               <div className={`${glass} absolute bottom-6 left-6 top-[72px] z-20 w-[400px] space-y-4 overflow-y-auto p-5`}>
                 {devPanels}
@@ -1631,7 +1704,10 @@ export default function ConsultationRoom({ room, department }: { room: RoomStyle
             )}
             <div className={`${glass} absolute right-6 top-[72px] z-20 max-h-[calc(100%-96px)] w-[320px] overflow-y-auto p-5 ${visitShown ? "" : "hidden"}`}>{visitPanel}</div>
             {sidePanel && (
-              <div className={`${glass} absolute bottom-6 right-6 top-[72px] z-20 overflow-y-auto p-5`} style={{ width: Math.min(640, Math.round(viewW * 0.46)) }}>
+              <div
+                className={`${glass} absolute bottom-6 top-[72px] z-20 overflow-y-auto p-5 ${tier === "none" ? "left-1/2 -translate-x-1/2" : "right-6"}`}
+                style={{ width: tier === "none" ? Math.min(760, viewW - 48) : Math.min(640, Math.round(viewW * 0.46)) }}
+              >
                 {emergencyPanel}
                 {summaryPanel}
               </div>
@@ -1645,8 +1721,9 @@ export default function ConsultationRoom({ room, department }: { room: RoomStyle
                 style={{ paddingLeft: frame.l ? frame.l + 8 : 24, paddingRight: frame.r ? frame.r + 8 : 24 }}
               >
                 {/* Text only: the conversation itself fills the space the picture would. */}
+                {tier === "none" && !emergency && <div className="pointer-events-auto flex w-full max-w-[760px] flex-col items-center gap-2">{notices}</div>}
                 {tier === "none" && log.length > 1 && (
-                  <ol aria-label="Conversation so far" className="pointer-events-auto flex min-h-0 w-full max-w-[760px] flex-col gap-2 overflow-y-auto px-1">
+                  <ol ref={historyRef} aria-label="Conversation so far" className="pointer-events-auto flex min-h-0 w-full max-w-[760px] flex-col gap-2 overflow-y-auto px-1">
                     {log.slice(0, -1).slice(-14).map((l, i) => (
                       <li key={i} className={`max-w-[85%] rounded-2xl px-4 py-2.5 text-[15px] leading-relaxed ${l.who === "guide" ? "self-start bg-white text-slate-800 shadow-sm ring-1 ring-slate-900/5" : "self-end bg-blue-900 text-white"}`}>
                         <span className="sr-only">{l.who === "guide" ? "Guide: " : "You: "}</span>
@@ -1711,6 +1788,11 @@ export default function ConsultationRoom({ room, department }: { room: RoomStyle
       {!begun && tier === "none" && wide && null}
     </div>
   );
+}
+
+function chartValue(chart: Chart, label: string) {
+  const r = chart.reported.find((x) => x.label === label);
+  return r?.provided ? r.value : undefined;
 }
 
 function extraEntryKind(turn: Turn, saved: { medicines?: string; allergies?: string; conditions?: string }) {

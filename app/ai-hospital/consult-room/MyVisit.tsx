@@ -9,7 +9,7 @@ import type { Chart, ChartRow } from "../../lib/consultation";
 const GROUPS: { title: string; labels: string[] }[] = [
   { title: "Today's concern", labels: ["Main concern", "Main problem", "For", "Age group", "Pregnancy status"] },
   { title: "About it", labels: ["Where", "How it feels", "Pain", "Pattern", "Better or worse with", "Duration", "Change", "How bad", "Temperature", "Fever"] },
-  { title: "Other things you told me", labels: ["Symptoms reported", "Not sure about", "Other problems mentioned (not assessed)"] },
+  { title: "Other things you told me", labels: ["Symptoms mentioned", "Symptoms reported", "Not sure about", "Other problems mentioned (not assessed)"] },
   { title: "Things you don't have", labels: ["Relevant negatives"] },
   { title: "Medicines and health", labels: ["Current medicines", "Known allergies", "Existing conditions"] },
 ];
@@ -21,6 +21,7 @@ const SHORT: Record<string, string> = {
   "Change": "Since then",
   "How bad": "How bad",
   "Symptoms reported": "You have",
+  "Symptoms mentioned": "You mentioned",
   "Relevant negatives": "You don't have",
   "Not sure about": "Not sure about",
   "Other problems mentioned (not assessed)": "Also mentioned",

@@ -275,6 +275,10 @@ for (const mode of ["visual viewport (current browsers)", "whole window (older A
   });
 }
 
+test.describe("3D download failure", () => {
+  // The offline service worker fetches the model itself, past page.route —
+  // blocked here so the simulated network failure reaches every request.
+  test.use({ serviceWorkers: "block" });
 test("the 3D doctor can't download mid-visit: the simple picture takes over and nothing is lost", async ({ page }) => {
   // test double: the network drops every request for the 3D models
   await page.route("**/models/**", (r) => r.abort("failed"));
@@ -288,6 +292,7 @@ test("the 3D doctor can't download mid-visit: the simple picture takes over and 
   await expect(chart(page)).toContainText("I've been coughing for three weeks");
   await expect(chart(page)).toContainText("18 to 59 years");
   expect(errors).toEqual([]);
+});
 });
 
 test("'sorry, I meant no' changes the last answer, says so, and does not answer the next question", async ({ page }) => {

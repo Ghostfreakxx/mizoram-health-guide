@@ -83,3 +83,26 @@ test("text only: the conversation is the whole screen, nothing overlaps", async 
   expect(inView(await page.locator("#consult-question").boundingBox(), s)).toBe(true);
   expect(inView(await page.getByRole("button", { name: "Send" }).boundingBox(), s)).toBe(true);
 });
+
+test("typing never scrolls the room: the top bar with Emergency stays on screen", async ({ page }, info) => {
+  const s = SIZES[info.project.name][0];
+  await page.setViewportSize({ width: s.width, height: s.height });
+  await page.goto(ROOM);
+  await page.getByRole("button", { name: "Begin consultation" }).click();
+  const box = page.getByRole("textbox", { name: /Your answer|Or answer in your own words/ }).first();
+  // Typed answers, then the safety check's sticky "None of these" button:
+  // tapping a button inside a scrolled list made the browser scroll the
+  // whole room (top bar off screen) before the fix.
+  for (const words of ["I don't really know. Something hurts around here.", "my lower tummy", "left", "it comes and goes, worse after food", "today", "@none"]) {
+    if (words === "@none") await page.getByRole("button", { name: "None of these — continue" }).click();
+    else {
+      await box.click();
+      await box.fill(words);
+      await page.getByRole("button", { name: "Send" }).first().click();
+    }
+    await page.waitForTimeout(400);
+    const pinned = await page.evaluate(() => [...document.querySelectorAll<HTMLElement>("[data-pin]")].every((e) => e.scrollTop === 0));
+    expect(pinned, `after "${words}": the room has not scrolled`).toBe(true);
+    expect(inView(await page.getByRole("link", { name: /Emergency|108/ }).first().boundingBox(), s), `after "${words}": Emergency on screen`).toBe(true);
+  }
+});

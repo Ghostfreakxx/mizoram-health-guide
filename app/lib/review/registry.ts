@@ -20,6 +20,7 @@ import { PASSAGES } from "../knowledge";
 import { allEducation } from "../education";
 import { getSource } from "../sources";
 import { EXPLAIN_LINES, WHY_LINES, WHY_SAFETY } from "../consultation";
+import { MENTIONS, SPOKEN, spokenFor } from "../consultSpeech";
 import { BOUNDARY_ANSWERS, EMERGENCY_SPOKEN, FAILSAFE_MESSAGE, KNOWLEDGE_LIMIT, LEVEL_TEXT, PROFESSIONAL_REQUEST, SAFETY_NET } from "../safety/language";
 import { redFlags } from "../safety/redFlags";
 import { AGE_GROUPS, POLICY_RULES, type Context, complaints, populationQuestions } from "../safety/triage";
@@ -56,6 +57,18 @@ export type SignOff = { itemId: string; role: string; date: string; decision: "a
 
 // Real sign-offs only. Empty until a qualified reviewer has checked an item.
 export const SIGN_OFFS: SignOff[] = [];
+
+// How the virtual guide says the question aloud (lib/consultSpeech.ts) —
+// reviewed together with the written rule, because a "yes" to either must
+// mean the same thing.
+function spokenText(id: string): string {
+  const s = SPOKEN[id];
+  if (!s) return " Said aloud as written.";
+  const self = spokenFor(s, false);
+  const other = spokenFor(s, true);
+  const m = MENTIONS[id];
+  return ` Said aloud: "${self}"${other !== self ? ` (about someone else: "${other}")` : ""}.${m ? ` If the patient already mentioned it: "${m.lead} ${spokenFor(m.ask, false)}"` : ""}`;
+}
 
 const LEVEL_WORDS: Record<string, string> = {
   RED: "Emergency",
@@ -126,10 +139,10 @@ export function reviewRegistry(): ReviewItem[] {
           id: `TQ-${q.id}`,
           kind: "triage-question",
           title: `${c.label}: "${q.text}"`,
-          rule: `Yes → ${effectText(q.yes)}. Not sure → ${effectText(unsure)}. No → no change.${q.showIf ? " Asked only for some patients (see code)." : ""} Summary wording: "${q.positive}" / "${q.negative}".`,
+          rule: `Yes → ${effectText(q.yes)}. Not sure → ${effectText(unsure)}. No → no change.${q.showIf ? " Asked only for some patients (see code)." : ""} Summary wording: "${q.positive}" / "${q.negative}".${spokenText(q.id)}`,
           sourceIds: q.sourceIds,
           reviewer: "clinician",
-          definedIn: "app/lib/safety/triage.ts",
+          definedIn: "app/lib/safety/triage.ts; spoken: app/lib/consultSpeech.ts",
         }),
       );
     }
@@ -168,10 +181,10 @@ export function reviewRegistry(): ReviewItem[] {
         id: `TQ-${q.id}`,
         kind: "triage-question",
         title: `Danger sign (${asked}): "${q.text}"`,
-        rule: `Asked for: ${asked}, before the problem's own questions. Yes → ${effectText(q.yes)}. Not sure → ${effectText(unsure)}. No → no change. Summary wording: "${q.positive}" / "${q.negative}".`,
+        rule: `Asked for: ${asked}, before the problem's own questions. Yes → ${effectText(q.yes)}. Not sure → ${effectText(unsure)}. No → no change. Summary wording: "${q.positive}" / "${q.negative}".${spokenText(q.id)}`,
         sourceIds: q.sourceIds,
         reviewer: "clinician",
-        definedIn: "app/lib/safety/triage.ts (populationQuestions)",
+        definedIn: "app/lib/safety/triage.ts (populationQuestions); spoken: app/lib/consultSpeech.ts",
       }),
     );
   }
