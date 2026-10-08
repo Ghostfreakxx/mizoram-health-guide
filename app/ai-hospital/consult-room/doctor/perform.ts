@@ -29,7 +29,7 @@ export function performAt(t: number, state: DoctorState, since: number, opts: Pe
   const m = opts.reducedMotion ? 0 : 1;
   const dt = Math.max(0, t - since);
   const gaze = gazeAt(t, perf.gaze, since, opts);
-  const reviewing = gaze.target === "chart" && (state === "processing" || state === "handoff" || state === "initializing" || state === "acknowledging");
+  const reviewing = gaze.target === "chart" && (state === "processing" || state === "summarizing" || state === "initializing" || state === "acknowledging");
   const body = bodyAt(t, perf, { ...opts, reviewing, sinceState: dt, state });
 
   // Blinks: natural rhythm, plus one with larger gaze shifts, plus sometimes

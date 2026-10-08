@@ -2,6 +2,7 @@
 
 import dynamic from "next/dynamic";
 import { Component, type ReactNode, useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
+import { isApproved } from "../../lib/review/signoffs";
 import { type Chart, type ConsultState, type Turn, BODY_AREAS, chartOf, converse, explainLine, nextTurn, reopen, respond, startConsultation, startHelpDescribe, toAnswers, whyLine } from "../../lib/consultation";
 import { termsIn } from "../../lib/knowledge/glossary";
 import type { EducationAnswer } from "../../lib/education";
@@ -1039,11 +1040,12 @@ export default function ConsultationRoom({ room, department }: { room: RoomStyle
         <p key={t} className="text-slate-900">{t}</p>
       ))}
       <p className="text-sm text-slate-700">
-        From the reviewed page{" "}
+        From the health library page{" "}
         <a href={education.topic.href} className="font-semibold text-teal-900 underline" target="_blank" rel="noreferrer">
           {education.topic.title}
         </a>{" "}
-        · Sources: {education.sources.join("; ")}
+        · Sources: {education.sources.join("; ")} ·{" "}
+        <span className="font-semibold">{isApproved(`ED-${education.id}`) ? "Clinically reviewed" : "Awaiting clinical review"}</span>
       </p>
       <button type="button" onClick={() => setEducation(null)} className="min-h-11 rounded-lg border-2 border-teal-700 bg-white px-4 font-semibold text-teal-900">
         Back to my consultation
@@ -1636,7 +1638,8 @@ export default function ConsultationRoom({ room, department }: { room: RoomStyle
     done && inp.kind === "result" ? (
       <div className="space-y-5">
         <p className="rounded-2xl bg-slate-900 px-5 py-4 text-[17px] leading-relaxed text-white">{subtitleText || turn.say}</p>
-        <HandoffPanel level={inp.level} />
+        {/* How urgent and where to go come first; then the summary to check;
+            then the general next steps. */}
         <section aria-labelledby="visit-summary" className="space-y-3">
           <h2 id="visit-summary" className="text-2xl font-bold text-blue-950">
             📋 Patient-prepared visit summary
@@ -1649,6 +1652,7 @@ export default function ConsultationRoom({ room, department }: { room: RoomStyle
             onEmergency={(flags) => setHistory((h) => [...h, { ...state, emergency: { flags, clear: { kind: "text" } } }])}
           />
         </section>
+        <HandoffPanel level={inp.level} />
         <div className="no-print rounded-2xl border border-slate-200 bg-white p-4">
           <p className="text-slate-700">
             {state.otherConcerns.length ? `You also mentioned ${state.otherConcerns.join(" and ")}. ` : ""}Another problem, or for someone else? Your summary stays in My Visit until you close this tab.

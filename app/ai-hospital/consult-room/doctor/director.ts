@@ -38,7 +38,7 @@ export function planTurn(turn: Turn, ctx: { first: boolean; lastSaid: string; re
   }
   if (turn.input.kind === "result") {
     const lines: Spoken[] = [{ text: turn.say, state: resultState(turn.input.level) }];
-    if (turn.then) lines.push({ text: turn.then, state: "handoff" });
+    if (turn.then) lines.push({ text: turn.then, state: "summarizing" });
     return { lines, after: "complete", delayMs: thinkMs(ctx.lastSaid), before: "processing", interrupt: false };
   }
   if (turn.step === "concern" && ctx.first) {

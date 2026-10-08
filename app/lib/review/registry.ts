@@ -24,6 +24,7 @@ import { MENTIONS, SPOKEN, spokenFor } from "../consultSpeech";
 import { BOUNDARY_ANSWERS, EMERGENCY_SPOKEN, FAILSAFE_MESSAGE, KNOWLEDGE_LIMIT, LEVEL_TEXT, PROFESSIONAL_REQUEST, SAFETY_NET } from "../safety/language";
 import { redFlags } from "../safety/redFlags";
 import { AGE_GROUPS, POLICY_RULES, type Context, complaints, populationQuestions } from "../safety/triage";
+import { SIGN_OFFS, type SignOff } from "./signoffs";
 
 export type ReviewStatus = "verified" | "needs-clinician-review" | "needs-government-verification" | "deprecated";
 
@@ -53,10 +54,8 @@ export type ReviewItem = {
   signOff?: SignOff;
 };
 
-export type SignOff = { itemId: string; role: string; date: string; decision: "approved" | "changes-needed" | "deprecated"; note?: string };
-
-// Real sign-offs only. Empty until a qualified reviewer has checked an item.
-export const SIGN_OFFS: SignOff[] = [];
+// Real sign-offs only (signoffs.ts). Empty until a qualified reviewer has checked an item.
+export { SIGN_OFFS, type SignOff };
 
 // How the virtual guide says the question aloud (lib/consultSpeech.ts) —
 // reviewed together with the written rule, because a "yes" to either must

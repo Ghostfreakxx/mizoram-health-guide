@@ -54,7 +54,7 @@ describe("the director", () => {
     }
     const p = planTurn(nextTurn(s), ctx);
     expect(p.lines[0].state).toBe("reassuring");
-    expect(p.lines.at(-1)?.state).toBe("handoff");
+    expect(p.lines.at(-1)?.state).toBe("summarizing");
     expect(p.after).toBe("complete");
   });
 

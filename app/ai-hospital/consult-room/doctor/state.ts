@@ -15,7 +15,7 @@ export type DoctorState =
   | "reassuring" // a calm closing line
   | "concerned" // an urgent (not emergency) result
   | "emergency" // the safety engine found a red flag
-  | "handoff" // the summary for a real healthcare professional
+  | "summarizing" // saying the summary for a real healthcare professional (the hand-off)
   | "clarifying" // re-saying a question simply, or saying why it is asked
   | "acknowledging" // "got it": a correction or an extra problem is noted (nod, glance at the chart)
   | "checking" // two answers differ: asking which is right — calm, steady, never doubting
@@ -46,7 +46,7 @@ export const PERFORMANCE: Record<DoctorState, Performance> = {
   reassuring: { expression: "reassuring", gaze: "conversational", gesture: 0.45, head: 0.8, lean: 0.3, nods: false },
   concerned: { expression: "concerned", gaze: "steady", gesture: 0.35, head: 0.5, lean: 0.55, nods: false },
   emergency: { expression: "urgent", gaze: "steady", gesture: 0, head: 0.2, lean: 0.7, nods: false },
-  handoff: { expression: "reassuring", gaze: "review", gesture: 0.5, head: 0.8, lean: 0.3, nods: false },
+  summarizing: { expression: "reassuring", gaze: "review", gesture: 0.5, head: 0.8, lean: 0.3, nods: false },
   clarifying: { expression: "helpful", gaze: "conversational", gesture: 0.4, head: 0.6, lean: 0.4, nods: false },
   acknowledging: { expression: "listening", gaze: "review", gesture: 0.15, head: 0.6, lean: 0.4, nods: false },
   checking: { expression: "helpful", gaze: "patient", gesture: 0.15, head: 0.45, lean: 0.45, nods: false },
@@ -66,7 +66,7 @@ export const STATE_LABEL: Record<DoctorState, string> = {
   reassuring: "Doctor speaking",
   concerned: "Doctor speaking",
   emergency: "Urgent",
-  handoff: "Preparing your summary",
+  summarizing: "Summarizing your visit",
   clarifying: "Explaining",
   acknowledging: "Noting that",
   checking: "Checking with you",
@@ -75,7 +75,7 @@ export const STATE_LABEL: Record<DoctorState, string> = {
 };
 
 export const isSpeakingState = (s: DoctorState) =>
-  s === "greeting" || s === "asking" || s === "showing" || s === "explaining" || s === "reassuring" || s === "concerned" || s === "handoff" || s === "clarifying" || s === "acknowledging" || s === "checking" || s === "educating";
+  s === "greeting" || s === "asking" || s === "showing" || s === "explaining" || s === "reassuring" || s === "concerned" || s === "summarizing" || s === "clarifying" || s === "acknowledging" || s === "checking" || s === "educating";
 
 // What every part of the consultation does in each state — one table, so the
 // screen, voice, microphone, captions and the doctor can never disagree.
@@ -104,6 +104,6 @@ export const EFFECTS: Record<DoctorState, Effects> = {
   // Emergency: routine questions stop, Talk is off (the emergency screen leads),
   // only the verified emergency line is spoken.
   emergency: { routine: false, talk: false, caption: "urgent", speaks: true },
-  handoff: { routine: false, talk: false, caption: "doctor", speaks: true },
+  summarizing: { routine: false, talk: false, caption: "doctor", speaks: true },
   complete: { routine: false, talk: false, caption: "none", speaks: false },
 };

@@ -100,6 +100,12 @@ describe("volunteered information is noted, not misunderstood", () => {
     expect(s.modifiers).toBe("worse after food");
     expect(row(s, "Pattern")?.value).toBe("Comes and goes");
   });
+  it("safety first: a medicine mention with a danger sign opens Emergency Mode, it is not just 'noted'", () => {
+    const s = toSex();
+    const o = converse(s, nextTurn(s), "I took an overdose of paracetamol");
+    expect(o.kind).toBe("answered");
+    expect("state" in o && o.state.emergency).toBeTruthy();
+  });
   it("learn() never touches urgency fields", () => {
     const s = talk(["I have a cough"]).s;
     const l = learn(s, "I'm diabetic, I took paracetamol, it comes and goes, I also have a headache").state;
