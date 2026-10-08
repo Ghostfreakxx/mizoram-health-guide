@@ -100,6 +100,29 @@ describe("volunteered information is noted, not misunderstood", () => {
     expect(s.modifiers).toBe("worse after food");
     expect(row(s, "Pattern")?.value).toBe("Comes and goes");
   });
+  it("'I'm diabetic' at the female/male question is noted — never recorded as 'male'", () => {
+    const s = toSex();
+    const o = converse(s, nextTurn(s), "I'm diabetic");
+    expect(o.kind).toBe("noted");
+    if (o.kind !== "noted") return;
+    expect(o.state.sex).toBeUndefined();
+    expect(o.state.conditionsSaid).toEqual(["diabetes"]);
+    expect(nextTurn(o.state).step).toBe("sex");
+    for (const [w, sex] of [["f", "female"], ["m", "male"], ["I am a woman", "female"], ["male", "male"]] as const) {
+      const a = converse(s, nextTurn(s), w);
+      expect("state" in a && a.state.sex, w).toBe(sex);
+    }
+  });
+  it("a number is an age only when the answer is about age", () => {
+    const s = talk(["I have had a headache and fever for three days", "fever", "none"]).s;
+    expect(nextTurn(s).step).toBe("age");
+    for (const [w, age] of [["34", "adult"], ["I'm 70", "older"], ["3 months old", "child-under-5"], ["about 8 years", "child"], ["she is 2", "child-under-5"]] as const) {
+      const o = converse(s, nextTurn(s), w);
+      expect("state" in o && o.state.age, w).toBe(age);
+    }
+    const o = converse(s, nextTurn(s), "I took 2 tablets");
+    expect("state" in o ? o.state.age : undefined).toBeUndefined();
+  });
   it("safety first: a medicine mention with a danger sign opens Emergency Mode, it is not just 'noted'", () => {
     const s = toSex();
     const o = converse(s, nextTurn(s), "I took an overdose of paracetamol");

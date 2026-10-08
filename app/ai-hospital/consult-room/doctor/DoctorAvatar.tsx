@@ -183,13 +183,21 @@ function makeMaterial(name: string, old: THREE.MeshStandardMaterial, detail: boo
       });
     case "coat": {
       // Cotton drill: matte, a touch below pure white so folds and shading
-      // read (pure white with a strong sheen glowed like plastic).
+      // read (pure white with a strong sheen glowed like plastic). Below the
+      // high level a plain material: the coat is the largest surface on
+      // screen, and the cloth sheen roughly doubles its shading cost.
+      if (!detail) {
+        const m = new THREE.MeshStandardMaterial({ vertexColors: true, color: new THREE.Color(attire.coatColor ?? "#e9ebee"), roughness: 0.95, envMapIntensity: 0.6 });
+        return m;
+      }
       const m = new THREE.MeshPhysicalMaterial({ vertexColors: true, color: new THREE.Color("#e9ebee"), roughness: 0.94, sheen: 0.22, sheenColor: new THREE.Color("#f4f6f8"), sheenRoughness: 0.9, envMapIntensity: 0.6 });
       if (attire.coatColor) m.color = new THREE.Color(attire.coatColor);
       return m;
     }
     case "scrubs": {
-      const m = new THREE.MeshPhysicalMaterial({ vertexColors: true, roughness: 0.9, sheen: 0.4, sheenColor: new THREE.Color("#cfe9ee"), sheenRoughness: 0.8 });
+      const m = detail
+        ? new THREE.MeshPhysicalMaterial({ vertexColors: true, roughness: 0.9, sheen: 0.4, sheenColor: new THREE.Color("#cfe9ee"), sheenRoughness: 0.8 })
+        : new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.92 });
       if (attire.scrubsColor) {
         m.vertexColors = false;
         m.color = new THREE.Color(attire.scrubsColor);

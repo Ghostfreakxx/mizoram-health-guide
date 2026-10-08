@@ -243,18 +243,16 @@ for (const mode of ["visual viewport (current browsers)", "whole window (older A
     const question = page.locator("#consult-question");
     // The question must be readable while typing: written out in full (the
     // heading, or its repeat just above the box on choice questions).
+    // Checked once the layout has settled after the keyboard opens (a real
+    // keyboard animates for ~250 ms; the room re-lays out on the next frame).
     const check = async () => {
       await focusLikeAPhone();
-      const b = (await box(page).boundingBox())!;
-      expect(b.y + b.height).toBeLessThanOrEqual(visible);
-      const shown = page.locator("#consult-question, [data-question-repeat]");
-      const said = (await question.textContent())!;
-      let readable = false;
-      for (const el of await shown.all()) {
-        const r = await el.boundingBox();
-        if (r && r.height > 20 && r.y >= 0 && r.y + r.height <= visible && (await el.textContent()) === said) readable = true;
-      }
-      expect(readable).toBe(true);
+      await expect.poll(async () => {
+        const b = await box(page).boundingBox();
+        if (!b || b.y + b.height > visible) return "answer box under the keyboard";
+        const r = await question.boundingBox();
+        return r && r.height > 20 && r.y >= 0 && r.y + r.height <= visible ? "ok" : "question not readable";
+      }, { timeout: 3000 }).toBe("ok");
     };
     const tallStage = (await stage.boundingBox())!.height;
     expect(tallStage).toBeGreaterThan(full.height * 0.3);

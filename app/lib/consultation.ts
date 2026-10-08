@@ -1430,7 +1430,10 @@ export function interpretText(turn: Turn, text: string): string | string[] | nul
     return null;
   }
   if (step === "age") {
-    const n = t.match(/\b(\d{1,3})\s*(days?|weeks?|months?|years?|yrs?)?\b/);
+    // A number is an age only when the answer is about age: "34", "34 years",
+    // "I'm 34", "aged 3 months" — not "I took 2 tablets".
+    const ageLike = /^(?:(?:i am|i'm|im|he is|she is|he's|she's|they are|age|aged|my age is|(?:my|the|our) \w+ is|about|around|nearly|almost|over|above|under|below|more than|less than)\s+)?\d{1,3}\s*(?:days?|weeks?|months?|years?|yrs?)?(?:\s+old)?$/.test(t) || /\b\d{1,3}\s*(?:days?|weeks?|months?|years?|yrs?)\s+old\b|\b(?:aged|i am|i'm|im)\s+\d{1,3}\b/.test(t);
+    const n = ageLike ? t.match(/\b(\d{1,3})\s*(days?|weeks?|months?|years?|yrs?)?\b/) : null;
     if (n) {
       const v = parseInt(n[1], 10);
       const unit = n[2] ?? "years";
@@ -1442,8 +1445,10 @@ export function interpretText(turn: Turn, text: string): string | string[] | nul
   }
   if (step === "sex") {
     if (/\b(prefer not|rather not|don'?t want)\b/.test(t)) return "unspecified";
-    if (/\b(female|woman|girl|lady|f)\b/.test(t)) return "female";
-    if (/\b(male|man|boy|m)\b/.test(t)) return "male";
+    // A single letter counts only as the whole answer ("f", "m"): "I'm …"
+    // once recorded a patient as male.
+    if (t === "f" || /\b(female|woman|girl|lady)\b/.test(t)) return "female";
+    if (t === "m" || /\b(male|man|boy)\b/.test(t)) return "male";
     return null;
   }
   if (step === "special") {

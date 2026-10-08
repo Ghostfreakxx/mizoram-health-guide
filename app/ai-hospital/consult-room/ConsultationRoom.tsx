@@ -244,6 +244,7 @@ export default function ConsultationRoom({ room, department }: { room: RoomStyle
   const [visitOpen, setVisitOpen] = useState(true); // My Visit panel (desktop)
   const [confirmRestart, setConfirmRestart] = useState(false);
   const historyRef = useRef<HTMLOListElement>(null);
+  const panelScrollRef = useRef<HTMLDivElement>(null);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [seenNotices, setSeenNotices] = useState<string[]>([]); // notices already shown for a few seconds
   const [bodyDismissed, setBodyDismissed] = useState(false); // phones: "say it in words instead"
@@ -310,6 +311,16 @@ export default function ConsultationRoom({ room, department }: { room: RoomStyle
       s.forEach(clearTimeout);
     };
   }, []);
+
+  // Phones, keyboard open: the question stays readable above the answer box
+  // (the box is pinned to the bottom of the panel; the panel scrolls so the
+  // question is at its top).
+  useEffect(() => {
+    const panel = panelScrollRef.current;
+    const q = document.getElementById("consult-question");
+    if (!keyboardOpen || !panel || !q) return;
+    panel.scrollTop = Math.max(0, q.getBoundingClientRect().top - panel.getBoundingClientRect().top + panel.scrollTop - 8);
+  }, [keyboardOpen, turn.step, turn.say]);
 
   // Text only: the newest line of the conversation is always in view.
   useEffect(() => {
@@ -1782,8 +1793,8 @@ export default function ConsultationRoom({ room, department }: { room: RoomStyle
           </>
         ) : (
           <div className="relative z-20 -mt-4 flex min-h-0 flex-1 flex-col rounded-t-[22px] bg-white shadow-[0_-10px_30px_-12px_rgba(15,23,42,.25)]">
-            <div className="flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto px-4 pt-4">
-              {!emergency && <div className="flex flex-col gap-2">{notices}</div>}
+            <div ref={panelScrollRef} className="flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto px-4 pt-4">
+              {!emergency && !keyboardOpen && <div className="flex flex-col gap-2">{notices}</div>}
               {devPanels}
               {!begun ? (
                 entry
