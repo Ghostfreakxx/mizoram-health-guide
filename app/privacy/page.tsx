@@ -17,8 +17,9 @@ export default function PrivacyPage() {
         Reception, the virtual doctor, triage, visit preparation, Emergency
         Mode and the Diabetes Risk Check run in your web browser. Your
         symptoms and answers are kept in memory only while the page is open.
-        They are not saved on your device, not sent to our servers, not put in
-        web addresses, not written to logs, and not used for analytics. If you
+        They are not saved on your device, not sent to our servers (unless you
+        choose online help, below), not put in web addresses, not written to
+        logs, and not used for analytics. If you
         choose &quot;Share&quot; on your visit summary, you are first shown
         exactly what will be shared, and the text is then passed to the app
         you choose (for example WhatsApp).
@@ -29,6 +30,20 @@ export default function PrivacyPage() {
         My Visit shows the latest summary from this visit. It is held in the
         open browser tab&apos;s memory only. Reloading or closing the tab, or
         pressing &quot;Clear this visit&quot;, removes it.
+      </p>
+
+      <h2>Online help understanding your words (only if you choose it)</h2>
+      <p>
+        Where this website has it switched on, the virtual doctor may offer
+        online help when it cannot understand one of your answers. Only if you
+        agree, that question, its answer choices and the words you just wrote
+        are sent through our server to an online AI service (OpenAI), which
+        suggests which answer you meant. Long numbers, e-mail addresses and
+        links are removed first; nothing else from your visit is sent. Nothing
+        is recorded until you confirm the suggestion. We do not log or keep
+        what is sent. OpenAI processes it outside India under its own terms.
+        It is off unless you choose it, only for that visit, and you can turn
+        it off in Settings. Please do not write your name or phone number.
       </p>
 
       <h2>Speaking instead of typing</h2>

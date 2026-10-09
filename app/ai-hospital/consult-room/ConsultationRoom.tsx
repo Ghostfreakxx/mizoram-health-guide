@@ -26,6 +26,8 @@ import MyVisit, { EDIT_STEP } from "./MyVisit";
 import type { ChartLine } from "./Room3D";
 import type { RoomStyle } from "./rooms";
 import { type SpeechOutput, VOICE_CONSENT_TEXT, browserSpeech, listen, needsSpeechConfirmation, voiceInputSetting } from "./voice";
+import { type Suggestion, type UnderstandRequest, UNDERSTAND_PROVIDER, acceptReply, requestFor, suggestionFor } from "../../lib/understand";
+import { askOnline, onlineAvailable } from "./online";
 
 // The 3D room is only downloaded once a consultation room is opened (or
 // warmed up by preload.ts when the person points at a link to it).
@@ -101,6 +103,7 @@ const useViewHeight = () => useSyncExternalStore(subscribeWide, () => window.inn
 const SYMPTOM_STEPS = new Set(["concern", "concern-more", "complaint", "describe", "body", "side", "simple-pain"]);
 
 const UNSURE_LABEL: Record<string, string> = { "?unsure": "I'm not sure", "?forgot": "I don't remember", "?describe": "I can't describe it" };
+const ONLINE_NO_SUGGESTION = "I'm still not sure what you meant. Please tap the answer that is closest, or say it another way.";
 
 function answerLabel(t: Turn, value: string | string[]): string {
   const v = Array.isArray(value) ? value : [value];
@@ -256,6 +259,23 @@ export default function ConsultationRoom({ room, department }: { room: RoomStyle
   const [shellTop, setShellTop] = useState(0);
   const [keyboardOpen, setKeyboardOpen] = useState(false); // on-screen keyboard (phones): the doctor area shrinks
   const [heard, setHeard] = useState<string | null>(null); // uncertain speech awaiting confirmation
+  // Online help understanding the patient's words (lib/understand.ts): only
+  // if this site has it switched on AND the patient agrees, for this visit.
+  const [onlineOn, setOnlineOn] = useState(false); // switched on for this site
+  const [onlineConsent, setOnlineConsent] = useState<boolean | null>(null); // null: not asked yet
+  const [onlineOffer, setOnlineOffer] = useState<{ req: UnderstandRequest; at: number } | null>(null);
+  const [offered, setOffered] = useState(0); // asked at most twice a visit
+  const [suggestion, setSuggestion] = useState<(Suggestion & { at: number }) | null>(null);
+  const onlineAsk = useRef<AbortController | null>(null);
+  useEffect(() => {
+    let live = true;
+    void onlineAvailable().then((on) => {
+      if (live) setOnlineOn(on);
+    });
+    return () => {
+      live = false;
+    };
+  }, []);
   const [tempUnit, setTempUnit] = useState<"C" | "F">("C");
   const [tempValue, setTempValue] = useState("");
   // From the Health Passport — only when the patient has turned saving on.
@@ -321,6 +341,12 @@ export default function ConsultationRoom({ room, department }: { room: RoomStyle
     if (!keyboardOpen || !panel || !q) return;
     panel.scrollTop = Math.max(0, q.getBoundingClientRect().top - panel.getBoundingClientRect().top + panel.scrollTop - 8);
   }, [keyboardOpen, turn.step, turn.say]);
+
+  // Online help: its card (the offer, or a suggestion) comes into view.
+  const onlineCard = onlineOffer ? `offer:${onlineOffer.at}` : suggestion ? `suggestion:${suggestion.at}` : "";
+  useEffect(() => {
+    if (onlineCard) document.getElementById("online-card")?.scrollIntoView({ block: "nearest" });
+  }, [onlineCard]);
 
   // Text only: the newest line of the conversation is always in view.
   useEffect(() => {
@@ -589,6 +615,10 @@ export default function ConsultationRoom({ room, department }: { room: RoomStyle
   const commit = useCallback(
     (next: ConsultState, said: string) => {
       stopMic.current?.();
+      onlineAsk.current?.abort();
+      onlineAsk.current = null;
+      setSuggestion(null);
+      setOnlineOffer(null);
       setLog((g) => [...g, { who: "patient", text: said }]);
       setVisitOverTool(false);
       lastSaid.current = said;
@@ -648,11 +678,43 @@ export default function ConsultationRoom({ room, department }: { room: RoomStyle
     reply([{ text: line, state: "clarifying" }], line);
   };
 
+  // Asks the online model which answer on screen the words meant (the
+  // patient agreed). Emergencies never wait for this: converse() has already
+  // checked the words for danger signs on the device. Nothing is recorded
+  // from the reply until the patient confirms it.
+  const checkOnline = async (req: UnderstandRequest, fallback: Said[], fallbackNote: string) => {
+    onlineAsk.current?.abort();
+    const ask = new AbortController();
+    onlineAsk.current = ask;
+    const at = history.length;
+    setNote("Checking what you meant…");
+    setDoctor("processing");
+    const got = await askOnline(req, ask.signal);
+    if (ask.signal.aborted) return;
+    onlineAsk.current = null;
+    const ids = got ? acceptReply(req, got) : null;
+    const sug = ids ? suggestionFor(turn, req, ids) : null;
+    if (!sug) {
+      if (fallback.length) return reply(fallback, fallbackNote);
+      return reply([{ text: ONLINE_NO_SUGGESTION, state: "clarifying" }], ONLINE_NO_SUGGESTION);
+    }
+    track({ type: "clarification", kind: "online-suggested" });
+    setSuggestion({ ...sug, at });
+    reply([{ text: sug.line, state: "clarifying" }], "");
+  };
+  const stopOnline = () => {
+    onlineAsk.current?.abort();
+    onlineAsk.current = null;
+    setSuggestion(null);
+  };
+
   // Typed or spoken words. Safety checks run first inside converse().
   const sendWords = (words: string) => {
     const w = words.trim();
     if (!w) return;
     stopSpeaking();
+    stopOnline();
+    setOnlineOffer(null);
     const o = converse(state, turn, w);
     if (o.kind === "answered") {
       if (o.state !== state) commit(o.state, w);
@@ -673,6 +735,14 @@ export default function ConsultationRoom({ room, department }: { room: RoomStyle
     // The question is already the heading: the note shows only what is new.
     const q = turn.question ?? turn.say;
     const shown = o.kind === "education" ? "" : o.line.endsWith(q) && o.line.length > q.length ? o.line.slice(0, -q.length).trim() : o.line;
+    // Not understood on the device: with the patient's agreement, an online
+    // model may suggest which answer on screen they meant.
+    const req = o.kind === "unclear" && o.difficulty !== "knowledge" && onlineOn && onlineConsent !== false ? requestFor(turn, w) : null;
+    if (req && onlineConsent) return void checkOnline(req, plan.lines, shown);
+    if (req && offered < 2) {
+      setOffered((n) => n + 1);
+      setOnlineOffer({ req, at: history.length });
+    }
     reply(plan.lines, shown);
   };
 
@@ -698,6 +768,8 @@ export default function ConsultationRoom({ room, department }: { room: RoomStyle
 
   const back = () => {
     stopSpeaking();
+    stopOnline();
+    setOnlineOffer(null);
     setHistory((h) => (h.length > 1 ? h.slice(0, -1) : h));
   };
   const restart = useCallback(() => {
@@ -706,6 +778,10 @@ export default function ConsultationRoom({ room, department }: { room: RoomStyle
     cancelSay();
     active.current = null;
     stopMic.current?.();
+    onlineAsk.current?.abort();
+    onlineAsk.current = null;
+    setSuggestion(null);
+    setOnlineOffer(null);
     setSpeaking(false);
     lastKey.current = "";
     setLog([]);
@@ -916,6 +992,7 @@ export default function ConsultationRoom({ room, department }: { room: RoomStyle
       <span aria-hidden>🔒</span>
       <span>
         {PRIVACY_LINE} Camera and location are never used.{" "}
+        {onlineConsent ? `Online help is on: when I can't understand an answer, that answer and the question go to ${UNDERSTAND_PROVIDER}. ` : ""}
         {listening
           ? "The microphone is on now — your browser's speech service is turning your words into text."
           : consented
@@ -974,6 +1051,71 @@ export default function ConsultationRoom({ room, department }: { room: RoomStyle
       </div>
     </div>
   ) : null;
+
+  // Online help (lib/understand.ts). Asked at the moment it would help — once
+  // the doctor could not understand an answer — and never assumed.
+  const agreeOnline = (req: UnderstandRequest | null) => {
+    setOnlineConsent(true);
+    setOnlineOffer(null);
+    track({ type: "clarification", kind: "online-agreed" });
+    if (req) {
+      stopSpeaking();
+      void checkOnline(req, [], "");
+    }
+  };
+  const declineOnline = () => {
+    setOnlineConsent(false);
+    setOnlineOffer(null);
+    stopOnline();
+  };
+  const onlineOfferPanel =
+    onlineOffer && onlineOffer.at === history.length && onlineConsent === null && canAnswer ? (
+      <div id="online-card" role="group" aria-labelledby="online-title" className="space-y-2.5 rounded-2xl border-2 border-blue-900 bg-blue-50 p-4">
+        <p id="online-title" className="text-[17px] font-bold text-blue-950">Use online help to understand your words?</p>
+        <p className="text-[15px] leading-snug text-slate-800">
+          Only this question, its choices and what you just wrote go to an online AI service ({UNDERSTAND_PROVIDER}), to suggest an answer. You confirm before anything is recorded.
+        </p>
+        <div className="flex flex-wrap gap-2">
+          <button type="button" className="min-h-11 rounded-xl bg-blue-900 px-4 font-bold text-white" onClick={() => agreeOnline(onlineOffer.req)}>
+            Yes, use online help
+          </button>
+          <button type="button" className={chip} onClick={declineOnline}>
+            No, thanks
+          </button>
+        </div>
+        <p className="text-xs leading-relaxed text-slate-600">Long numbers, e-mail addresses and links are removed first; nothing else is sent. For this visit only. Please don&apos;t write your name or phone number.</p>
+      </div>
+    ) : null;
+  const confirmSuggestion = () => {
+    if (!suggestion) return;
+    track({ type: "clarification", kind: "online-confirmed" });
+    const value = suggestion.value;
+    setSuggestion(null);
+    answer(value);
+  };
+  const suggestionPanel =
+    suggestion && suggestion.at === history.length && suggestion.step === turn.step && canAnswer ? (
+      <div id="online-card" role="group" aria-labelledby="suggest-title" className="space-y-2.5 rounded-2xl border-2 border-blue-700 bg-white p-4 shadow-sm">
+        <p id="suggest-title" className="font-semibold text-blue-950">I think you mean:</p>
+        <p className="text-lg font-bold text-slate-900">{suggestion.labels.map((l) => l.replace(/\s+—\s+continue$/i, "")).join(", ")}</p>
+        <div className="flex flex-wrap gap-2">
+          <button type="button" className="min-h-11 rounded-xl bg-blue-900 px-4 font-bold text-white" onClick={confirmSuggestion}>
+            Yes, that&apos;s right
+          </button>
+          <button
+            type="button"
+            className={chip}
+            onClick={() => {
+              track({ type: "clarification", kind: "online-declined" });
+              setSuggestion(null);
+            }}
+          >
+            No, I&apos;ll choose
+          </button>
+        </div>
+        <p className="text-xs text-slate-500">Suggested by online help from your words. Please check it — nothing is recorded until you confirm.</p>
+      </div>
+    ) : null;
 
   // The patient asked for a real professional: always respected.
   const professionalCard = wantsProfessional ? (
@@ -1290,6 +1432,16 @@ export default function ConsultationRoom({ room, department }: { room: RoomStyle
         <Toggle on={reducedMotion} onClick={() => setReducedMotion((v) => !v)}>Reduce motion</Toggle>
       </div>
       {displaySelect}
+      {onlineOn && (
+        <div className="space-y-1.5 border-t border-slate-200 pt-3">
+          <Toggle on={onlineConsent === true} onClick={() => (onlineConsent ? declineOnline() : agreeOnline(null))}>
+            🌐 Online help with my words
+          </Toggle>
+          <p className="text-xs leading-relaxed text-slate-600">
+            Off unless you choose it. When I can&apos;t understand an answer, only that question, its choices and your words (long numbers removed) go to {UNDERSTAND_PROVIDER}. You confirm before anything is recorded.
+          </p>
+        </div>
+      )}
       {started && history.length > 2 && !done && !emergency && (
         <div className="border-t border-slate-200 pt-3">
           {confirmRestart ? (
@@ -1528,7 +1680,8 @@ export default function ConsultationRoom({ room, department }: { room: RoomStyle
       )}
       {!talk.available && talk.reason && canAnswer && <p className="text-xs text-slate-500">{talk.reason}</p>}
       <p className="text-xs text-slate-500">
-        🔒 Your consultation information stays on this device. {listening ? "The microphone is on now." : "The microphone is only used if you press Talk."}
+        🔒 {onlineConsent ? `Online help is on: an answer I can't understand goes to ${UNDERSTAND_PROVIDER}, with the question.` : "Your consultation information stays on this device."}{" "}
+        {listening ? "The microphone is on now." : "The microphone is only used if you press Talk."}
       </p>
     </form>
   );
@@ -1606,6 +1759,8 @@ export default function ConsultationRoom({ room, department }: { room: RoomStyle
       </h2>
       {started && turn.hint && !keyboardOpen && <p className={`${bigText ? "text-lg" : "text-[15px]"} leading-relaxed text-slate-600`}>{turn.hint}</p>}
       {heardPanel}
+      {suggestionPanel}
+      {onlineOfferPanel}
       {consent}
       {professionalCard}
       {choices}
