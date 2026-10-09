@@ -36,8 +36,22 @@ export default function PrivacyPage() {
         Voice input is off until you turn it on. Before you do, we explain
         that your browser&apos;s own speech service turns your voice into text.
         In Chrome, this sends the audio of what you say to Google. We do not
-        receive, record or keep the audio. The virtual doctor&apos;s spoken
-        replies are made by your device. You can always type instead.
+        receive, record or keep the audio. You can always type instead.
+      </p>
+
+      <h2>The virtual doctor&apos;s voice</h2>
+      <p>
+        Where this website has a natural voice set up, the virtual doctor&apos;s
+        sentences are turned into speech by an online service (OpenAI),
+        through our server. Only the doctor&apos;s own sentence is sent, one at
+        a time. These sentences can mention your symptoms (for example
+        &quot;You mentioned a headache. Is it severe?&quot;), but no name,
+        account or device information is sent with them, and your own typed or
+        spoken words are never sent: a sentence that repeats them is spoken by
+        your device instead. We do not log or keep what is sent; OpenAI
+        processes it outside India under its own terms. You can choose
+        &quot;This device&quot; as the doctor&apos;s voice before you begin or
+        in Settings; then nothing is sent and your device makes the voice.
       </p>
 
       <h2>The 3D virtual doctor</h2>

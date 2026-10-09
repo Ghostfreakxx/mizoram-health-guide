@@ -199,6 +199,19 @@ export class LipSync {
     this.reschedule(i, now - this.t0);
   }
 
+  // The real length of the sentence's audio (a recorded or generated voice
+  // knows it; a phone's speech engine does not): the speaking rate is set so
+  // the words fill it, pauses included.
+  fit(seconds: number) {
+    if (!this.words.length || !(seconds > 0.3)) return;
+    const fixed = this.words.reduce((a, w) => a + (0.05 + w.pause) / this.rate, 0);
+    const letters = this.words.reduce((a, w) => a + w.letters, 0);
+    const target = seconds - 0.1 - fixed; // a little silence at the start and end
+    if (target <= 0 || !letters) return;
+    this.perLetter = Math.min(0.2, Math.max(0.03, (target * this.rate) / letters));
+    this.reschedule(0, 0);
+  }
+
   pause(now: number) {
     if (this.pausedAt === null) this.pausedAt = now;
   }

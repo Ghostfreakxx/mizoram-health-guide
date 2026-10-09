@@ -26,6 +26,9 @@ import MyVisit, { EDIT_STEP } from "./MyVisit";
 import type { ChartLine } from "./Room3D";
 import type { RoomStyle } from "./rooms";
 import { type SpeechOutput, VOICE_CONSENT_TEXT, browserSpeech, listen, needsSpeechConfirmation, voiceInputSetting } from "./voice";
+import { type NaturalVoice, naturalSpeech, naturalVoiceAvailable } from "./naturalVoice";
+import { VOICE_PROVIDER, patientTexts, toneFor } from "../../lib/doctorVoice";
+import { EMERGENCY_LINE } from "../../lib/consultation";
 
 // The 3D room is only downloaded once a consultation room is opened (or
 // warmed up by preload.ts when the person points at a link to it).
@@ -58,6 +61,7 @@ type Line = { who: "guide" | "patient"; text: string };
 type Said = { text: string; state: DoctorState };
 
 export const PRIVACY_LINE = "Your consultation information stays on this device unless you choose to share it.";
+export const NATURAL_PRIVACY_LINE = `Your answers stay on this device unless you choose to share them. The doctor's natural voice is made online by ${VOICE_PROVIDER} from her own sentences, which can mention your symptoms; your own words are never sent.`;
 
 const NORMAL_RATE = 0.92;
 const SLOW_RATE = 0.78;
@@ -174,6 +178,10 @@ export default function ConsultationRoom({ room, department }: { room: RoomStyle
   const fresh = useCallback(() => startConsultation(room.greeting, room.intro, room.focus), [room]);
   const [history, setHistory] = useState<ConsultState[]>(() => [fresh()]);
   const state = history[history.length - 1];
+  const stateRef = useRef(state);
+  useEffect(() => {
+    stateRef.current = state;
+  }, [state]);
   const turn = useMemo(() => nextTurn(state), [state]);
   const chart = useMemo(() => chartOf(state), [state]);
   const lines3d = useMemo(() => chartLines(chart), [chart]);
@@ -192,6 +200,14 @@ export default function ConsultationRoom({ room, department }: { room: RoomStyle
   const lips = useRef<LipSync | null>(null);
   // The voice could not play: carry on in captions, say so once.
   const [voiceIssue, setVoiceIssue] = useState(false);
+  // The doctor's natural voice (naturalVoice.ts): offered when this site has
+  // one set up; the patient can choose the device's voice instead.
+  const natural = useRef<NaturalVoice | null>(null);
+  const [naturalOn, setNaturalOn] = useState(false); // set up on this site
+  const [naturalChosen, setNaturalChosen] = useState(true);
+  const [naturalFailed, setNaturalFailed] = useState(false);
+  const naturalActive = naturalOn && naturalChosen && !naturalFailed;
+  const recentWords = useRef<string[]>([]); // typed or spoken just now (before the state catches up)
   const voiceFailed = useCallback(() => {
     setVoiceIssue((was) => {
       if (!was) reportFailure("voice-output");
@@ -278,7 +294,13 @@ export default function ConsultationRoom({ room, department }: { room: RoomStyle
   }, []);
 
   useEffect(() => {
-    speech.current = browserSpeech();
+    natural.current = naturalSpeech(browserSpeech(), {
+      // The patient's own words are never sent for the natural voice.
+      patientTexts: () => [...patientTexts(stateRef.current), ...recentWords.current],
+      onGiveUp: () => setNaturalFailed(true),
+    });
+    speech.current = natural.current;
+    void naturalVoiceAvailable().then((on) => setNaturalOn(on));
     lips.current = new LipSync();
     // eslint-disable-next-line react-hooks/set-state-in-effect -- device checks after mount
     setDetected(chooseTier(readDevice()));
@@ -396,13 +418,20 @@ export default function ConsultationRoom({ room, department }: { room: RoomStyle
     };
   }, []);
 
+  // The natural voice follows the patient's choice; the emergency line is
+  // fetched as soon as the consultation begins, so it can be said at once.
+  useEffect(() => {
+    if (natural.current) natural.current.enabled = naturalActive;
+    if (naturalActive && begun) natural.current?.prefetch(splitSentences(EMERGENCY_LINE), { tone: "urgent", rate: slower ? SLOW_RATE : NORMAL_RATE });
+  }, [naturalActive, begun, slower]);
+
   // A notice is shown for 8 seconds, then retired (Settings still shows the display used).
   useEffect(() => {
-    const keys = [failed3d ?? "", voiceIssue ? "voice" : ""].filter((k) => k && !seenNotices.includes(k));
+    const keys = [failed3d ?? "", voiceIssue ? "voice" : "", naturalFailed ? "natural" : ""].filter((k) => k && !seenNotices.includes(k));
     if (!keys.length) return;
     const t = setTimeout(() => setSeenNotices((n) => [...n, ...keys]), 8000);
     return () => clearTimeout(t);
-  }, [failed3d, voiceIssue, seenNotices]);
+  }, [failed3d, voiceIssue, naturalFailed, seenNotices]);
   // Phones: the full-screen body map stops above the answer box, so the
   // patient can always say it in words instead.
   useEffect(() => {
@@ -476,6 +505,9 @@ export default function ConsultationRoom({ room, department }: { room: RoomStyle
         const rate = rateRef.current;
         if (voiceRef.current && speech.current?.available) {
           setSpeaking(true);
+          // Natural voice: everything still to be said is fetched now, so the
+          // sentences follow each other without gaps.
+          for (const rest of lines.slice(i)) natural.current?.prefetch(splitSentences(rest.text), { tone: toneFor(rest.state), rate });
           // Sentence by sentence, with a short natural pause between them —
           // easier to follow, and the doctor can be stopped between sentences.
           const sentences = splitSentences(l.text);
@@ -495,16 +527,27 @@ export default function ConsultationRoom({ room, department }: { room: RoomStyle
               lips.current?.end();
               wait(() => say(j + 1), j + 1 < sentences.length ? sentencePause(rate) : 0);
             };
-            wait(finish, Math.max(3000, (text.length * 110 * NORMAL_RATE) / rate));
+            // (A natural voice may first need a moment to fetch the audio:
+            // the wait starts again when the sound does.)
+            const allow = Math.max(3000, (text.length * 110 * NORMAL_RATE) / rate);
+            let guard = setTimeout(finish, allow + (natural.current?.enabled ? 9000 : 0));
+            sayTimers.current.push(guard);
             speech.current!.speak(
               text,
               {
-                onStart: () => lips.current?.begin(text, performance.now() / 1000, rate / NORMAL_RATE),
+                onStart: () => {
+                  clearTimeout(guard);
+                  guard = setTimeout(finish, allow);
+                  sayTimers.current.push(guard);
+                  lips.current?.begin(text, performance.now() / 1000, rate / NORMAL_RATE);
+                },
+                onDuration: (seconds) => lips.current?.fit(seconds),
                 onWord: (ci) => lips.current?.word(ci, performance.now() / 1000),
                 onEnd: finish,
                 onFail: voiceFailed,
               },
               rate,
+              { tone: toneFor(l.state) },
             );
           };
           say(0);
@@ -652,6 +695,7 @@ export default function ConsultationRoom({ room, department }: { room: RoomStyle
   const sendWords = (words: string) => {
     const w = words.trim();
     if (!w) return;
+    recentWords.current = [...recentWords.current, w].slice(-5);
     stopSpeaking();
     const o = converse(state, turn, w);
     if (o.kind === "answered") {
@@ -756,10 +800,17 @@ export default function ConsultationRoom({ room, department }: { room: RoomStyle
     return clearTimers;
   }, [demo, paused, started, doc, turn, state, answer, later, clearTimers]);
 
+  // Phones allow sound only after a tap: the natural voice's audio is
+  // started here, by the patient's own tap.
+  const beginConsultation = () => {
+    natural.current?.unlock();
+    setBegun(true);
+  };
   const playDemo = (id: string) => {
     restart();
     demoAsked.current = false;
     setDemo(id);
+    natural.current?.unlock();
     setBegun(true);
   };
   const resetDemo = () => {
@@ -915,7 +966,7 @@ export default function ConsultationRoom({ room, department }: { room: RoomStyle
     <p className="flex items-start gap-2 rounded-xl bg-green-50 px-3 py-2 text-sm text-green-900">
       <span aria-hidden>🔒</span>
       <span>
-        {PRIVACY_LINE} Camera and location are never used.{" "}
+        {naturalActive ? NATURAL_PRIVACY_LINE : PRIVACY_LINE} Camera and location are never used.{" "}
         {listening
           ? "The microphone is on now — your browser's speech service is turning your words into text."
           : consented
@@ -1084,6 +1135,30 @@ export default function ConsultationRoom({ room, department }: { room: RoomStyle
 
   const noted = [...chart.reported, ...chart.safety].filter((r) => r.provided).length;
 
+  // The doctor's voice: natural (made online) or the device's own.
+  const voiceSelect = naturalOn ? (
+    <div className="space-y-1">
+      <label className="flex items-center justify-between gap-3 text-sm font-semibold text-slate-800">
+        Doctor&apos;s voice
+        <select
+          value={naturalChosen && !naturalFailed ? "natural" : "device"}
+          onChange={(e) => {
+            stopSpeaking();
+            setNaturalChosen(e.target.value === "natural");
+          }}
+          className="min-h-10 min-w-0 max-w-[62%] rounded-lg border border-slate-300 bg-white px-2 py-1.5"
+        >
+          <option value="natural" disabled={naturalFailed}>
+            {naturalFailed ? "Natural (not working now)" : "Natural (online)"}
+          </option>
+          <option value="device">This device</option>
+        </select>
+      </label>
+      <p className="text-xs leading-relaxed text-slate-500">
+        {naturalActive ? `Made by ${VOICE_PROVIDER} from the doctor's sentences. Your own words are never sent.` : "Made on this device. Nothing is sent."}
+      </p>
+    </div>
+  ) : null;
   const displaySelect = (
     <label className="flex items-center justify-between gap-3 text-sm font-semibold text-slate-800">
       Display
@@ -1290,6 +1365,7 @@ export default function ConsultationRoom({ room, department }: { room: RoomStyle
         <Toggle on={reducedMotion} onClick={() => setReducedMotion((v) => !v)}>Reduce motion</Toggle>
       </div>
       {displaySelect}
+      {voiceSelect}
       {started && history.length > 2 && !done && !emergency && (
         <div className="border-t border-slate-200 pt-3">
           {confirmRestart ? (
@@ -1330,6 +1406,11 @@ export default function ConsultationRoom({ room, department }: { room: RoomStyle
           {failed3d}
         </p>
       )}
+      {naturalFailed && voiceOn && noticeOn("natural") && (
+        <p role="status" className="rounded-full bg-white/95 px-4 py-1.5 text-sm font-semibold text-slate-800 shadow ring-1 ring-slate-900/10">
+          The natural voice isn&apos;t working right now — using this device&apos;s voice.
+        </p>
+      )}
       {voiceIssue && voiceOn && tier !== "none" && noticeOn("voice") && (
         <p role="status" className="rounded-full bg-white/95 px-4 py-1.5 text-sm font-semibold text-slate-800 shadow ring-1 ring-slate-900/10">
           Voice is off on this device — the doctor&apos;s words are written here.
@@ -1359,7 +1440,7 @@ export default function ConsultationRoom({ room, department }: { room: RoomStyle
           ))}
         </ol>
       )}
-      <button type="button" onClick={() => setBegun(true)} className="mt-5 w-full rounded-2xl bg-blue-900 px-5 py-3.5 text-lg font-bold text-white shadow-lg shadow-blue-900/20 hover:bg-blue-800">
+      <button type="button" onClick={beginConsultation} className="mt-5 w-full rounded-2xl bg-blue-900 px-5 py-3.5 text-lg font-bold text-white shadow-lg shadow-blue-900/20 hover:bg-blue-800">
         Begin consultation
       </button>
       {is3d && !avatarReady && (
@@ -1367,8 +1448,11 @@ export default function ConsultationRoom({ room, department }: { room: RoomStyle
           Continue without 3D (faster)
         </button>
       )}
-      <div className="mt-4 border-t border-slate-100 pt-3">{displaySelect}</div>
-      <p className="mt-3 text-xs leading-relaxed text-slate-500">🔒 {PRIVACY_LINE} The microphone is only used if you press Talk.</p>
+      <div className="mt-4 space-y-3 border-t border-slate-100 pt-3">
+        {displaySelect}
+        {voiceSelect}
+      </div>
+      <p className="mt-3 text-xs leading-relaxed text-slate-500">🔒 {naturalActive ? NATURAL_PRIVACY_LINE : PRIVACY_LINE} The microphone is only used if you press Talk.</p>
     </div>
   ) : null;
 
@@ -1528,7 +1612,8 @@ export default function ConsultationRoom({ room, department }: { room: RoomStyle
       )}
       {!talk.available && talk.reason && canAnswer && <p className="text-xs text-slate-500">{talk.reason}</p>}
       <p className="text-xs text-slate-500">
-        🔒 Your consultation information stays on this device. {listening ? "The microphone is on now." : "The microphone is only used if you press Talk."}
+        🔒 {naturalActive ? "Your answers stay on this device; the doctor's voice is made online." : "Your consultation information stays on this device."}{" "}
+        {listening ? "The microphone is on now." : "The microphone is only used if you press Talk."}
       </p>
     </form>
   );

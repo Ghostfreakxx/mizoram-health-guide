@@ -1,7 +1,9 @@
 // Voice for the virtual doctor.
 //
 // OUTPUT: the phone's built-in text-to-speech. Speech is produced by the
-// browser on the device; AI Hospital sends nothing anywhere.
+// browser on the device; AI Hospital sends nothing anywhere. (Where the site
+// has a natural voice set up, naturalVoice.ts speaks instead and falls back
+// to this one — see lib/doctorVoice.ts for what it may send.)
 //
 // INPUT ("Talk"): the browser's speech recognition turns speech into text.
 // Spoken words appear in the answer box so the patient can check or correct
@@ -17,6 +19,8 @@
 // The microphone is never used without the patient pressing Talk, and the
 // browser always asks for permission first.
 
+import type { Tone } from "../../lib/doctorVoice";
+
 export type VoiceMode = "consent" | "on-device" | "off";
 export const VOICE_MODE: VoiceMode = (["consent", "on-device", "off"] as const).includes(process.env.NEXT_PUBLIC_VOICE_INPUT as VoiceMode)
   ? (process.env.NEXT_PUBLIC_VOICE_INPUT as VoiceMode)
@@ -29,11 +33,13 @@ export const VOICE_CONSENT_TEXT =
 
 // onFail: the voice could not play (no on-device voice, or a speech error).
 // Stopping on purpose ("interrupted", "canceled") is not a failure.
-export type SpeakHandlers = { onStart?: () => void; onEnd?: () => void; onWord?: (charIndex: number) => void; onFail?: () => void };
+// onDuration: the length of the audio, when the voice knows it (for lip sync).
+export type SpeakHandlers = { onStart?: () => void; onEnd?: () => void; onWord?: (charIndex: number) => void; onFail?: () => void; onDuration?: (seconds: number) => void };
 
 export type SpeechOutput = {
   available: boolean;
-  speak: (text: string, h?: SpeakHandlers, rate?: number) => void;
+  // tone: how the sentence should sound (used by the natural voice only).
+  speak: (text: string, h?: SpeakHandlers, rate?: number, o?: { tone?: Tone }) => void;
   stop: () => void;
   pause: () => void;
   resume: () => void;

@@ -139,14 +139,26 @@ describe("privacy by default (static checks)", () => {
     expect(files.length).toBeGreaterThan(0);
   });
 
+  // The one exception: the doctor's natural voice (when the site has one),
+  // which sends the doctor's own sentences — never the patient's words
+  // (lib/doctorVoice.ts; tests/safety/natural-voice.test.ts).
+  const VOICE = join("app", "ai-hospital", "consult-room", "naturalVoice.ts");
   it("no health data in browser storage, console logs, analytics, or network calls", () => {
     for (const f of files) {
       const src = readFileSync(f, "utf8");
       expect(src, `${f}: localStorage`).not.toMatch(/localStorage|sessionStorage|indexedDB/);
       expect(src, `${f}: console`).not.toMatch(/console\.(log|info|debug|warn)\(/);
-      expect(src, `${f}: network`).not.toMatch(/\bfetch\(|XMLHttpRequest|sendBeacon/);
+      if (f !== VOICE) expect(src, `${f}: network`).not.toMatch(/\bfetch\(|XMLHttpRequest|sendBeacon/);
       expect(src, `${f}: analytics`).not.toMatch(/gtag\(|analytics/i);
     }
+  });
+  it("the natural voice talks only to this site's /api/voice, and filters out the patient's words", () => {
+    expect(files).toContain(VOICE);
+    const src = readFileSync(VOICE, "utf8");
+    expect(src.match(/\bfetch\(/g)?.length).toBe(2); // availability check + the audio request
+    expect(src.match(/\bfetch\(([^,)]+)/g)?.every((c) => c.includes("VOICE_PATH"))).toBe(true);
+    expect(src).not.toMatch(/XMLHttpRequest|sendBeacon|https?:\/\//);
+    expect(src.match(/patientWordsIn\(/g)?.length).toBeGreaterThanOrEqual(2); // when speaking and when fetching ahead
   });
 
   it("symptoms are never put in URLs (no query strings built from answers)", () => {
