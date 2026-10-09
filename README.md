@@ -152,10 +152,8 @@ Saver, text only), offline use, My Visit and demo mode.
 ## Deployment
 
 Deployed on Vercel from `main`. Optional environment variables (live video,
-voice input mode, pilot counts, online help understanding words) and security
-headers are described in [`docs/DEPLOYMENT.md`](docs/DEPLOYMENT.md). The only
-secret is the optional server-side `OPENAI_API_KEY` for online help (off when
-unset): set it in the host's settings, never in the repository.
+voice input mode, pilot counts) and security headers are described in
+[`docs/DEPLOYMENT.md`](docs/DEPLOYMENT.md). No secrets are used.
 
 ## Project structure
 

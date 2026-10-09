@@ -139,27 +139,14 @@ describe("privacy by default (static checks)", () => {
     expect(files.length).toBeGreaterThan(0);
   });
 
-  // The one exception: optional online help understanding an answer, used
-  // only after the patient agrees (lib/understand.ts; online.ts sends it).
-  const ONLINE = join("app", "ai-hospital", "consult-room", "online.ts");
   it("no health data in browser storage, console logs, analytics, or network calls", () => {
     for (const f of files) {
       const src = readFileSync(f, "utf8");
       expect(src, `${f}: localStorage`).not.toMatch(/localStorage|sessionStorage|indexedDB/);
       expect(src, `${f}: console`).not.toMatch(/console\.(log|info|debug|warn)\(/);
-      if (f !== ONLINE) expect(src, `${f}: network`).not.toMatch(/\bfetch\(|XMLHttpRequest|sendBeacon/);
+      expect(src, `${f}: network`).not.toMatch(/\bfetch\(|XMLHttpRequest|sendBeacon/);
       expect(src, `${f}: analytics`).not.toMatch(/gtag\(|analytics/i);
     }
-  });
-  it("the online exception talks only to this site's /api/understand, and is used in one place", () => {
-    expect(files).toContain(ONLINE);
-    const src = readFileSync(ONLINE, "utf8");
-    expect(src.match(/\bfetch\(/g)?.length).toBe(2); // availability check + the one request
-    expect(src.match(/fetch\(([^,)]+)/g)?.every((c) => c.includes("UNDERSTAND_PATH"))).toBe(true);
-    expect(src).not.toMatch(/XMLHttpRequest|sendBeacon|https?:\/\//);
-    const users = files.filter((f) => f !== ONLINE && /\baskOnline\(/.test(readFileSync(f, "utf8")));
-    expect(users).toEqual([join("app", "ai-hospital", "consult-room", "ConsultationRoom.tsx")]);
-    expect(readFileSync(users[0], "utf8").match(/\baskOnline\(/g)?.length).toBe(1);
   });
 
   it("symptoms are never put in URLs (no query strings built from answers)", () => {

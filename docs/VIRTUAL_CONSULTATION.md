@@ -317,41 +317,6 @@ CONCERNED (an urgent result), EMERGENCY (a red flag: no pause, interrupts
 everything), SUMMARIZING (the hand-off), COMPLETE. No smile while concerned,
 urgent or thinking; nods only while the patient is talking or typing.
 
-## VD5: online help understanding words (optional, off by default)
-
-When the device cannot understand a typed or spoken answer to a question
-with answer choices, an online model (OpenAI, through this site's
-`/api/understand`) can suggest which choice was meant. The contract is
-`app/lib/understand.ts`; the call is `consult-room/online.ts` (the room's
-only network call); the server is `app/api/understand/`.
-
-1. `converse()` runs first, unchanged: danger signs, corrections, "what does
-   that mean", "not sure", the device's own understanding. Only an
-   `unclear` result on a question with choices can go further.
-2. If the site has it on and the patient has not decided, a card asks once:
-   "Use online help to understand your words?" — with what is sent and to
-   whom. "No, thanks" ends it for the visit; Settings can turn it on or off.
-3. With agreement, the doctor shows "Checking what you meant…" (thinking
-   state). The request carries the question, the choices and the words
-   (long numbers, e-mails, links removed); 8 seconds at most.
-4. The reply can only name choices on screen (Structured Outputs with an
-   `enum` of the ids). Server and room both apply the policy: one choice for
-   a single answer; never "none of these" mixed with others; a reassuring
-   answer to a danger-sign question only when the model is certain. Never
-   asked online: confirmations of danger words, contradictions, emergencies,
-   free-text questions.
-5. The doctor says "I think you mean “1 to 3 days”. Is that right?" The
-   answer is recorded only when the patient taps "Yes, that's right"; "No,
-   I'll choose" records nothing.
-6. Any failure (offline, timeout, refusal, no key) → the device's own
-   clarification line; the consultation carries on.
-
-Measured here: the contract (20 unit tests, including the route with a fake
-model) and the room (5 browser tests × desktop and phone, with a stand-in
-for `/api/understand`). **Not measured: the real model** — no key in this
-environment. `npx tsx scripts/understand-eval.ts` measures it on the 15
-held-out phrasings the device does not understand (`--dry` lists them).
-
 ## Phones
 
 Portrait: the doctor in the upper part (36–50% of the height, depending on
@@ -478,9 +443,6 @@ bones. The 2D and text tiers stay as they are.
 - The microphone is used only after the patient presses Talk (and, in
   `consent` mode, agrees to the explanation); the privacy line says when it is on.
 - Nothing typed is stored or sent; the information panel lives in page memory.
-  The one exception is optional online help with an answer the device could
-  not understand — only if the site switches it on and the patient agrees
-  (see "VD5" below and `DATA_PRIVACY.md`).
 
 ## Safety tests
 

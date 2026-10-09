@@ -25,7 +25,6 @@ import { BOUNDARY_ANSWERS, EMERGENCY_SPOKEN, FAILSAFE_MESSAGE, KNOWLEDGE_LIMIT, 
 import { redFlags } from "../safety/redFlags";
 import { AGE_GROUPS, POLICY_RULES, type Context, complaints, populationQuestions } from "../safety/triage";
 import { SIGN_OFFS, type SignOff } from "./signoffs";
-import { SYSTEM_PROMPT } from "../understand";
 
 export type ReviewStatus = "verified" | "needs-clinician-review" | "needs-government-verification" | "deprecated";
 
@@ -291,21 +290,6 @@ export function reviewRegistry(): ReviewItem[] {
       sourceIds: ["who-imci"],
       reviewer: "clinician",
       definedIn: "app/lib/safety/triage.ts",
-    }),
-  );
-  out.push(
-    item({
-      id: "TP-online-understanding",
-      kind: "triage-policy",
-      title: "Optional online help understanding an answer (VD5): what it may suggest",
-      rule:
-        "Only when the device could not understand an answer to a question with choices, and the patient agreed: an online model suggests which choice was meant; " +
-        "the patient must tap “Yes, that's right” before anything is recorded. Never used for danger-word confirmations, contradictions, emergencies or free text. " +
-        "A reassuring answer (“No”, “None of these”) to a danger-sign question is suggested only when the model is certain. Model instructions: " +
-        SYSTEM_PROMPT.replace(/\n/g, " "),
-      sourceIds: [],
-      reviewer: "clinician",
-      definedIn: "app/lib/understand.ts",
     }),
   );
 
