@@ -21,8 +21,24 @@ that runs Next.js 16 works; it is currently deployed on Vercel from `main`.
 | `NEXT_PUBLIC_VOICE_INPUT` | `consent` | `consent`, `on-device` (only on-device recognition) or `off` |
 | `NEXT_PUBLIC_TELEMETRY_URL` | unset → no counts sent | HTTPS endpoint that accepts a JSON array of events (see `DATA_PRIVACY.md`). Added to the CSP `connect-src` |
 
-All are public build-time values — none is a secret. **No secret is needed
-or used anywhere.** Never put a secret in a `NEXT_PUBLIC_` variable.
+The `NEXT_PUBLIC_` values are public build-time values — none is a secret.
+Never put a secret in a `NEXT_PUBLIC_` variable.
+
+### Online help understanding words (server-only, optional)
+
+| Variable | Default | Effect |
+| --- | --- | --- |
+| `AI_UNDERSTANDING` | unset → off | `on` offers patients "online help with my words" (`/api/understand`). Read at request time |
+| `OPENAI_API_KEY` | unset → off | **Secret.** The OpenAI project key used only by the server route. Set it in the host's environment settings; never in the repository, a `NEXT_PUBLIC_` variable or a chat |
+| `OPENAI_MODEL` | `gpt-5.4-mini` | Any OpenAI chat model that supports Structured Outputs |
+| `OPENAI_REASONING_EFFORT` | `low` | `none`, `minimal`, `low`, `medium`, `high`, or `default` (leave it to the model) |
+
+Both `AI_UNDERSTANDING=on` and a key are needed; otherwise the feature is not
+offered and nothing is sent. On Vercel: Project → Settings → Environment
+Variables, then redeploy. Before switching it on for real patients: privacy
+and legal approval (it sends a patient's words to OpenAI — see
+`DATA_PRIVACY.md`), a spending limit on the OpenAI project, and a run of
+`npx tsx scripts/understand-eval.ts` with the chosen model.
 
 ## Security headers
 
