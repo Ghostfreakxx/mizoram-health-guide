@@ -423,6 +423,23 @@ bones. The 2D and text tiers stay as they are.
   is estimated from the text, including pauses at punctuation. Lips only move
   while the voice is actually speaking. Mute, Repeat, Stop, Pause and
   subtitles are always available.
+- Natural voice (when the site has `OPENAI_API_KEY`; `consult-room/naturalVoice.ts`,
+  `app/api/voice/`, contract in `lib/doctorVoice.ts`): each sentence is spoken
+  with audio from OpenAI text-to-speech (default `gpt-4o-mini-tts`, voice
+  `marin`, a calm Indian English doctor; "serious" and "urgent" tones for
+  concern and emergencies). Everything still to be said is fetched as soon as
+  a line starts, so sentences follow without gaps; Repeat plays from memory.
+  Played with Web Audio, started by the "Begin consultation" tap (phones need
+  a tap before any sound). Lip sync is fitted to the real length of each
+  sentence's audio. Pause, Stop, Slower (a slower generated pace) all work.
+  - **Emergencies never wait:** the emergency line's audio is fetched when the
+    consultation begins; if it is not ready, the device's voice says it at once.
+  - **The patient's words never leave:** a sentence that repeats them (a whole
+    message, or four words in a row) is spoken by the device's voice.
+  - **Failures:** the device's voice says that sentence; after three failures
+    in a row the natural voice stops for the visit, with a short notice.
+  - The patient chooses "Natural (online)" or "This device" before beginning
+    or in Settings.
 - Interruption: typing, **Talk**, **Type instead** or **Stop** stops the doctor
   at once; anything not yet said is still written in the conversation.
 - Input (**Talk**): `NEXT_PUBLIC_VOICE_INPUT` = `consent` (default) | `on-device`
@@ -443,6 +460,8 @@ bones. The 2D and text tiers stay as they are.
 - The microphone is used only after the patient presses Talk (and, in
   `consent` mode, agrees to the explanation); the privacy line says when it is on.
 - Nothing typed is stored or sent; the information panel lives in page memory.
+  With the natural voice on, the doctor's own sentences are sent for speech
+  (never the patient's words) — see "Voice" above and `DATA_PRIVACY.md`.
 
 ## Safety tests
 

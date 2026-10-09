@@ -14,7 +14,8 @@ name, phone number, Aadhaar, address or account is needed for anything.
 | Health Passport, reminders | `localStorage` **only after** the patient turns saving on (`lib/storage.ts`, the only module allowed to store health data); "Delete everything" | No |
 | Text size, contrast, language | `localStorage` (not health data) | No |
 | Voice input (optional) | Browser speech service — in Chrome, audio goes to Google. The patient is told before turning it on | Yes, to the browser vendor, only if chosen |
-| Doctor's voice | On-device voices only (online voices are never selected) | No |
+| Doctor's voice (device) | On-device voices only (the browser's online voices are never selected) | No |
+| Doctor's voice (natural, when the site has `OPENAI_API_KEY`) | Each of the doctor's own sentences, one at a time, with its tone and pace (`lib/doctorVoice.ts`) | **Yes, to OpenAI** via this site's `/api/voice`. Never the patient's own words (a sentence that repeats them is spoken by the device). The patient can choose "This device" before beginning or in Settings |
 | Live video (when configured) | Health Department's own video server; room code is random | To that server only |
 | Pilot counts (when configured) | Allowlisted category codes + day (`lib/metrics.ts`) | To the configured collector only; off by default; honours DNT/GPC |
 | Service worker cache | Public pages and code only | No |
@@ -32,6 +33,37 @@ name, phone number, Aadhaar, address or account is needed for anything.
 - **Fixed in this cycle:** the doctor's speech preferred "online" cloud
   voices, which could send its words (sometimes repeating the patient's) to
   a cloud service. Now on-device only, with a test.
+
+## The doctor's natural voice (when set up)
+
+With `OPENAI_API_KEY` on the server, the doctor speaks in a natural voice
+made by OpenAI's text-to-speech. The room asks this site's `/api/voice` for
+the audio of each sentence; the server calls OpenAI with its key.
+
+- **Sent:** the doctor's own sentence (for example "You mentioned a headache.
+  Is it severe?"), its tone (calm / serious / urgent) and pace. These
+  sentences are the doctor's words, but they can mention the patient's
+  symptoms. No name, account, device or address goes with them (requests
+  come from this site's server). Not in the address: always in the request
+  body.
+- **Never sent:** the patient's own typed or spoken words. A sentence that
+  repeats any of them (a whole message, or four words in a row) is spoken by
+  the device's voice instead — tested in `tests/safety/natural-voice.test.ts`
+  and in the browser.
+- **This site:** the route keeps nothing and logs nothing; the audio is
+  streamed straight back (`Cache-Control: no-store`). A per-address request
+  count is held in memory for a minute to protect the key.
+- **OpenAI:** its API data terms apply (for example, abuse-monitoring
+  retention). Check the current terms for the project, and zero data
+  retention if it is available. Processing is outside India.
+- **Choice:** shown before the consultation begins ("Doctor's voice: Natural
+  (online) / This device") with a plain explanation, and in Settings at any
+  time. "This device" sends nothing.
+
+**Before real patients:** privacy and legal approval (the sentences can
+mention symptoms and are processed outside India — including under the
+Digital Personal Data Protection Act, 2023), and a data processing agreement
+with OpenAI.
 
 ## Telemetry rules (if switched on)
 

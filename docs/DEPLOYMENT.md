@@ -21,8 +21,22 @@ that runs Next.js 16 works; it is currently deployed on Vercel from `main`.
 | `NEXT_PUBLIC_VOICE_INPUT` | `consent` | `consent`, `on-device` (only on-device recognition) or `off` |
 | `NEXT_PUBLIC_TELEMETRY_URL` | unset → no counts sent | HTTPS endpoint that accepts a JSON array of events (see `DATA_PRIVACY.md`). Added to the CSP `connect-src` |
 
-All are public build-time values — none is a secret. **No secret is needed
-or used anywhere.** Never put a secret in a `NEXT_PUBLIC_` variable.
+The `NEXT_PUBLIC_` values are public build-time values — none is a secret.
+Never put a secret in a `NEXT_PUBLIC_` variable.
+
+### The doctor's natural voice (server-only, optional)
+
+| Variable | Default | Effect |
+| --- | --- | --- |
+| `OPENAI_API_KEY` | unset → device voice only | **Secret.** Turns on the natural voice (`/api/voice`, OpenAI text-to-speech). Set it in the host's environment settings — never in the repository, a `NEXT_PUBLIC_` variable or a chat message |
+| `DOCTOR_VOICE` | on when the key is set | `off` switches the natural voice off without removing the key |
+| `OPENAI_TTS_MODEL` | `gpt-4o-mini-tts` | `tts-1` / `tts-1-hd` also work (no tone instructions) |
+| `OPENAI_TTS_VOICE` | `marin` | Any OpenAI voice, e.g. `coral`, `sage`, `shimmer`, `nova` |
+
+On Vercel: Project → Settings → Environment Variables → add
+`OPENAI_API_KEY` (Production), then redeploy. Read at request time. Set a
+monthly spending limit on the OpenAI project. Before real patients:
+privacy/legal approval (see `DATA_PRIVACY.md`).
 
 ## Security headers
 

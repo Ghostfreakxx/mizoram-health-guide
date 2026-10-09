@@ -1,6 +1,6 @@
 # Project status — Mizoram AI Hospital (Prototype)
 
-Last updated: 8 October 2026. Update at every major development pass.
+Last updated: 9 October 2026. Update at every major development pass.
 
 **Overall: a strong prototype.** The safety architecture, consultation and
 navigation work end to end and are heavily tested. It is **not** pilot-ready
@@ -12,10 +12,11 @@ BLOCKED · NEEDS CLINICIAN REVIEW · NEEDS GOVERNMENT DATA · DEFERRED
 
 | Capability | Status | Notes |
 | --- | --- | --- |
-| Safety engine (red flags, triage, fail-safe) | WORKING BUT NEEDS REVIEW · NEEDS CLINICIAN REVIEW | Deterministic; 571 unit tests incl. regression corpus and 760 simulated consultations. 0 of 310 clinical items reviewed |
+| Safety engine (red flags, triage, fail-safe) | WORKING BUT NEEDS REVIEW · NEEDS CLINICIAN REVIEW | Deterministic; 593 unit tests incl. regression corpus and 760 simulated consultations. 0 of 310 clinical items reviewed |
 | Digital Reception | WORKING BUT NEEDS REVIEW | Free text → safety check → understood → consultation; "I can't explain it" entry |
 | Virtual Doctor (consultation engine) | WORKING BUT NEEDS REVIEW | Answer accuracy measured: 0 wrong / 0 unsafe recordings; 88.5% of answers understood first time on a never-tuned phrase set (`docs/quality/CONVERSATION_ACCURACY.md`); summary matches the patient's final answers in 1,500 messy simulated visits. Memory with provenance, corrections, contradiction checks, multiple problems, clarification ladder, education from library, honest professional answers |
 | Virtual Doctor (3D / 2D / text presentation) | WORKING BUT NEEDS REVIEW | VD4: conversation column + unobstructed doctor on wide screens; doctor model v11 (baked ambient occlusion, strand-cut hairline); memory of facts said in passing; danger-sign questions spoken in everyday words (spoken forms on the review list). VD3: full-screen consultation scene (no site chrome), camera frames the doctor in the space the panels leave, My Visit with "Change" (safety checks rerun), dynamic quality (resolution, then tier), layout regression at 1920/1366/820/393/360/320 px, voice interruption measured (Stop/Talk ≈ 0 ms). Software-only rendering is slow (2–7 fps for 3D at 1366×768); not yet measured on a real low-cost phone |
+| Doctor's natural voice (OpenAI) | WORKING BUT NEEDS REVIEW · BLOCKED (privacy approval for real patients) | On when `OPENAI_API_KEY` is set on the server; the patient can choose the device's voice. Only the doctor's sentences are sent, never the patient's words; emergencies never wait; falls back to the device voice. Tested with a stand-in (21 unit + 8 browser tests); real voice quality and latency not yet measured (no key here). `docs/quality/VOICE_REPORT.md` |
 | Help me describe it | WORKING BUT NEEDS REVIEW | Body map (front/back), side, feeling, timing, pattern, triggers |
 | Emergency Mode | WORKING BUT NEEDS REVIEW · NEEDS CLINICIAN REVIEW | Interrupts everything; guidance text needs review |
 | Virtual departments (17 info pages, 6 rooms) | WORKING BUT NEEDS REVIEW · NEEDS CLINICIAN REVIEW | |
@@ -39,7 +40,7 @@ BLOCKED · NEEDS CLINICIAN REVIEW · NEEDS GOVERNMENT DATA · DEFERRED
 
 1. Clinical review of 310 items (`docs/CLINICAL_REVIEW.md`).
 2. Verification of 10 government-data items and 60 source records.
-3. Privacy / legal approval for any pilot.
+3. Privacy / legal approval for any pilot (including the natural voice, which sends the doctor's sentences to OpenAI).
 4. Mizo translation and phrase list.
 5. A video server (only if live consultations are wanted).
 
